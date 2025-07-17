@@ -1,0 +1,37 @@
+```
+└── 📁backend
+    └── 📁Controllers
+        └── adminController.js
+        └── manufacturerController.js
+        └── notificationController.js
+        └── userController.js
+    └── 📁db
+        └── db.js
+    └── 📁middleware
+        └── asyncHandler.js
+        └── auth.js
+        └── loginAuth.js
+        └── otpRateLimiter.js
+    └── 📁Models
+        └── admin.js
+        └── manufacturer.js
+        └── notificationModel.js
+        └── otpRequest.js
+        └── Users.js
+    └── 📁public
+        └── vite.svg
+    └── 📁routes
+        └── index.js
+        └── manufacturerRoutes.js
+        └── notificationRoutes.js
+        └── userRoutes.js
+    └── 📁utils
+        └── appError.js
+        └── catchAsync.js
+    └── .env
+    └── .example.env
+    └── package.json
+    └── pnpm-lock.yaml
+    └── README.md
+    └── server.js
+```

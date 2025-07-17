@@ -1,0 +1,44 @@
+
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+/* styles.css or global.css */
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 1.5s ease-in-out;
+}
+
+body {
+  margin: 0;
+  font-family: "Roboto", sans-serif;
+  background: linear-gradient(to bottom, #f4f4f4, #e0e0e0);
+}
+
+.card:hover {
+  transition: transform 0.3s ease;
+  transform: scale(1.05);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+
+@keyframes progress {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+.animate-progress {
+  animation: progress 2s linear;
+}
