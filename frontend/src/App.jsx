@@ -33,7 +33,7 @@ import CheckoutPage from './pages/CheckoutPage';
 import Admin from './components/admin/Admin.jsx';
 import ManufactDetailsAdmin from './components/admin/ManufactDetailsAdmin.jsx';
 import Userdashboard from './components/admin/Userdashboard.jsx';
-
+import WishlistPage from './pages/wishlistPage.jsx';
 // import ChatBot from './components/ChatBot.jsx';
 
 // import { CartProvider, Navbar,Home } from '../src/components/Ecomerse.jsx';
@@ -163,6 +163,7 @@ const App = () => {
             <Route path="/staff/dashboard"  element={<StaffHiring/>}/>
             <Route path="/checkout" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
             <Route path="/order-tracking" element={<OrderTrackingPage />} />
+           <Route path="/wishlist" element={<WishlistPage />} />
           </Routes>
         </main>
 

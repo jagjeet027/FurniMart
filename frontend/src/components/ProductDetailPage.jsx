@@ -11,23 +11,51 @@ import {
   Tag,
   Award,
   ArrowLeft,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react';
 import api from '../axios/axiosInstance';
+import { useAuth } from '../contexts/AuthContext';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [activeTab, setActiveTab] = useState('details');
-  const [quantity, setQuantity] = useState(20);
+  const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState(null);
   const [selectedImage, setSelectedImage] = useState(0);
   const [similarProducts, setSimilarProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isInWishlist, setIsInWishlist] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  // Listen for wishlist updates from other components
+  useEffect(() => {
+    const handleWishlistUpdate = (event) => {
+      if (selectedProduct && event.detail) {
+        // Direct update if this is the product being modified
+        if (event.detail.productId === selectedProduct._id) {
+          setIsInWishlist(event.detail.inWishlist);
+        } else {
+          // Otherwise check status
+          checkWishlistStatus(selectedProduct._id);
+        }
+      }
+    };
+
+    window.addEventListener('wishlistUpdated', handleWishlistUpdate);
+    
+    return () => {
+      window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
+    };
+  }, [selectedProduct]);
 
   useEffect(() => {
+    // Force wishlist check on component mount and whenever product changes
     const fetchProductData = async () => {
       try {
         setLoading(true);
@@ -36,6 +64,11 @@ const ProductDetailPage = () => {
         
         setSelectedProduct(productData);
         setSelectedSize(productData.sizes ? productData.sizes[0] : null);
+        
+        // Check if product is in wishlist - immediate check when product loads
+        setTimeout(() => {
+          checkWishlistStatus(productData._id);
+        }, 100); // Small delay to ensure localStorage is up to date
         
         // Fetch similar products
         if (productData.category) {
@@ -62,10 +95,98 @@ const ProductDetailPage = () => {
     if (id) {
       fetchProductData();
     }
+
+    // Also check wishlist status whenever component re-renders
+    const checkInterval = setInterval(() => {
+      if (selectedProduct) {
+        checkWishlistStatus(selectedProduct._id);
+      }
+    }, 1000); // Check every second
+
+    return () => clearInterval(checkInterval);
   }, [id]);
+
+  // Check if product is in wishlist - global utility function to ensure consistency
+  const checkWishlistStatus = (productId) => {
+    try {
+      const storedWishlist = localStorage.getItem('wishlist');
+      if (storedWishlist) {
+        const wishlistItems = JSON.parse(storedWishlist);
+        const exists = wishlistItems.some(item => item._id === productId);
+        setIsInWishlist(exists);
+        return exists;
+      } else {
+        setIsInWishlist(false);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error checking wishlist status:', error);
+      setIsInWishlist(false);
+      return false;
+    }
+  };
+
+  const toggleWishlist = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      let wishlistItems = [];
+      const storedWishlist = localStorage.getItem('wishlist');
+      
+      if (storedWishlist) {
+        wishlistItems = JSON.parse(storedWishlist);
+      }
+
+      // Force check current status instead of relying on state
+      const currentlyInWishlist = wishlistItems.some(item => item._id === selectedProduct._id);
+
+      if (currentlyInWishlist) {
+        // Remove from wishlist
+        wishlistItems = wishlistItems.filter(item => item._id !== selectedProduct._id);
+        setToastMessage(`${selectedProduct.name} removed from your wishlist`);
+        setIsInWishlist(false);
+      } else {
+        // Add to wishlist
+        wishlistItems.push({
+          _id: selectedProduct._id,
+          name: selectedProduct.name,
+          price: selectedProduct.price,
+          rating: selectedProduct.rating,
+          reviews: selectedProduct.reviews,
+          image: selectedProduct.image,
+          images: selectedProduct.images
+        });
+        setToastMessage(`${selectedProduct.name} added to your wishlist`);
+        setIsInWishlist(true);
+      }
+
+      localStorage.setItem('wishlist', JSON.stringify(wishlistItems));
+      setShowToast(true);
+      
+      // Dispatch custom event to notify header and other components about wishlist updates
+      window.dispatchEvent(new CustomEvent('wishlistUpdated', { 
+        detail: { 
+          productId: selectedProduct._id,
+          inWishlist: !currentlyInWishlist 
+        } 
+      }));
+      
+      // Hide toast after 3 seconds
+      setTimeout(() => {
+        setShowToast(false);
+      }, 3000);
+    } catch (error) {
+      console.error('Error updating wishlist:', error);
+    }
+  };
 
   const handleSimilarProductClick = (productId) => {
     navigate(`/products/${productId}`);
+    // Refresh the page to ensure new product data is loaded
+    window.location.reload();
   };
 
   const handleBuyNow = () => {
@@ -79,17 +200,6 @@ const ProductDetailPage = () => {
     });
   };
 
-
-  const handleQuantity = (type) => {
-    if (type === 'increase') {
-      setQuantity(prev => prev + 1);
-    } else if (type === 'decrease' && quantity > 20) {
-      setQuantity(prev => prev - 1);
-    } else {
-      alert('Order minimum is 20 products');
-      setQuantity(20);
-    }
-  };
   const renderRatingStars = (rating) => {
     return [...Array(5)].map((_, index) => (
       <Star 
@@ -133,6 +243,19 @@ const ProductDetailPage = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen py-8 px-4">
+      {/* Toast Notification */}
+      {showToast && (
+        <div className="fixed top-20 right-4 z-50 bg-white shadow-lg rounded-lg px-4 py-3 flex items-center">
+          <span className="text-gray-800">{toastMessage}</span>
+          <button 
+            onClick={() => setShowToast(false)}
+            className="ml-3 text-gray-500 hover:text-gray-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div className="container mx-auto grid lg:grid-cols-2 gap-6">
         {/* Left Side: Image Gallery */}
         <div className="space-y-4">
@@ -144,8 +267,13 @@ const ProductDetailPage = () => {
             />
             
             <div className="absolute top-4 right-4 flex space-x-2">
-              <button className="bg-white/80 p-2 rounded-full shadow-md hover:bg-white">
-                <Heart className="h-4 w-4 text-red-500" />
+              <button 
+                onClick={toggleWishlist}
+                className="bg-white/80 p-2 rounded-full shadow-md hover:bg-white"
+              >
+                <Heart 
+                  className={`h-4 w-4 ${isInWishlist ? 'text-red-500 fill-current' : 'text-red-500'}`} 
+                />
               </button>
               <button className="bg-white/80 p-2 rounded-full shadow-md hover:bg-white">
                 <Repeat className="h-4 w-4 text-blue-500" />
@@ -234,7 +362,7 @@ const ProductDetailPage = () => {
             <span className="mr-4 text-sm">Quantity:</span>
             <div className="flex items-center border rounded-lg text-sm">
               <button 
-                onClick={handleQuantity}
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
                 className="px-2 py-1 border-r"
               >
                 -

@@ -39,17 +39,22 @@ const menuSections = [
   {
     icon: <ShoppingCart className="h-5 w-5 text-amber-600" />,
     text: 'Orders',
-    link: '/order-tracking'
+    link: '/orders'
   },
   {
     icon: <Clipboard className="h-5 w-5 text-blue-600" />,
     text: 'My Quotes',
-    link: '/faqsection'
+    link: '/quotes'
   },
   {
     icon: <MessageCircle className="h-5 w-5 text-violet-600" />,
     text: 'Chat History',
     link: '/chat-history'
+  },
+  {
+    icon: <Heart className="h-5 w-5 text-rose-600" />,
+    text: 'My Wishlist',
+    link: '/wishlist'
   },
   {
     icon: <HelpCircle className="h-5 w-5 text-teal-600" />,
@@ -79,11 +84,12 @@ const menuSections = [
 ];
 
 const SearchBar = () => {
+  // SearchBar code remains the same
   const [searchTerm, setSearchTerm] = useState('');
   const [isFocused, setIsFocused] = useState(false);
 
   return (
-    <div className="relative flex items-center w-full max-w-md">
+    <div className="relative flex items-center">
       <input
         type="text"
         placeholder="Search furniture..."
@@ -103,6 +109,7 @@ const SearchBar = () => {
 };
 
 const ProfileMenu = ({ user, handleLogout }) => {
+  // ProfileMenu code remains the same
   const [isOpen, setIsOpen] = useState(false);
   const filteredMenuSections = menuSections.filter(item => {
     if (user?.isManufacturer) {
@@ -193,6 +200,7 @@ const ProfileMenu = ({ user, handleLogout }) => {
 
 // Notifications dropdown component
 const NotificationsDropdown = () => {
+  // NotificationsDropdown code remains the same
   const [isOpen, setIsOpen] = useState(false);
   const [notificationCount, setNotificationCount] = useState(3);
   
@@ -224,7 +232,7 @@ const NotificationsDropdown = () => {
   
   return (
     <div className="relative">
-      <button   
+      <button
         onClick={(e) => {
           e.stopPropagation();
           setIsOpen(!isOpen);
@@ -279,78 +287,78 @@ const NotificationsDropdown = () => {
   );
 };
 
-// Mobile footer navigation component
-const MobileFooter = ({ isAuthenticated }) => {
-  const location = useLocation();
+// Wishlist button component with tooltip
+const WishlistButton = ({ wishlistCount, isAnimating }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
   
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden z-40 safe-area-inset-bottom">
+    <div className="relative" 
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <Link 
+        to="/wishlist" 
+        className="p-2 relative hover:bg-orange-100 rounded-full transition-colors duration-200 flex items-center justify-center"
+        aria-label="My Wishlist"
+      >
+        <Heart className={`h-6 w-6 text-rose-600 ${isAnimating ? 'animate-pulse scale-110' : ''}`} />
+        {wishlistCount > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+            {wishlistCount}
+          </span>
+        )}
+      </Link>
+      
+      {showTooltip && (
+        <div className="absolute -bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-50">
+          My Wishlist
+          <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Mobile footer navigation component
+const MobileFooter = ({ isAuthenticated, wishlistCount, isWishlistAnimating }) => {
+  return (
+    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden z-40">
       <div className="grid grid-cols-5 h-16">
-        <Link 
-          to="/" 
-          className={`flex flex-col items-center justify-center transition-colors duration-200 ${
-            location.pathname === '/' ? 'text-orange-600' : 'text-gray-600 hover:text-orange-600'
-          }`}
-        >
+        <Link to="/" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
           <Home className="h-6 w-6" />
           <span className="text-xs mt-1">Home</span>
         </Link>
-        <Link 
-          to="/categories" 
-          className={`flex flex-col items-center justify-center transition-colors duration-200 ${
-            location.pathname === '/categories' ? 'text-orange-600' : 'text-gray-600 hover:text-orange-600'
-          }`}
-        >
+        <Link to="/categories" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
           <Grid className="h-6 w-6" />
           <span className="text-xs mt-1">Categories</span>
         </Link>
         {isAuthenticated ? (
           <>
-            <Link 
-              to="/order-tracking" 
-              className={`flex flex-col items-center justify-center transition-colors duration-200 ${
-                location.pathname === '/order-tracking' ? 'text-orange-600' : 'text-gray-600 hover:text-orange-600'
-              }`}
-            >
-              <ShoppingCart className="h-6 w-6" />
-              <span className="text-xs mt-1">Orders</span>
+            <Link to="/wishlist" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600 relative">
+              <Heart className={`h-6 w-6 text-rose-600 ${isWishlistAnimating ? 'animate-pulse scale-110' : ''}`} />
+              {wishlistCount > 0 && (
+                <span className="absolute top-0 right-1/4 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                  {wishlistCount}
+                </span>
+              )}
+              <span className="text-xs mt-1">Wishlist</span>
             </Link>
-            <Link 
-              to="/chat" 
-              className={`flex flex-col items-center justify-center transition-colors duration-200 ${
-                location.pathname === '/chat' ? 'text-orange-600' : 'text-gray-600 hover:text-orange-600'
-              }`}
-            >
+            <Link to="/chat-history" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
               <MessageCircle className="h-6 w-6" />
               <span className="text-xs mt-1">Chat</span>
             </Link>
-            <Link 
-              to="/profile" 
-              className={`flex flex-col items-center justify-center transition-colors duration-200 ${
-                location.pathname === '/profile' ? 'text-orange-600' : 'text-gray-600 hover:text-orange-600'
-              }`}
-            >
+            <Link to="/profile" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
               <User className="h-6 w-6" />
               <span className="text-xs mt-1">Profile</span>
             </Link>
           </>
         ) : (
           <>
-            <Link 
-              to="/login" 
-              className={`flex flex-col items-center justify-center transition-colors duration-200 ${
-                location.pathname === '/login' ? 'text-orange-600' : 'text-gray-600 hover:text-orange-600'
-              }`}
-            >
+            <Link to="/login" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
               <ShoppingCart className="h-6 w-6" />
               <span className="text-xs mt-1">Login</span>
             </Link>
-            <Link 
-              to="/signup" 
-              className={`flex flex-col items-center justify-center transition-colors duration-200 ${
-                location.pathname === '/signup' ? 'text-orange-600' : 'text-gray-600 hover:text-orange-600'
-              }`}
-            >
+            <Link to="/signup" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
               <User className="h-6 w-6" />
               <span className="text-xs mt-1">Sign Up</span>
             </Link>
@@ -365,17 +373,153 @@ const MobileFooter = ({ isAuthenticated }) => {
   );
 };
 
+// Create a context for wishlist management
+const WishlistContext = React.createContext();
+
+// Export the provider for use in your app
+export const WishlistProvider = ({ children }) => {
+  const [wishlistItems, setWishlistItems] = useState([]);
+  const [wishlistAnimation, setWishlistAnimation] = useState(false);
+
+  useEffect(() => {
+    // Load wishlist from localStorage on mount
+    try {
+      const storedWishlist = localStorage.getItem('wishlist');
+      if (storedWishlist) {
+        setWishlistItems(JSON.parse(storedWishlist));
+      }
+    } catch (error) {
+      console.error('Error loading wishlist:', error);
+    }
+  }, []);
+
+  const addToWishlist = (product) => {
+    setWishlistItems(prev => {
+      const updated = [...prev, product];
+      localStorage.setItem('wishlist', JSON.stringify(updated));
+      return updated;
+    });
+    
+    // Trigger animation
+    setWishlistAnimation(true);
+    setTimeout(() => setWishlistAnimation(false), 1000);
+  };
+
+  const removeFromWishlist = (productId) => {
+    setWishlistItems(prev => {
+      const updated = prev.filter(item => item.id !== productId);
+      localStorage.setItem('wishlist', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const toggleWishlist = (product) => {
+    const isInWishlist = wishlistItems.some(item => item.id === product.id);
+    
+    if (isInWishlist) {
+      removeFromWishlist(product.id);
+    } else {
+      addToWishlist(product);
+    }
+  };
+
+  return (
+    <WishlistContext.Provider 
+      value={{ 
+        wishlistItems, 
+        wishlistCount: wishlistItems.length,
+        wishlistAnimation,
+        addToWishlist, 
+        removeFromWishlist,
+        toggleWishlist,
+        isInWishlist: (productId) => wishlistItems.some(item => item.id === productId)
+      }}
+    >
+      {children}
+    </WishlistContext.Provider>
+  );
+};
+
+// Custom hook to use the wishlist context
+export const useWishlist = () => {
+  const context = React.useContext(WishlistContext);
+  if (context === undefined) {
+    throw new Error('useWishlist must be used within a WishlistProvider');
+  }
+  return context;
+};
+
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartItemCount, setCartItemCount] = useState(2); // Example cart count
+  const [wishlistCount, setWishlistCount] = useState(0);
+  const [wishlistAnimation, setWishlistAnimation] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  // Enhanced useEffect to load wishlist items and listen for changes
+  useEffect(() => {
+    const getWishlistCount = () => {
+      try {
+        const storedWishlist = localStorage.getItem('wishlist');
+        if (storedWishlist) {
+          const wishlistItems = JSON.parse(storedWishlist);
+          setWishlistCount(wishlistItems.length);
+        } else {
+          setWishlistCount(0);
+        }
+      } catch (error) {
+        console.error('Error loading wishlist:', error);
+        setWishlistCount(0);
+      }
+    };
+
+    getWishlistCount();
+
+    // FIX: Use both storage events and a global custom event for wishlist updates
+    window.addEventListener('storage', getWishlistCount);
+    
+    // Create a more robust custom event listener for wishlist updates
+    const handleWishlistUpdate = (e) => {
+      getWishlistCount();
+      // If item was added, trigger animation
+      if (e.detail?.action === 'add') {
+        setWishlistAnimation(true);
+        setTimeout(() => setWishlistAnimation(false), 1000);
+      }
+    };
+    
+    // Listen for our custom event
+    window.addEventListener('wishlistUpdated', handleWishlistUpdate);
+
+    // Create a MutationObserver to watch for changes in localStorage
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(key, value) {
+      // Call original implementation
+      originalSetItem.apply(this, arguments);
+      
+      // If wishlist is being updated, dispatch our custom event
+      if (key === 'wishlist') {
+        const event = new CustomEvent('wishlistUpdated', { 
+          detail: { action: 'update', value: JSON.parse(value) } 
+        });
+        window.dispatchEvent(event);
+      }
+    };
+
+    return () => {
+      window.removeEventListener('storage', getWishlistCount);
+      window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
+      // Restore original localStorage function
+      localStorage.setItem = originalSetItem;
+    };
+  }, []);
 
   // Early return for manufacturer routes
   if (location.pathname.startsWith('/manufacturer') && user?.isManufacturer) {
@@ -386,7 +530,6 @@ const Header = () => {
     <>
       <header className="bg-gradient-to-r from-white to-orange-50 shadow-md sticky top-0 z-40 w-full">
         <div className="w-full px-4 py-3">
-          {/* Mobile Header */}
           <div className="md:hidden flex items-center justify-between">
             <Link
               to="/"
@@ -396,14 +539,27 @@ const Header = () => {
             </Link>
             <div className="flex items-center space-x-3">
               {isAuthenticated && (
-                <Link to="/cart" className="relative p-2">
-                  <ShoppingCart className="h-6 w-6 text-orange-600" />
-                  {cartItemCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                      {cartItemCount}
-                    </span>
-                  )}
-                </Link>
+                <>
+                  {/* Updated wishlist link for mobile with animation */}
+                  <Link to="/wishlist" className="relative p-2">
+                    <Heart 
+                      className={`h-6 w-6 text-rose-600 ${wishlistAnimation ? 'animate-pulse scale-110' : ''}`} 
+                    />
+                    {wishlistCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {wishlistCount}
+                      </span>
+                    )}
+                  </Link>
+                  <Link to="/cart" className="relative p-2">
+                    <ShoppingCart className="h-6 w-6 text-orange-600" />
+                    {cartItemCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {cartItemCount}
+                      </span>
+                    )}
+                  </Link>
+                </>
               )}
               <button 
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -414,18 +570,14 @@ const Header = () => {
             </div>
           </div>
 
-          {/* Mobile Menu */}
           {mobileMenuOpen && (
-            <div className="md:hidden absolute left-0 right-0 top-full bg-white shadow-lg z-50 max-h-96 overflow-y-auto">
+            <div className="md:hidden absolute left-0 right-0 top-full bg-white shadow-lg z-50">
               <div className="p-4 space-y-4">
-                <div className="w-full">
-                  <SearchBar />
-                </div>
+                <SearchBar />
                 {isAuthenticated && !user?.isManufacturer && (
                   <Link
                     to="/manufacturer/register"
                     className="block w-full text-center px-5 py-2 text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl shadow-md hover:shadow-lg transition-all duration-300"
-                    onClick={() => setMobileMenuOpen(false)}
                   >
                     Become a Manufacturer
                   </Link>
@@ -434,53 +586,45 @@ const Header = () => {
                   <Link
                     to="/manufacturer/dashboard"
                     className="block w-full text-center px-5 py-2 text-white bg-emerald-600 rounded-xl shadow-md hover:bg-emerald-700 transition-colors duration-200"
-                    onClick={() => setMobileMenuOpen(false)}
                   >
                     Dashboard
                   </Link>
                 )}
                 {!isAuthenticated ? (
-                  <div className="space-y-2">
+                  <>
                     <Link
                       to="/login"
                       className="block w-full text-center px-5 py-2 text-white bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl shadow-md hover:shadow-lg transition-all duration-300"
-                      onClick={() => setMobileMenuOpen(false)}
                     >
                       Login
                     </Link>
                     <Link
                       to="/signup"
                       className="block w-full text-center px-5 py-2 text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl shadow-md hover:shadow-lg transition-all duration-300"
-                      onClick={() => setMobileMenuOpen(false)}
                     >
                       SignUp
                     </Link>
-                  </div>
+                  </>
                 ) : null}
               </div>
             </div>
           )}
 
-          {/* Desktop Header */}
-          <div className="hidden md:grid md:grid-cols-3 md:items-center md:gap-4">
+          <div className="hidden md:grid md:grid-cols-3 md:items-center">
             <Link
               to="/"
               className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 text-transparent bg-clip-text hover:scale-105 transition-transform duration-300"
             >
               FurniMart
             </Link>
-            <div className="justify-self-center">
-              <SearchBar />
-            </div>
+            <SearchBar />
             <div className="justify-self-end flex gap-3 items-center">
               {isAuthenticated && (
                 <>
-                  <Link 
-                    to="/wishlist" 
-                    className="p-2 hover:bg-orange-100 rounded-full transition-colors duration-200"
-                  >
-                    <Heart className="h-6 w-6 text-rose-600" />
-                  </Link>
+                  {/* Updated wishlist button with animation and tooltip */}
+                  <div className={`${wishlistAnimation ? 'animate-bounce' : ''}`}>
+                    <WishlistButton wishlistCount={wishlistCount} isAnimating={wishlistAnimation} />
+                  </div>
                   <Link 
                     to="/cart" 
                     className="p-2 relative hover:bg-orange-100 rounded-full transition-colors duration-200"
@@ -512,7 +656,7 @@ const Header = () => {
                 </Link>
               )}
               {!isAuthenticated ? (
-                <div className="flex gap-2">
+                <>
                   <Link
                     to="/login"
                     className="px-4 py-2 text-white bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300"
@@ -525,7 +669,7 @@ const Header = () => {
                   >
                     SignUp
                   </Link>
-                </div>
+                </>
               ) : (
                 <ProfileMenu user={user} handleLogout={handleLogout} />
               )}
@@ -535,7 +679,14 @@ const Header = () => {
       </header>
       
       {/* Mobile Footer Navigation */}
-      <MobileFooter isAuthenticated={isAuthenticated} />
+      <MobileFooter 
+        isAuthenticated={isAuthenticated} 
+        wishlistCount={wishlistCount} 
+        isWishlistAnimating={wishlistAnimation}
+      />
+      
+      {/* Add padding to the bottom to prevent content from being hidden behind the mobile footer */}
+      <div className="md:hidden h-16"></div>
     </>
   );
 };
