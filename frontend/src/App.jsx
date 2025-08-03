@@ -2,14 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import Header from './components/Header';
 import FurnitureMarketplace from './FurnitureMarketplace';
-import ServiceSection from './components/ServiceSection';
-import Banner from './components/Banner';
-import CardSection from './components/CardSection';
 import LoginPage from './components/LoginPage';
 import './index.css';
 import Footer from './components/Footer';
 import SignupPage from './components/SignUpPage';
-import FurnitureShowcase from './components/FurnitureShowcase';
+// import FurnitureShowcase from './components/FurnitureShowcase';
 // import Map from './components/Map';
 import CategoryList from "./components/CategoryList";
 import CategoryDetail from "./components/CategoryDetails";
@@ -120,10 +117,7 @@ const App = () => {
   return (
     <AuthProvider>
       <div className="min-h-screen bg-gray-50 flex flex-col">
-        {/* Header */}
         {!hideHeaderFooter && <Header />}
-        
-        {/* Main Content */}
         <main className={`flex-1 ${shouldShowMobileFooter ? 'pb-16 md:pb-0' : ''}`}>
           <Routes>
             <Route path="/chatsupport" element={<Navigate to="/chat" />} />
@@ -132,11 +126,6 @@ const App = () => {
               <div className="space-y-0">
                 <FurnitureMarketplace />
                 <Recruitment/>
-                <FurnitureShowcase />
-                <ServiceSection />
-                <Banner />
-                <CardSection />
-                <Faq/>
               </div>
             } />
         <Route path="/admin/*" element={<Admin />} />
@@ -160,7 +149,7 @@ const App = () => {
             <Route path="/manufacturer/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>}/>
             <Route path="/hompageStaff" element={<HomePage />} />
             <Route path="/premium" element={<PremiumFeatures />}/>
-            <Route path="/staff/dashboard"  element={<StaffHiring/>}/>
+            <Route path="/recruitment/staff/dashboard"  element={<StaffHiring/>}/>
             <Route path="/checkout" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
             <Route path="/order-tracking" element={<OrderTrackingPage />} />
           </Routes>
