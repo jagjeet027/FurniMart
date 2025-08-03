@@ -1,4 +1,4 @@
-import Order from '../models/Order.js'
+import Order from '../models/order.js'
 import jwt from 'jsonwebtoken';
 import { User } from '../models/Users.js';
 
