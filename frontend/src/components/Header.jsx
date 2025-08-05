@@ -4,12 +4,10 @@ import {
   User,
   Menu,
   X,
-  Search,
   Heart,
   ShoppingCart,
   Settings,
   MessageCircle,
-  Layout,
   Home,
   Clipboard,
   Shield,
@@ -18,7 +16,9 @@ import {
   FileText,
   Bell,
   Factory,
-  Grid
+  Grid,
+  ChevronRight,
+  Edit
 } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -83,33 +83,7 @@ const menuSections = [
   }
 ];
 
-const SearchBar = () => {
-  // SearchBar code remains the same
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
-
-  return (
-    <div className="relative flex items-center">
-      <input
-        type="text"
-        placeholder="Search furniture..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        className={`w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all duration-300 ${
-          isFocused ? 'shadow-lg' : ''
-        }`}
-      />
-      <Search className={`absolute right-4 ${
-        isFocused ? 'text-orange-500' : 'text-gray-500'
-      } transition-colors duration-300`} />
-    </div>
-  );
-};
-
 const ProfileMenu = ({ user, handleLogout }) => {
-  // ProfileMenu code remains the same
   const [isOpen, setIsOpen] = useState(false);
   const filteredMenuSections = menuSections.filter(item => {
     if (user?.isManufacturer) {
@@ -146,7 +120,7 @@ const ProfileMenu = ({ user, handleLogout }) => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-64 bg-white rounded-xl shadow-2xl z-50">
+        <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl z-50 border">
           <div className="px-4 py-3 bg-gradient-to-r from-orange-50 to-orange-100 rounded-t-xl">
             <div className="flex items-center">
               <div className="p-2 bg-orange-200 rounded-full">
@@ -164,20 +138,18 @@ const ProfileMenu = ({ user, handleLogout }) => {
             </div>
           </div>
 
-          <div className="py-2 max-h-80 overflow-y-auto">
-            <div className="grid grid-cols-1 gap-1">
-              {filteredMenuSections.map((item, index) => (
-                <Link
-                  key={index}
-                  to={item.link}
-                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 transition-colors duration-200"
-                  onClick={() => setIsOpen(false)}
-                >
-                  {item.icon}
-                  <span className="ml-3">{item.text}</span>
-                </Link>
-              ))}
-            </div>
+          <div className="py-1 max-h-80 overflow-y-auto">
+            {filteredMenuSections.map((item, index) => (
+              <Link
+                key={index}
+                to={item.link}
+                className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 transition-colors duration-200"
+                onClick={() => setIsOpen(false)}
+              >
+                {item.icon}
+                <span className="ml-3">{item.text}</span>
+              </Link>
+            ))}
           </div>
 
           <div className="border-t py-1">
@@ -186,7 +158,7 @@ const ProfileMenu = ({ user, handleLogout }) => {
                 handleLogout();
                 setIsOpen(false);
               }}
-              className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200"
+              className="w-full flex items-center px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200"
             >
               <LogOut className="h-5 w-5 text-red-500" />
               <span className="ml-3">Logout</span>
@@ -200,7 +172,6 @@ const ProfileMenu = ({ user, handleLogout }) => {
 
 // Notifications dropdown component
 const NotificationsDropdown = () => {
-  // NotificationsDropdown code remains the same
   const [isOpen, setIsOpen] = useState(false);
   const [notificationCount, setNotificationCount] = useState(3);
   
@@ -248,7 +219,7 @@ const NotificationsDropdown = () => {
       </button>
       
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl z-50">
+        <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl z-50 border">
           <div className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-orange-50 to-orange-100 rounded-t-xl">
             <h3 className="font-medium">Notifications</h3>
             <button 
@@ -319,8 +290,127 @@ const WishlistButton = ({ wishlistCount, isAnimating }) => {
   );
 };
 
+// Mobile Profile Page Component
+const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
+  const navigate = useNavigate();
+  const filteredMenuSections = menuSections.filter(item => {
+    if (user?.isManufacturer) {
+      return !item.hideForManufacturer;
+    }
+    return !item.showOnlyForManufacturer;
+  });
+
+  const handleNavigation = (link) => {
+    navigate(link);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-white z-50 md:hidden">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white p-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold">Profile</h1>
+          <button onClick={onClose} className="p-2 hover:bg-orange-700 rounded-full">
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+        
+        {/* User Info */}
+        <div className="mt-4 flex items-center">
+          <div className="p-3 bg-white bg-opacity-20 rounded-full">
+            <User className="h-8 w-8" />
+          </div>
+          <div className="ml-4">
+            <h2 className="text-lg font-semibold">{user?.name || 'Guest'}</h2>
+            <p className="text-orange-100 text-sm">{user?.email || 'No email'}</p>
+            {user?.isManufacturer && (
+              <span className="inline-block px-3 py-1 mt-2 text-xs font-medium text-emerald-700 bg-white rounded-full">
+                Manufacturer
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {/* Quick Actions */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">Quick Actions</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <button 
+              onClick={() => handleNavigation('/profile')}
+              className="flex items-center justify-center p-4 bg-orange-50 rounded-lg border border-orange-200"
+            >
+              <Edit className="h-5 w-5 text-orange-600 mr-2" />
+              <span className="text-sm font-medium text-gray-700">Edit Profile</span>
+            </button>
+            
+            {user?.isManufacturer && (
+              <button 
+                onClick={() => handleNavigation('/manufacturer/dashboard')}
+                className="flex items-center justify-center p-4 bg-emerald-50 rounded-lg border border-emerald-200"
+              >
+                <Factory className="h-5 w-5 text-emerald-600 mr-2" />
+                <span className="text-sm font-medium text-gray-700">Dashboard</span>
+              </button>
+            )}
+            
+            {!user?.isManufacturer && (
+              <button 
+                onClick={() => handleNavigation('/manufacturer/register')}
+                className="flex items-center justify-center p-4 bg-purple-50 rounded-lg border border-purple-200"
+              >
+                <Factory className="h-5 w-5 text-purple-600 mr-2" />
+                <span className="text-sm font-medium text-gray-700">Become Seller</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Menu Items */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">Menu</h3>
+          <div className="space-y-1">
+            {filteredMenuSections.map((item, index) => (
+              <button
+                key={index}
+                onClick={() => handleNavigation(item.link)}
+                className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+              >
+                <div className="flex items-center">
+                  {item.icon}
+                  <span className="ml-3 text-gray-700 font-medium">{item.text}</span>
+                </div>
+                <ChevronRight className="h-5 w-5 text-gray-400" />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Logout Button */}
+        <div className="pt-4 border-t">
+          <button
+            onClick={() => {
+              handleLogout();
+              onClose();
+            }}
+            className="w-full flex items-center justify-center p-4 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors duration-200"
+          >
+            <LogOut className="h-5 w-5 mr-2" />
+            <span className="font-medium">Logout</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Mobile footer navigation component
-const MobileFooter = ({ isAuthenticated, wishlistCount, isWishlistAnimating }) => {
+const MobileFooter = ({ isAuthenticated, wishlistCount, isWishlistAnimating, onProfileClick }) => {
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden z-40">
       <div className="grid grid-cols-5 h-16">
@@ -347,10 +437,10 @@ const MobileFooter = ({ isAuthenticated, wishlistCount, isWishlistAnimating }) =
               <MessageCircle className="h-6 w-6" />
               <span className="text-xs mt-1">Chat</span>
             </Link>
-            <Link to="/profile" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
+            <button onClick={onProfileClick} className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
               <User className="h-6 w-6" />
               <span className="text-xs mt-1">Profile</span>
-            </Link>
+            </button>
           </>
         ) : (
           <>
@@ -454,6 +544,7 @@ const Header = () => {
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileProfileOpen, setMobileProfileOpen] = useState(false);
   const [cartItemCount, setCartItemCount] = useState(2); // Example cart count
   const [wishlistCount, setWishlistCount] = useState(0);
   const [wishlistAnimation, setWishlistAnimation] = useState(false);
@@ -528,8 +619,9 @@ const Header = () => {
 
   return (
     <>
-      <header className="bg-gradient-to-r from-white to-orange-50 shadow-md sticky top-0 z-40 w-full">
+      <header className="bg-gradient-to-r from-white to-orange-50 shadow-sm sticky top-0 z-40 w-full border-b border-orange-100">
         <div className="w-full px-4 py-3">
+          {/* Mobile Header */}
           <div className="md:hidden flex items-center justify-between">
             <Link
               to="/"
@@ -537,11 +629,11 @@ const Header = () => {
             >
               FurniMart
             </Link>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
               {isAuthenticated && (
                 <>
-                  {/* Updated wishlist link for mobile with animation */}
-                  <Link to="/wishlist" className="relative p-2">
+                  {/* Wishlist link for mobile with animation */}
+                  <Link to="/wishlist" className="relative p-2 hover:bg-orange-100 rounded-full">
                     <Heart 
                       className={`h-6 w-6 text-rose-600 ${wishlistAnimation ? 'animate-pulse scale-110' : ''}`} 
                     />
@@ -551,7 +643,7 @@ const Header = () => {
                       </span>
                     )}
                   </Link>
-                  <Link to="/cart" className="relative p-2">
+                  <Link to="/cart" className="relative p-2 hover:bg-orange-100 rounded-full">
                     <ShoppingCart className="h-6 w-6 text-orange-600" />
                     {cartItemCount > 0 && (
                       <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
@@ -570,77 +662,20 @@ const Header = () => {
             </div>
           </div>
 
+          {/* Mobile Menu Dropdown */}
           {mobileMenuOpen && (
-            <div className="md:hidden absolute left-0 right-0 top-full bg-white shadow-lg z-50">
-              <div className="p-4 space-y-4">
-                <SearchBar />
+            <div className="md:hidden absolute left-0 right-0 top-full bg-white shadow-lg z-50 border-t">
+              <div className="p-4 space-y-3">
                 {isAuthenticated && !user?.isManufacturer && (
                   <Link
                     to="/manufacturer/register"
-                    className="block w-full text-center px-5 py-2 text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl shadow-md hover:shadow-lg transition-all duration-300"
+                    className="block w-full text-center px-4 py-3 text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+                    onClick={() => setMobileMenuOpen(false)}
                   >
                     Become a Manufacturer
                   </Link>
                 )}
-                {isAuthenticated && user?.isManufacturer && (
-                  <Link
-                    to="/manufacturer/dashboard"
-                    className="block w-full text-center px-5 py-2 text-white bg-emerald-600 rounded-xl shadow-md hover:bg-emerald-700 transition-colors duration-200"
-                  >
-                    Dashboard
-                  </Link>
-                )}
-                {!isAuthenticated ? (
-                  <>
-                    <Link
-                      to="/login"
-                      className="block w-full text-center px-5 py-2 text-white bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl shadow-md hover:shadow-lg transition-all duration-300"
-                    >
-                      Login
-                    </Link>
-                    <Link
-                      to="/signup"
-                      className="block w-full text-center px-5 py-2 text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl shadow-md hover:shadow-lg transition-all duration-300"
-                    >
-                      SignUp
-                    </Link>
-                  </>
-                ) : null}
-              </div>
-            </div>
-          )}
-
-          <div className="hidden md:grid md:grid-cols-3 md:items-center">
-            <Link
-              to="/"
-              className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 text-transparent bg-clip-text hover:scale-105 transition-transform duration-300"
-            >
-              FurniMart
-            </Link>
-            <SearchBar />
-            <div className="justify-self-end flex gap-3 items-center">
-              {isAuthenticated && (
-                <>
-                  {/* Updated wishlist button with animation and tooltip */}
-                  <div className={`${wishlistAnimation ? 'animate-bounce' : ''}`}>
-                    <WishlistButton wishlistCount={wishlistCount} isAnimating={wishlistAnimation} />
-                  </div>
-                  <Link 
-                    to="/cart" 
-                    className="p-2 relative hover:bg-orange-100 rounded-full transition-colors duration-200"
-                  >
-                    <ShoppingCart className="h-6 w-6 text-orange-600" />
-                    {cartItemCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {cartItemCount}
-                      </span>
-                    )}
-                  </Link>
-                  <NotificationsDropdown />
-                </>
-              )}
-              
-              {isAuthenticated && user?.isManufacturer ? (
+                {isAuthenticated && user?.isManufacturer ? (
                 <Link
                   to="/manufacturer/dashboard"
                   className="px-4 py-2 text-white bg-emerald-600 rounded-xl shadow-md hover:bg-emerald-700 hover:scale-105 transition-all duration-300"
@@ -675,18 +710,73 @@ const Header = () => {
               )}
             </div>
           </div>
+          )}
+
+          {/* Desktop Header */}
+          <div className="hidden md:flex items-center justify-between">
+            <Link
+              to="/"
+              className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 text-transparent bg-clip-text"
+            > 
+
+              FurniMart
+            </Link>
+            <div className="flex items-center space-x-6"> 
+              {isAuthenticated && (
+                <>
+                  <WishlistButton 
+                    wishlistCount={wishlistCount}
+                    isAnimating={wishlistAnimation}
+                  />
+                  <Link to="/cart" className="relative p-2 hover:bg-orange-100 rounded-full">
+                    <ShoppingCart className="h-6 w-6 text-orange-600" />
+                    {cartItemCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {cartItemCount}
+                      </span>
+                    )}
+                  </Link>
+                  <NotificationsDropdown />
+                  <ProfileMenu user={user} handleLogout={handleLogout} />
+                </>
+              )}
+              {!isAuthenticated && (
+                <>
+                  <Link
+                    to="/login"
+                    className="px-4 py-2 text-white bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"  
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    to="/signup"
+                    className="px-4 py-2 text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+                  >
+                    SignUp
+                  </Link> 
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </header>
+      
+      {/* Mobile Profile Page */}
+      <MobileProfilePage 
+        isOpen={mobileProfileOpen}
+        onClose={() => setMobileProfileOpen(false)}
+        user={user}
+        handleLogout={handleLogout}
+      />
       
       {/* Mobile Footer Navigation */}
       <MobileFooter 
         isAuthenticated={isAuthenticated} 
         wishlistCount={wishlistCount} 
         isWishlistAnimating={wishlistAnimation}
+        onProfileClick={() => setMobileProfileOpen(true)}
       />
       
-      {/* Add padding to the bottom to prevent content from being hidden behind the mobile footer */}
-      <div className="md:hidden h-16"></div>
     </>
   );
 };

@@ -6,17 +6,13 @@ import LoginPage from './components/LoginPage';
 import './index.css';
 import Footer from './components/Footer';
 import SignupPage from './components/SignUpPage';
-// import FurnitureShowcase from './components/FurnitureShowcase';
-// import Map from './components/Map';
-import CategoryList from "./components/CategoryList";
-import CategoryDetail from "./components/CategoryDetails";
 import { AuthProvider } from './contexts/AuthContext';
 import Dashboard from './components/manufacturer/Dashboard';
 import PrivateRoute from './components/PrivateRoute';
 import ProductDetailPage from './components/ProductDetailPage';
 import ManufacturerRegistration from './components/manufacturer/ManufacturerRegistration';
 import PremiumFeatures from './components/manufacturer/PremiumFeatures'
-import HomePage from './services/AuthService.jsx';
+// import HomePage from './services/AuthService.jsx';
 import Profile from './components/manufacturer/Profile';
 import Recruitment from './components/Recruitment/pages/Recruitment';
 import StaffHiring from './components/Recruitment/pages/StaffHiring'
@@ -31,9 +27,12 @@ import Admin from './components/admin/Admin.jsx';
 import ManufactDetailsAdmin from './components/admin/ManufactDetailsAdmin.jsx';
 import Userdashboard from './components/admin/Userdashboard.jsx';
 import WishlistPage from './pages/wishlistPage.jsx';
-// import ChatBot from './components/ChatBot.jsx';
+import CategoryProductsPage from './components/userDashBoard/CategoryProductsPage.jsx';
 
-// import { CartProvider, Navbar,Home } from '../src/components/Ecomerse.jsx';
+// NEW IMPORTS - Add these new components
+import CategoriesOverviewPage from './components/userDashBoard/CategoriesOverviewPage.jsx';
+import CategoryManagement from './components/userDashBoard/CategoryManagement';
+import APIDebugComponent from './services/APIDebugComponent.jsx';
 
 import { socket } from "./services/socketService";
 
@@ -80,8 +79,6 @@ const App = () => {
     '/admin',
     '/admin/manufacturer/dashboard',
     '/userdashboard',
-
-    
     '/manufacturer/register',
     '/manufacturer/dashboard',
     '/manufactdetails',
@@ -90,6 +87,7 @@ const App = () => {
     '/premium',
     '/manufacturer/faqsection',
     '/products/management',
+    '/categories/management', // Add this for category management
   ];
 
   // Improved check for paths that should hide header/footer
@@ -125,34 +123,53 @@ const App = () => {
             <Route path="/" element={
               <div className="space-y-0">
                 <FurnitureMarketplace />
-                <Recruitment/>
+                <CategoryProductsPage />
+                <Recruitment/>    
               </div>
             } />
-        <Route path="/admin/*" element={<Admin />} />
-        <Route path="/manufactdetails" element ={<ManufactDetailsAdmin/>}/>
-        <Route path="/userdashboard/*" element={<Userdashboard />} />
 
+            {/* Admin Routes */}
+            <Route path="/admin/*" element={<Admin />} />
+            <Route path="/manufactdetails" element={<ManufactDetailsAdmin/>} />
+            <Route path="/userdashboard/*" element={<Userdashboard />} />
 
-
+            {/* Authentication Routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/profile" element={<Profile/>} />
-            <Route path="/order" element={<Orders />} />
+
+            {/* Product Routes */}
             <Route path="/products" element={<ProductManagement />} />
-            <Route path="/categories" element={<CategoryList />} />
-            <Route path="/category/:id" element={<CategoryDetail />} />
-            <Route path="/products/:id/edit" element={<EditProduct />} />
-            <Route path="/faqsection" element={<Faq />} />
             <Route path="/products/:id" element={<ProductDetailPage />} />
+            <Route path="/products/:id/edit" element={<EditProduct />} />
+
+            {/* UPDATED CATEGORY ROUTES - Replace these existing routes */}
+            {/* Old route - keep for backward compatibility */}
+            <Route path="/categories" element={<Navigate to="/categories/overview" replace />} />
+            <Route path="/category/:id" element={<Navigate to="/categories/:id/products" replace />} />
+            
+            {/* NEW CATEGORY ROUTES */}
+            <Route path="/categories/overview" element={<CategoriesOverviewPage />} />
+            <Route path="/categories/:categoryId/products" element={<CategoryProductsPage />} />
+            <Route path="/categories/management" element={<PrivateRoute><CategoryManagement /></PrivateRoute>} />
+
+            {/* Alternative routes for easier navigation */}
+            <Route path="/browse/categories" element={<CategoriesOverviewPage />} />
+            <Route path="/browse/:categoryId" element={<CategoryProductsPage />} />
+
+            {/* Other Routes */}
+            <Route path="/order" element={<Orders />} />
+            <Route path="/faqsection" element={<Faq />} />
             <Route path="/manufacturer/register" element={<ManufacturerRegistration />} />
             <Route path="/furniture" element={<FurnitureMarketplace />} />
             <Route path="/manufacturer/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>}/>
-            <Route path="/hompageStaff" element={<HomePage />} />
+            {/* <Route path="/hompageStaff" element={<HomePage />} /> */}
             <Route path="/premium" element={<PremiumFeatures />}/>
-            <Route path="/recruitment/staff/dashboard"  element={<StaffHiring/>}/>
+            <Route path="/recruitment/staff/dashboard" element={<StaffHiring/>}/>
             <Route path="/checkout" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
             <Route path="/order-tracking" element={<OrderTrackingPage />} />
-           <Route path="/wishlist" element={<WishlistPage />} />
+            <Route path="/wishlist" element={<WishlistPage />} />
+            <Route path="/debug-api" element={<APIDebugComponent />} />
           </Routes>
         </main>
 

@@ -474,4 +474,4 @@ const FurnitureMarketplace = () => {
   );
 };
 
-export default FurnitureMarketplace;
+export default FurnitureMarketplace; 
