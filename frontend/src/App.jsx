@@ -33,6 +33,7 @@ import CategoryProductsPage from './components/userDashBoard/CategoryProductsPag
 import CategoriesOverviewPage from './components/userDashBoard/CategoriesOverviewPage.jsx';
 import CategoryManagement from './components/userDashBoard/CategoryManagement';
 import APIDebugComponent from './services/APIDebugComponent.jsx';
+import CareerHomePage from './careerPortal/CareerHomePage.jsx';
 
 import { socket } from "./services/socketService";
 
@@ -170,6 +171,7 @@ const App = () => {
             <Route path="/order-tracking" element={<OrderTrackingPage />} />
             <Route path="/wishlist" element={<WishlistPage />} />
             <Route path="/debug-api" element={<APIDebugComponent />} />
+            <Route path="/career/portal" element={<CareerHomePage />} />
           </Routes>
         </main>
 

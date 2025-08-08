@@ -10,7 +10,6 @@ const ProductCard = ({ product, updateWishlist, listView = false }) => {
   const [imageLoading, setImageLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
-  // Check if product is in wishlist when component mounts
   useEffect(() => {
     checkWishlistStatus();
   }, [product._id]);
