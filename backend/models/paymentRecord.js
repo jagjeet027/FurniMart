@@ -16,12 +16,25 @@ const paymentRecordSchema = new mongoose.Schema({
     required: true
   },
   amount: {
+    // This stores the actual amount paid (e.g., 50% for advance payments)
+    type: Number,
+    required: true
+  },
+  totalAmount: {
+    // This new field stores the full amount of the order
     type: Number,
     required: true
   },
   planType: {
     type: String,
+    enum: ['full_payment', '50_percent_advance'],
     required: true
+  },
+  paymentMethod: {
+    // Corrected to include all desired payment methods in the enum
+    type: String,
+    enum: ['credit_card', 'upi', 'netbanking', 'wallet', 'cod'],
+    required: true,
   },
   status: {
     type: String,

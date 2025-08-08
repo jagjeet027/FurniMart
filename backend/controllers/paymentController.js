@@ -14,17 +14,26 @@ const razorpay = new Razorpay({
 
 export const createOrder = async (req, res) => {
   try {
-    const { amount, manufacturerId, planType } = req.body;
+    // Destructure the new paymentMethod field from the request body
+    const { amount, manufacturerId, planType, paymentMethod } = req.body;
     if (amount > 500000) { // 5 lakhs in INR
       return res.status(400).json({ 
         message: 'Amount exceeds maximum limit'
       });
     }
+
     // Validate manufacturerId
     if (!mongoose.Types.ObjectId.isValid(manufacturerId)) {
       return res.status(400).json({ 
         message: 'Invalid manufacturer ID format'
       });
+    }
+    
+    // Simple validation for paymentMethod
+    if (!paymentMethod) {
+        return res.status(400).json({
+            message: 'Payment method is required'
+        });
     }
 
     // Verify manufacturer exists
@@ -35,21 +44,50 @@ export const createOrder = async (req, res) => {
       });
     }
 
+    // Calculate the actual amount to be charged
+    let paymentAmount = amount;
+    if (planType === '50_percent_advance') {
+      paymentAmount = amount * 0.5;
+    }
+    paymentAmount = parseFloat(paymentAmount.toFixed(2));
+
+    // Handle different payment methods
+    if (paymentMethod === 'cod') {
+      // For Cash on Delivery, we don't need a Razorpay order.
+      // We just create a pending payment record and return success.
+      await PaymentRecord.create({
+        manufacturerId,
+        razorpayOrderId: 'N/A', // Placeholder for COD orders
+        razorpayPaymentId: 'N/A', // Placeholder for COD orders
+        amount: 0, // No payment is made online for COD
+        planType,
+        paymentMethod,
+        status: 'pending'
+      });
+
+      return res.json({
+        orderId: 'COD_' + Date.now(),
+        message: 'Order created with Cash on Delivery'
+      });
+    }
+    
+    // For other online payment methods, proceed with Razorpay
     const options = {
-      amount: amount * 100, // Razorpay expects amount in paise
+      amount: paymentAmount * 100, // Razorpay expects amount in paise
       currency: 'INR',
       receipt: `receipt_${Date.now()}`
     };
 
     const order = await razorpay.orders.create(options);
 
-    // Create a pending payment record
+    // Create a pending payment record for the online payment
     await PaymentRecord.create({
       manufacturerId,
       razorpayOrderId: order.id,
-      razorpayPaymentId: 'pending', // Add a placeholder
-      amount,
+      razorpayPaymentId: 'pending', 
+      amount: paymentAmount,
       planType,
+      paymentMethod,
       status: 'pending'
     });
 
@@ -60,10 +98,12 @@ export const createOrder = async (req, res) => {
       keyId: process.env.RAZORPAY_KEY_ID
     });
   } catch (error) {
+    // Enhanced error logging and response for debugging
     console.error('Order creation failed:', error);
     res.status(500).json({ 
       message: 'Failed to create order',
-      error: error.message 
+      error: error.message, // Return the error message to the client for better debugging
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // Optionally show stack trace in dev
     });
   }
 };
@@ -76,7 +116,24 @@ export const verifyPayment = async (req, res) => {
       razorpay_signature 
     } = req.body;
 
-    // Verify signature
+    // Find the payment record first
+    const paymentRecord = await PaymentRecord.findOne({ razorpayOrderId: razorpay_order_id });
+
+    if (!paymentRecord) {
+      return res.status(404).json({ 
+        message: 'Payment record not found'
+      });
+    }
+
+    // Handle COD payments separately
+    if (paymentRecord.paymentMethod === 'cod') {
+        return res.status(200).json({
+            success: true,
+            message: 'Payment verified successfully (COD order)'
+        });
+    }
+
+    // Proceed with signature verification for online payments
     const body = razorpay_order_id + '|' + razorpay_payment_id;
     const expectedSignature = crypto
       .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
@@ -87,21 +144,10 @@ export const verifyPayment = async (req, res) => {
       return res.status(400).json({ message: 'Invalid signature' });
     }
 
-    // Update payment record
-    const paymentRecord = await PaymentRecord.findOneAndUpdate(
-      { razorpayOrderId: razorpay_order_id },
-      { 
-        razorpayPaymentId: razorpay_payment_id,
-        status: 'successful'
-      },
-      { new: true }
-    );
-
-    if (!paymentRecord) {
-      return res.status(404).json({ 
-        message: 'Payment record not found'
-      });
-    }
+    // Update payment record after successful verification
+    paymentRecord.razorpayPaymentId = razorpay_payment_id;
+    paymentRecord.status = 'successful';
+    await paymentRecord.save();
 
     // Update manufacturer status and ispaid field
     await Manufacturer.findByIdAndUpdate(

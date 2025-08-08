@@ -41,7 +41,8 @@ const OrderSchema = new mongoose.Schema({
   paymentMethod: {
     type: String,
     required: true,
-    enum: ['credit_card', 'debit_card', 'paypal', 'cash_on_delivery']
+    // Updated enum to match the PaymentRecord schema for consistency
+    enum: ['credit_card', 'upi', 'netbanking', 'wallet', 'cod']
   },
   paymentResult: {
     id: String,
