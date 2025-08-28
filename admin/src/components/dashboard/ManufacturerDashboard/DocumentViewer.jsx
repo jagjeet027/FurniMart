@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CheckCircle, Download, X } from 'lucide-react';
-import api from '../../axios/axiosInstance';
+import api from '../../../axios/axiosInstance';
 
 const DocumentViewer = ({ document, onClose }) => {
   const [isLoading, setIsLoading] = useState(true);

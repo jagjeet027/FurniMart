@@ -1,25 +1,22 @@
-import express from "express";
-import { 
-  addProduct, 
-  getAllProducts,
-  getProductsByCategory,
-  getProductById,
-  updateProduct,
-  deleteProduct
-} from '../controllers/productController.js';
+  import express from "express";
+  import { 
+    addProduct, 
+    getAllProducts,
+    getProductsByCategory,
+    getProductById,
+    updateProduct,
+    deleteProduct
+  } from "../Controllers/productController.js";
 
 
-const router = express.Router();
+  const router = express.Router();
 
-// Public routes
-router.get("/", getAllProducts);
-router.get("/category/:categoryId", getProductsByCategory);
+  // Public routes
+ router.get("/", getAllProducts);
+router.get("/category/:categoryId", getProductsByCategory);  // KEY ROUTE
 router.get("/:id", getProductById);
-
-// Protected routes (admin only)
 router.post("/", addProduct);
-router.post("/add",  addProduct); // Keep both routes for backward compatibility
-router.put("/:id",  updateProduct);
-router.delete("/:id",  deleteProduct);
+router.put("/:id", updateProduct);
+router.delete("/:id", deleteProduct);
 
-export default router;
+  export default router;

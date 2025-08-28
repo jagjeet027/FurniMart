@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
-import { authenticateToken } from '../middleware/authMiddleware.js';
+// import { authenticateToken } from '../middleware/authMiddleware.js';
 import { Manufacturer } from '../models/manufacturer.js';
 import {User}from '../models/Users.js'; 
 import fs from 'fs';
@@ -38,9 +38,74 @@ const upload = multer({
   }
 });
 
+// GET /api/manufacturers/all - Get all manufacturers (admin only) - MOVED TO TOP
+router.get('/all',  async (req, res) => {
+  try {
+    console.log('=== GET ALL MANUFACTURERS ===');
+    console.log('User:', req.user ? {
+      id: req.user._id || req.user.id,
+      email: req.user.email,
+      isAdmin: req.user.isAdmin
+    } : 'No user');
+    console.log('UserId from req:', req.userId);
+
+    const manufacturers = await Manufacturer.find({})
+      .populate('userId', 'email username')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    console.log(`✅ Found ${manufacturers.length} manufacturers`);
+
+    res.json({
+      success: true,
+      data: manufacturers,
+      count: manufacturers.length
+    });
+  } catch (error) {
+    console.error('❌ Get all manufacturers error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// GET /api/manufacturers/me - Get current user's manufacturer info
+router.get('/me',  async (req, res) => {
+  try {
+    console.log('=== GET MY MANUFACTURER INFO ===');
+    console.log('User ID:', req.userId);
+
+    const manufacturer = await Manufacturer.findOne({ userId: req.userId })
+      .lean();
+    
+    if (!manufacturer) {
+      console.log('❌ Manufacturer profile not found');
+      return res.status(404).json({
+        success: false,
+        message: 'Manufacturer profile not found'
+      });
+    }
+
+    console.log('✅ Found manufacturer:', manufacturer.businessName);
+
+    res.json({
+      success: true,
+      data: manufacturer
+    });
+  } catch (error) {
+    console.error('❌ Get manufacturer error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // POST /api/manufacturers/register
 router.post('/register', 
-  authenticateToken, // Ensure user is authenticated
   upload.fields([
     { name: 'businessLicense', maxCount: 1 },
     { name: 'taxCertificate', maxCount: 1 },
@@ -48,9 +113,14 @@ router.post('/register',
   ]),
   async (req, res) => {
     try {
-      console.log('User from auth:', req.user); // Debug log
-      console.log('Request body:', req.body); // Debug log
-      console.log('Uploaded files:', req.files); // Debug log
+      console.log('=== MANUFACTURER REGISTRATION ===');
+      console.log('User from auth:', req.user ? {
+        id: req.user._id || req.user.id,
+        email: req.user.email
+      } : 'No user');
+      console.log('User ID:', req.userId);
+      console.log('Request body keys:', Object.keys(req.body));
+      console.log('Uploaded files:', req.files ? Object.keys(req.files) : 'No files');
 
       const {
         businessName,
@@ -69,23 +139,28 @@ router.post('/register',
       // Validate required fields
       if (!businessName || !businessType || !yearEstablished || !streetAddress || 
           !city || !state || !postalCode || !country || !contactPerson || !email || !phone) {
+        console.log('❌ Missing required fields');
         return res.status(400).json({
           success: false,
-          message: 'All fields are required'
+          message: 'All fields are required',
+          receivedFields: Object.keys(req.body)
         });
       }
 
       // Check if required files are uploaded
       if (!req.files?.businessLicense || !req.files?.taxCertificate) {
+        console.log('❌ Missing required files');
         return res.status(400).json({
           success: false,
-          message: 'Business license and tax certificate are required'
+          message: 'Business license and tax certificate are required',
+          receivedFiles: req.files ? Object.keys(req.files) : []
         });
       }
 
       // Check if user is already a manufacturer
       const existingManufacturer = await Manufacturer.findOne({ userId: req.userId });
       if (existingManufacturer) {
+        console.log('❌ User already registered as manufacturer');
         return res.status(400).json({
           success: false,
           message: 'You are already registered as a manufacturer'
@@ -144,6 +219,8 @@ router.post('/register',
       // Update user's manufacturer status
       await User.findByIdAndUpdate(req.userId, { isManufacturer: true });
 
+      console.log('✅ Manufacturer registered successfully');
+
       res.status(201).json({
         success: true,
         message: 'Manufacturer registration submitted successfully',
@@ -154,7 +231,7 @@ router.post('/register',
       });
 
     } catch (error) {
-      console.error('Manufacturer registration error:', error);
+      console.error('❌ Manufacturer registration error:', error);
       
       // Handle validation errors
       if (error.name === 'ValidationError') {
@@ -175,112 +252,50 @@ router.post('/register',
   }
 );
 
-// GET /api/manufacturers/all - Get all manufacturers (admin only)
-router.get('/all', authenticateToken, async (req, res) => {
-  try {
-    const manufacturers = await Manufacturer.find({})
-      .populate('userId', 'email username')
-      .sort({ createdAt: -1 });
-
-    res.json({
-      success: true,
-      data: manufacturers,
-      count: manufacturers.length
-    });
-  } catch (error) {
-    console.error('Get all manufacturers error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
-  }
-});
-
-// GET /api/manufacturers/me - Get current user's manufacturer info
-router.get('/me', authenticateToken, async (req, res) => {
-  try {
-    const manufacturer = await Manufacturer.findOne({ userId: req.userId });
-    
-    if (!manufacturer) {
-      return res.status(404).json({
-        success: false,
-        message: 'Manufacturer profile not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: manufacturer
-    });
-  } catch (error) {
-    console.error('Get manufacturer error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
-  }
-});
 // GET /api/manufacturers/:id - Get manufacturer by ID
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id',  async (req, res) => {
   try {
     const { id } = req.params;
     
+    console.log('=== GET MANUFACTURER BY ID ===');
+    console.log('Manufacturer ID:', id);
+    console.log('Requesting user:', req.userId);
+    
     const manufacturer = await Manufacturer.findById(id)
-      .populate('userId', 'email username');
+      .populate('userId', 'email username')
+      .lean();
 
     if (!manufacturer) {
+      console.log('❌ Manufacturer not found');
       return res.status(404).json({
         success: false,
         message: 'Manufacturer not found'
       });
     }
 
+    console.log('✅ Found manufacturer:', manufacturer.businessName);
+
     res.json({
       success: true,
       data: manufacturer
     });
   } catch (error) {
-    console.error('Get manufacturer by ID error:', error);
+    console.error('❌ Get manufacturer by ID error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
 
-router.get('/documents/:filename', authenticateToken, async (req, res) => {
-  try {
-    const { filename } = req.params;
-    const filePath = path.join(process.cwd(), 'uploads', 'manufacturers', filename);
-    
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found'
-      });
-    }
-
-    // Set appropriate headers
-    res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    
-    // Send file
-    res.sendFile(filePath);
-  } catch (error) {
-    console.error('Error serving document:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error serving document'
-    });
-  }
-});
-
-// PATCH /api/manufacturers/:id/status - Update manufacturer status
 // Enhanced document download route with better error handling and security
-router.get('/documents/:filename', authenticateToken, async (req, res) => {
+router.get('/documents/:filename',  async (req, res) => {
   try {
     const { filename } = req.params;
+    console.log('=== DOWNLOAD DOCUMENT ===');
+    console.log('Filename:', filename);
+    console.log('User:', req.userId);
     
     // First, find the manufacturer record that contains this document
     const manufacturer = await Manufacturer.findOne({
@@ -289,9 +304,10 @@ router.get('/documents/:filename', authenticateToken, async (req, res) => {
         { 'documents.taxCertificate.filename': filename },
         { 'documents.qualityCertifications.filename': filename }
       ]
-    });
+    }).lean();
 
     if (!manufacturer) {
+      console.log('❌ Document not found in records');
       return res.status(404).json({
         success: false,
         message: 'Document not found in records'
@@ -301,6 +317,7 @@ router.get('/documents/:filename', authenticateToken, async (req, res) => {
     // Check if user has permission to access this document
     // Allow access if: user is the manufacturer owner, or user is admin
     if (manufacturer.userId.toString() !== req.userId && !req.user.isAdmin) {
+      console.log('❌ Access denied');
       return res.status(403).json({
         success: false,
         message: 'Access denied'
@@ -329,6 +346,7 @@ router.get('/documents/:filename', authenticateToken, async (req, res) => {
     }
 
     if (!actualFilePath) {
+      console.log('❌ Document path not found');
       return res.status(404).json({
         success: false,
         message: 'Document path not found'
@@ -341,6 +359,7 @@ router.get('/documents/:filename', authenticateToken, async (req, res) => {
     // Security check: ensure the file is within the uploads directory
     const uploadsDir = path.resolve('uploads/manufacturers/');
     if (!fullPath.startsWith(uploadsDir)) {
+      console.log('❌ Invalid file path');
       return res.status(403).json({
         success: false,
         message: 'Access denied: Invalid file path'
@@ -349,7 +368,7 @@ router.get('/documents/:filename', authenticateToken, async (req, res) => {
 
     // Check if file exists
     if (!fs.existsSync(fullPath)) {
-      console.error(`File not found at path: ${fullPath}`);
+      console.error(`❌ File not found at path: ${fullPath}`);
       return res.status(404).json({
         success: false,
         message: 'Physical file not found on server'
@@ -381,6 +400,8 @@ router.get('/documents/:filename', authenticateToken, async (req, res) => {
         break;
     }
 
+    console.log('✅ Serving file:', filename);
+
     // Set headers
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Length', stats.size);
@@ -390,7 +411,7 @@ router.get('/documents/:filename', authenticateToken, async (req, res) => {
     const fileStream = fs.createReadStream(fullPath);
     
     fileStream.on('error', (error) => {
-      console.error('File stream error:', error);
+      console.error('❌ File stream error:', error);
       if (!res.headersSent) {
         res.status(500).json({
           success: false,
@@ -402,150 +423,25 @@ router.get('/documents/:filename', authenticateToken, async (req, res) => {
     fileStream.pipe(res);
 
   } catch (error) {
-    console.error('Error serving document:', error);
+    console.error('❌ Error serving document:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error while serving document'
+      message: 'Server error while serving document',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
 
-// Alternative route: Download by document ID (more secure)
-router.get('/documents/:manufacturerId/:documentType/:documentId?', authenticateToken, async (req, res) => {
-  try {
-    const { manufacturerId, documentType, documentId } = req.params;
-    
-    const manufacturer = await Manufacturer.findById(manufacturerId);
-    
-    if (!manufacturer) {
-      return res.status(404).json({
-        success: false,
-        message: 'Manufacturer not found'
-      });
-    }
-
-    // Check permissions
-    if (manufacturer.userId.toString() !== req.userId && !req.user.isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
-    }
-
-    let documentInfo = null;
-    
-    switch (documentType) {
-      case 'business-license':
-        documentInfo = manufacturer.documents.businessLicense;
-        break;
-      case 'tax-certificate':
-        documentInfo = manufacturer.documents.taxCertificate;
-        break;
-      case 'quality-certification':
-        if (documentId) {
-          documentInfo = manufacturer.documents.qualityCertifications.find(
-            cert => cert._id.toString() === documentId
-          );
-        }
-        break;
-      default:
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid document type'
-        });
-    }
-
-    if (!documentInfo) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found'
-      });
-    }
-
-    const filePath = path.resolve(documentInfo.path);
-    
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        success: false,
-        message: 'Physical file not found'
-      });
-    }
-
-    // Set headers and send file
-    res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${documentInfo.filename}"`);
-    
-    res.sendFile(filePath);
-
-  } catch (error) {
-    console.error('Error serving document by ID:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
-  }
-});
-
-// Utility route to list all documents for a manufacturer
-router.get('/:id/documents', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const manufacturer = await Manufacturer.findById(id);
-    
-    if (!manufacturer) {
-      return res.status(404).json({
-        success: false,
-        message: 'Manufacturer not found'
-      });
-    }
-
-    // Check permissions
-    if (manufacturer.userId.toString() !== req.userId && !req.user.isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
-    }
-
-    const documents = {
-      businessLicense: manufacturer.documents.businessLicense ? {
-        filename: manufacturer.documents.businessLicense.filename,
-        uploadDate: manufacturer.documents.businessLicense.uploadDate,
-        downloadUrl: `/api/manufacturers/documents/${manufacturer.documents.businessLicense.filename}`
-      } : null,
-      taxCertificate: manufacturer.documents.taxCertificate ? {
-        filename: manufacturer.documents.taxCertificate.filename,
-        uploadDate: manufacturer.documents.taxCertificate.uploadDate,
-        downloadUrl: `/api/manufacturers/documents/${manufacturer.documents.taxCertificate.filename}`
-      } : null,
-      qualityCertifications: manufacturer.documents.qualityCertifications?.map(cert => ({
-        id: cert._id,
-        filename: cert.filename,
-        certificationType: cert.certificationType,
-        uploadDate: cert.uploadDate,
-        downloadUrl: `/api/manufacturers/documents/${cert.filename}`
-      })) || []
-    };
-
-    res.json({
-      success: true,
-      data: documents
-    });
-
-  } catch (error) {
-    console.error('Error listing documents:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
-  }
-});
-
-router.patch('/:id/status', authenticateToken, async (req, res) => {
+// PATCH /api/manufacturers/:id/status - Update manufacturer status
+router.patch('/:id/status',  async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
+
+    console.log('=== UPDATE MANUFACTURER STATUS ===');
+    console.log('Manufacturer ID:', id);
+    console.log('New Status:', status);
+    console.log('User:', req.userId);
 
     // Validate status
     if (!['pending', 'approved', 'rejected'].includes(status)) {
@@ -563,11 +459,14 @@ router.patch('/:id/status', authenticateToken, async (req, res) => {
     ).populate('userId', 'email username');
 
     if (!manufacturer) {
+      console.log('❌ Manufacturer not found');
       return res.status(404).json({
         success: false,
         message: 'Manufacturer not found'
       });
     }
+
+    console.log('✅ Status updated successfully');
 
     res.json({
       success: true,
@@ -576,10 +475,11 @@ router.patch('/:id/status', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error updating manufacturer status:', error);
+    console.error('❌ Error updating manufacturer status:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error while updating status'
+      message: 'Server error while updating status',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });

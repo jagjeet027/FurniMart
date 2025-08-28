@@ -35,7 +35,7 @@ const SignupPage = () => {
     try {
       setError('');
       setRemainingAttempts(3); // Reset attempts
-      const response = await api.post('/api/users/send-otp', { 
+      const response = await api.post('/users/send-otp', { 
         phone: `+91${phone}` 
       });
       
@@ -63,7 +63,7 @@ const SignupPage = () => {
         otp: otp
       });
   
-      const response = await api.post('/api/users/verify-otp', { 
+      const response = await api.post('/users/verify-otp', { 
         phone: `+91${phone}`, 
         otp 
       });
@@ -93,7 +93,7 @@ const SignupPage = () => {
 
     try {
       setError('');
-      await api.post('/api/users/register', {
+      await api.post('/users/register', {
         name,
         email,
         phone: `+91${phone}`,

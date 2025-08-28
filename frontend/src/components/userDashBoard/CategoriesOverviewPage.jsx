@@ -26,17 +26,14 @@ const CategoriesOverviewPage = () => {
 
       // Try different API endpoints for categories
       let categoriesData = [];
-      const categoryEndpoints = ['/categories', '/category', '/api/categories'];
+      const categoryEndpoints = ['/categories', '/category', ];
       
       for (const endpoint of categoryEndpoints) {
         try {
-          console.log(`Trying categories endpoint: ${endpoint}`);
           const response = await api.get(endpoint);
           categoriesData = response.data.categories || response.data || [];
-          console.log(`Successfully fetched ${categoriesData.length} categories from ${endpoint}`);
           break;
         } catch (endpointErr) {
-          console.log(`Endpoint ${endpoint} failed:`, endpointErr.response?.status);
           continue;
         }
       }
@@ -86,7 +83,6 @@ const CategoriesOverviewPage = () => {
               latestProducts: products.slice(0, 3)
             };
           } catch (err) {
-            console.error(`Error fetching products for category ${category.name}:`, err);
             return {
               ...category,
               productCount: 0,
@@ -99,7 +95,6 @@ const CategoriesOverviewPage = () => {
 
       setCategories(categoriesWithDetails);
     } catch (err) {
-      console.error('Error fetching categories:', err);
       setError('Failed to load categories. Please try again later.');
     } finally {
       setLoading(false);

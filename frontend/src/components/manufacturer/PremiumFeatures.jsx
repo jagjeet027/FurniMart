@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Check, X, TrendingUp, Users, Globe, ShoppingBag
+  Check, X, TrendingUp, Users, Globe, ShoppingBag,
+  Sidebar
 } from 'lucide-react';
 import api from '../../axios/axiosInstance'
 
 const PremiumFeatures = () => {
   const [error, setError] = useState(null);
   const [loadingStates, setLoadingStates] = useState({});
+  const [manufacturerId, setManufacturerId] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [paymentStatus, setPaymentStatus] = useState({
     show: false,
     status: '',
@@ -49,6 +52,45 @@ const PremiumFeatures = () => {
     }
   ];
 
+  // Fetch manufacturer ID from backend
+  useEffect(() => {
+    const fetchManufacturerData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Use the existing manufacturer route instead of auth/profile
+        const { data } = await api.get('/manufacturers/me'); // Changed from '/auth/profile'
+        
+        if (data.success && data.data) {
+          const manufacturerData = data.data;
+          setManufacturerId(manufacturerData._id);
+          
+          // Set form data from manufacturer contact info
+          if (manufacturerData.contact?.email) {
+            setFormData(prev => ({ ...prev, email: manufacturerData.contact.email }));
+          }
+          if (manufacturerData.contact?.phone) {
+            setFormData(prev => ({ ...prev, phone: manufacturerData.contact.phone }));
+          }
+        } else {
+          throw new Error('Manufacturer profile not found. Please complete your manufacturer registration first.');
+        }
+      } catch (error) {
+        console.error('Failed to fetch manufacturer data:', error);
+        if (error.response?.status === 404) {
+          setError('Manufacturer profile not found. Please complete your manufacturer registration first.');
+        } else {
+          setError(error.response?.data?.message || error.message || 'Failed to load manufacturer data');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchManufacturerData();
+  }, []);
+
   const loadRazorpay = () => {
     return new Promise((resolve) => {
       const script = document.createElement('script');
@@ -64,6 +106,11 @@ const PremiumFeatures = () => {
   };
 
   const handlePayment = async (plan) => {
+    if (!manufacturerId) {
+      setError('Manufacturer ID not available. Please refresh the page.');
+      return;
+    }
+
     try {
       setLoadingStates(prev => ({ ...prev, [plan.title]: true }));
       setError(null);
@@ -75,7 +122,7 @@ const PremiumFeatures = () => {
 
       const { data } = await api.post('/payments/create-order', {
         amount: parseInt(plan.price),
-        manufacturerId: '67c1458b7570fc8701d93444',
+        manufacturerId: manufacturerId,
         planType: plan.title
       });
 
@@ -91,7 +138,8 @@ const PremiumFeatures = () => {
             const verificationData = await api.post('/payments/verify-payment', {
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature
+              razorpay_signature: response.razorpay_signature,
+              manufacturerId: manufacturerId
             });
 
             if (verificationData.data.success) {
@@ -150,7 +198,7 @@ const PremiumFeatures = () => {
     },
     {
       title: "Annual Premium",
-      price: "30,000",
+      price: "30000", // Removed comma for proper parsing
       period: "One-time payment",
       highlight: "Best Value",
       features: [
@@ -162,8 +210,24 @@ const PremiumFeatures = () => {
     }
   ];
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto p-6 lg:p-8">
+        <div className="flex items-center justify-center min-h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading your profile...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
+    
     <div className="max-w-7xl mx-auto p-6 lg:p-8 space-y-16">
+      <Sidebar/>
       {/* Features Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {features.map((feature, index) => {
@@ -187,8 +251,17 @@ const PremiumFeatures = () => {
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-800 p-4 rounded-lg">
-          {error}
+        <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg">
+          <div className="flex items-center">
+            <X className="w-5 h-5 text-red-500 mr-2" />
+            <span>{error}</span>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-2 text-sm bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+          >
+            Retry
+          </button>
         </div>
       )}
       
@@ -203,7 +276,9 @@ const PremiumFeatures = () => {
               </div>
             )}
             <h3 className="text-2xl font-bold mb-4">{plan.title}</h3>
-            <p className="text-4xl font-bold mb-2">₹{plan.price}</p>
+            <p className="text-4xl font-bold mb-2">
+              {plan.title === "Enterprise Partnership" ? plan.price : `₹${plan.price}`}
+            </p>
             <p className="text-gray-600 mb-6">{plan.period}</p>
             <ul className="space-y-3 mb-6">
               {plan.features.map((feature, idx) => (
@@ -215,17 +290,18 @@ const PremiumFeatures = () => {
             </ul>
             <button
               onClick={() => handlePayment(plan)}
-              disabled={loadingStates[plan.title]}
-              className="w-full bg-violet-600 text-white py-3 rounded-lg hover:bg-violet-700 transition-colors disabled:opacity-50"
+              disabled={loadingStates[plan.title] || !manufacturerId}
+              className="w-full bg-violet-600 text-white py-3 rounded-lg hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loadingStates[plan.title] ? 'Processing...' : 'Get Started'}
+              {loadingStates[plan.title] ? 'Processing...' : 
+               !manufacturerId ? 'Profile Loading...' : 'Get Started'}
             </button>
           </div>
         ))}
       </div>
 
       {paymentStatus.show && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl p-6 max-w-md w-full">
             <div className="text-center">
               {paymentStatus.status === 'success' ? (
@@ -248,7 +324,7 @@ const PremiumFeatures = () => {
               )}
               <button
                 onClick={() => setPaymentStatus({ show: false, status: '', message: '', transactionId: '' })}
-                className="w-full bg-violet-600 text-white py-2 rounded-lg"
+                className="w-full bg-violet-600 text-white py-2 rounded-lg hover:bg-violet-700 transition-colors"
               >
                 Close
               </button>

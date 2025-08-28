@@ -18,7 +18,6 @@ const LoginPage = () => {
   });
 
   useEffect(() => {
-    // Check for remembered email
     const rememberedEmail = localStorage.getItem('rememberedEmail');
     if (rememberedEmail) {
       setFormData(prev => ({

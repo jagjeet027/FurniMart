@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Users, DollarSign, CheckCircle, Search, X, Filter, Download, ArrowUpDown, Printer, RefreshCcw, Eye } from 'lucide-react';
-import api from '../../axios/axiosInstance';
-import { DocumentViewer} from '../admin/DocumentViewer';
+import api from '../../../axios/axiosInstance';
+import { DocumentViewer} from '../ManufacturerDashboard/DocumentViewer';
 
 
 const sendStatusEmail = async (email, status, manufacturerId) => {
@@ -719,13 +719,7 @@ const handleStatusUpdate = async (manufacturerId, newStatus) => {
           </div>
         )}
         <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-4xl font-bold text-white">
-              Manufacturer Dashboard
-            </h1>
-            <p className="text-indigo-200 mt-2">Monitor and manage all manufacturer registrations</p>
-          </div>
-          
+                    
           <div className="flex items-center gap-4">
 
             <div className="relative">

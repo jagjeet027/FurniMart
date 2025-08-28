@@ -7,11 +7,16 @@ import xss from 'xss-clean';
 import compression from 'compression';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
-import { createServer } from 'http';
+import http from 'http';
+import { Server } from 'socket.io';
+import fs from 'fs';
+
+// Database and configurations
 import connectDB from './db/db.js';
 import { setupSocket } from './config/socketConfig.js';
 import { predefinedIssues } from './data/issues.js';
 
+// Routes
 import userRoutes from './routes/userRoutes.js';
 import manufacturerRoutes from './routes/manufacturerRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
@@ -19,26 +24,130 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
+import issueRoutes from './routes/issueRoute.js';
+import chatRoutes from './routes/chatRoutes.js';
 
-// Load env vars
+// Load environment variables
 dotenv.config();
 
+// Create Express app
 const app = express();
-// After creating the server
-const server = createServer(app);
-const io = setupSocket(server);
-app.set('io', io);
 
-// Setup Socket.io
-// const io = setupSocket(server);
+// Create HTTP server
+const server = http.createServer(app);
+
+// Initialize Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || process.env.ALLOWED_ORIGINS?.split(',').map(origin => origin.trim()) || 
+           ['http://localhost:5173', 'http://localhost:5174',],
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
+
+// Store online users
+const onlineUsers = new Map();
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+  
+  // User joins with their details
+  socket.on('user-join', (userData) => {
+    const { userId, userType, userName } = userData;
+    
+    onlineUsers.set(socket.id, {
+      userId,
+      userType,
+      userName,
+      socketId: socket.id
+    });
+    console.log(`${userName} (${userType}) joined`);
+    
+    // Broadcast online users count
+    io.emit('online-users-count', onlineUsers.size);
+  });
+  
+  // Join specific chat room
+  socket.on('join-chat', (chatRoomId) => {
+    socket.join(chatRoomId);
+    console.log(`Socket ${socket.id} joined chat room: ${chatRoomId}`);
+  });
+  
+  // Leave chat room
+  socket.on('leave-chat', (chatRoomId) => {
+    socket.leave(chatRoomId);
+    console.log(`Socket ${socket.id} left chat room: ${chatRoomId}`);
+  });
+  
+  // Handle typing indicators
+  socket.on('typing-start', (data) => {
+    socket.to(data.chatRoomId).emit('user-typing', {
+      userId: data.userId,
+      userName: data.userName,
+      isTyping: true
+    });
+  });
+  
+  socket.on('typing-stop', (data) => {
+    socket.to(data.chatRoomId).emit('user-typing', {
+      userId: data.userId,
+      userName: data.userName,
+      isTyping: false
+    });
+  });
+  
+  // Handle message read receipts
+  socket.on('message-read', (data) => {
+    socket.to(data.chatRoomId).emit('message-read-receipt', {
+      messageId: data.messageId,
+      readBy: data.userId
+    });
+  });
+  
+  // Handle new message broadcast
+  socket.on('new-message', (data) => {
+    socket.to(data.chatRoomId).emit('message-received', data);
+  });
+  
+  // Handle disconnect
+  socket.on('disconnect', () => {
+    const user = onlineUsers.get(socket.id);
+    if (user) {
+      console.log(`${user.userName} (${user.userType}) disconnected`);
+      onlineUsers.delete(socket.id);
+      
+      // Broadcast updated online users count
+      io.emit('online-users-count', onlineUsers.size);
+    }
+  });
+});
+
+// Make io accessible throughout the app
+app.set('io', io);
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
 
 // Security Middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
 
 // CORS Configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
 
 app.use(
   cors({
@@ -61,22 +170,30 @@ app.use(
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, 
-  max: 100, 
-  message: 'Too many requests from this IP, please try again later.'
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: {
+    status: 'error',
+    message: 'Too many requests from this IP, please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 // Apply rate limiter to API routes
 app.use('/api/', limiter);
 
-// Body parser
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true }));
+// Body parser middleware
+app.use(express.json({ limit: '10mb' })); // Increased for chat images
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Request timeout
+// Request timeout middleware
 app.use((req, res, next) => {
   res.setTimeout(30000, () => {
-    res.status(408).send('Request Timeout');
+    res.status(408).json({
+      status: 'error',
+      message: 'Request Timeout'
+    });
   });
   next();
 });
@@ -86,10 +203,31 @@ app.use(mongoSanitize());
 app.use(xss());
 app.use(compression());
 
-// Logging
+// Logging middleware
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
 }
+
+// Create uploads directory for chat images
+const uploadDir = './uploads/chat-images';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Serve static files
+app.use('/uploads', express.static('uploads'));
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'Server is running',
+    timestamp: new Date().toISOString(),
+    onlineUsers: onlineUsers.size
+  });
+});
 
 // API Routes
 app.use('/api/users', userRoutes);
@@ -99,9 +237,19 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/issues', issueRoutes);
+app.use('/api/chat', chatRoutes);
 
-app.post('/api/chat', (req, res) => {
+// Simple chatbot endpoint for predefined issues
+app.post('/api/chatbot', (req, res) => {
   const { userInput } = req.body;
+  
+  if (!userInput) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'User input is required'
+    });
+  }
   
   // Simple matching algorithm - can be enhanced with fuzzy search
   const matchedIssue = predefinedIssues.find(item => 
@@ -109,17 +257,27 @@ app.post('/api/chat', (req, res) => {
   );
   
   if (matchedIssue) {
-    res.json({ response: matchedIssue.response });
+    res.json({ 
+      status: 'success',
+      response: matchedIssue.response 
+    });
   } else {
     res.json({ 
-      response: "I'm sorry, I couldn't find a matching solution. Please try rephrasing or contact support."
+      status: 'success',
+      response: "I'm sorry, I couldn't find a matching solution. Please try rephrasing or contact support for further assistance."
     });
   }
 });
 
 // Global Error Handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Error:', err.message);
+  
+  // Don't log stack trace in production
+  if (process.env.NODE_ENV === 'development') {
+    console.error('Stack:', err.stack);
+  }
+  
   res.status(err.status || 500).json({
     status: 'error',
     message: err.message || 'Internal server error',
@@ -127,11 +285,11 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Handle 404
-app.use((req, res) => {
+// Handle 404 - Route not found
+app.use('*', (req, res) => {
   res.status(404).json({
     status: 'error',
-    message: 'Route not found'
+    message: `Route ${req.originalUrl} not found`
   });
 });
 
@@ -141,23 +299,52 @@ connectDB();
 // Start Server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  console.log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+  console.log(`📡 Socket.IO server is ready for connections`);
 });
+
+// Graceful shutdown
+const gracefulShutdown = (signal) => {
+  console.log(`\n${signal} received. Shutting down gracefully...`);
+  
+  server.close(() => {
+    console.log('💤 HTTP server closed.');
+    
+    // Close database connection
+    process.exit(0);
+  });
+  
+  // Force close after 10 seconds
+  setTimeout(() => {
+    console.error('⚠️ Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000);
+};
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
-  console.log('UNHANDLED REJECTION! 💥 Shutting down...');
-  console.log(err.name, err.message);
-  server.close(() => {
-    process.exit(1);
-  });
+  console.error('UNHANDLED REJECTION! 💥');
+  console.error('Error:', err.name, err.message);
+  if (process.env.NODE_ENV === 'development') {
+    console.error('Stack:', err.stack);
+  }
+  gracefulShutdown('UNHANDLED REJECTION');
 });
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
-  console.log('UNCAUGHT EXCEPTION! 💥 Shutting down...');
-  console.log(err.name, err.message);
+  console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+  console.error('Error:', err.name, err.message);
+  if (process.env.NODE_ENV === 'development') {
+    console.error('Stack:', err.stack);
+  }
   process.exit(1);
 });
 
+// Handle process termination signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Export for testing
+export { app, io, server };
 export default app;

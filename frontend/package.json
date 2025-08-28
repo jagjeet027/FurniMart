@@ -9,7 +9,6 @@
         "lint": "eslint .",
         "preview": "vite preview",
         "postinstall": "npx update-browserslist-db@latest"
-        
     },
     "dependencies": {
         "@emotion/react": "^11.14.0",

@@ -12,18 +12,20 @@ import {
   Award,
   ArrowLeft,
   Loader2,
-  X
+  X,
+  MessageCircle
 } from 'lucide-react';
 import api from '../axios/axiosInstance';
 import { useAuth } from '../contexts/AuthContext';
+import ChatModal from '../orderpages/ChatModal'; // Import your ChatModal component
 
 const ProductDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth(); // Get user info from auth context
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [activeTab, setActiveTab] = useState('details');
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(20);
   const [selectedSize, setSelectedSize] = useState(null);
   const [selectedImage, setSelectedImage] = useState(0);
   const [similarProducts, setSimilarProducts] = useState([]);
@@ -32,6 +34,9 @@ const ProductDetailPage = () => {
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  
+  // Chat Modal State
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Listen for wishlist updates from other components
   useEffect(() => {
@@ -55,7 +60,6 @@ const ProductDetailPage = () => {
   }, [selectedProduct]);
 
   useEffect(() => {
-    // Force wishlist check on component mount and whenever product changes
     const fetchProductData = async () => {
       try {
         setLoading(true);
@@ -65,10 +69,10 @@ const ProductDetailPage = () => {
         setSelectedProduct(productData);
         setSelectedSize(productData.sizes ? productData.sizes[0] : null);
         
-        // Check if product is in wishlist - immediate check when product loads
+        // Check if product is in wishlist
         setTimeout(() => {
           checkWishlistStatus(productData._id);
-        }, 100); // Small delay to ensure localStorage is up to date
+        }, 100);
         
         // Fetch similar products
         if (productData.category) {
@@ -95,18 +99,9 @@ const ProductDetailPage = () => {
     if (id) {
       fetchProductData();
     }
-
-    // Also check wishlist status whenever component re-renders
-    const checkInterval = setInterval(() => {
-      if (selectedProduct) {
-        checkWishlistStatus(selectedProduct._id);
-      }
-    }, 1000); // Check every second
-
-    return () => clearInterval(checkInterval);
   }, [id]);
 
-  // Check if product is in wishlist - global utility function to ensure consistency
+  // Check if product is in wishlist
   const checkWishlistStatus = (productId) => {
     try {
       const storedWishlist = localStorage.getItem('wishlist');
@@ -140,16 +135,13 @@ const ProductDetailPage = () => {
         wishlistItems = JSON.parse(storedWishlist);
       }
 
-      // Force check current status instead of relying on state
       const currentlyInWishlist = wishlistItems.some(item => item._id === selectedProduct._id);
 
       if (currentlyInWishlist) {
-        // Remove from wishlist
         wishlistItems = wishlistItems.filter(item => item._id !== selectedProduct._id);
         setToastMessage(`${selectedProduct.name} removed from your wishlist`);
         setIsInWishlist(false);
       } else {
-        // Add to wishlist
         wishlistItems.push({
           _id: selectedProduct._id,
           name: selectedProduct.name,
@@ -166,7 +158,6 @@ const ProductDetailPage = () => {
       localStorage.setItem('wishlist', JSON.stringify(wishlistItems));
       setShowToast(true);
       
-      // Dispatch custom event to notify header and other components about wishlist updates
       window.dispatchEvent(new CustomEvent('wishlistUpdated', { 
         detail: { 
           productId: selectedProduct._id,
@@ -174,7 +165,6 @@ const ProductDetailPage = () => {
         } 
       }));
       
-      // Hide toast after 3 seconds
       setTimeout(() => {
         setShowToast(false);
       }, 3000);
@@ -185,12 +175,10 @@ const ProductDetailPage = () => {
 
   const handleSimilarProductClick = (productId) => {
     navigate(`/products/${productId}`);
-    // Refresh the page to ensure new product data is loaded
     window.location.reload();
   };
 
   const handleBuyNow = () => {
-    // Navigate to checkout page with the selected product details
     navigate('/checkout', {
       state: {
         product: selectedProduct,
@@ -198,6 +186,36 @@ const ProductDetailPage = () => {
         size: selectedSize
       }
     });
+  };
+
+  const handleChatWithManufacturer = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    
+    console.log('Opening chat for product:', selectedProduct);
+    setIsChatOpen(true);
+  };
+
+  // Get user info for chat
+  const getUserInfo = () => {
+    if (user) {
+      return {
+        id: user._id || user.id,
+        name: user.name || user.username || 'User',
+        email: user.email || 'user@example.com',
+        type: user.type || user.role || 'wholeseller'
+      };
+    }
+    
+    // Fallback for demo/testing
+    return {
+      id: '64a7b8c9d1e2f3a4b5c6d7e8', // Valid ObjectId format
+      name: 'Demo User',
+      email: 'demo@example.com',
+      type: 'wholeseller'
+    };
   };
 
   const renderRatingStars = (rating) => {
@@ -311,6 +329,10 @@ const ProductDetailPage = () => {
                 <Check className="mr-1 h-4 w-4" /> In Stock
               </span>
             </div>
+            {/* Manufacturer Info */}
+            <div className="mt-2 text-sm text-gray-600">
+              <span className="font-medium">Manufacturer:</span> {selectedProduct.manufacturer}
+            </div>
           </div>
 
           <div>
@@ -378,15 +400,21 @@ const ProductDetailPage = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <button className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center text-sm">
-              <ShoppingCart className="mr-2 h-4 w-4" /> Chat with Manufacturer
+              <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
             </button>
             <button 
               className="bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 flex items-center justify-center text-sm"
               onClick={handleBuyNow}
             >
               Buy Now
+            </button>
+            <button 
+              className="bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center text-sm"
+              onClick={handleChatWithManufacturer}
+            >
+              <MessageCircle className="mr-2 h-4 w-4" /> Chat
             </button>
           </div>
 
@@ -442,6 +470,14 @@ const ProductDetailPage = () => {
           </div>
         </div>
       )}
+
+      {/* Chat Modal */}
+      <ChatModal
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        product={selectedProduct} // Pass the actual product data
+        userInfo={getUserInfo()} // Pass real user info
+      />
     </div>
   );
 };

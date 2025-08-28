@@ -193,7 +193,6 @@ const FurnitureMarketplace = () => {
         setCategories(transformedCategories);
         setError(null);
       } catch (err) {
-        console.error('Error details:', err.response || err);
         setError(
           err.response?.data?.message || 
           'Failed to load categories. Please try again later.'
@@ -213,7 +212,7 @@ const FurnitureMarketplace = () => {
     
     try {
       setIsSearching(true);
-      setShowNoResults(false); // Reset no results state
+      setShowNoResults(false);
       
       // First check if the search query matches any category name
       const matchedCategory = categories.find(
@@ -221,8 +220,8 @@ const FurnitureMarketplace = () => {
       );
       
       if (matchedCategory) {
-        // If we found a matching category, navigate to that category
-        navigate(`/category/${matchedCategory.id}`);
+        // Navigate to category products page
+        navigate(`/categories/${matchedCategory.id}/products`);
         setSearchQuery('');
         return;
       }
@@ -240,19 +239,16 @@ const FurnitureMarketplace = () => {
         navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
       } else {
         // Handle no results - show suggested categories
-        // Get random 4 categories to suggest
         const suggestedCats = [...categories]
           .sort(() => 0.5 - Math.random())
           .slice(0, 4);
         
         setSuggestedCategories(suggestedCats);
-        setShowNoResults(true); // Show the NoResultsFound component instead of navigating
+        setShowNoResults(true);
       }
       
     } catch (err) {
-      console.error('Search error:', err);
-      setShowNoResults(true); // Also show NoResultsFound component on error
-      // Show random categories as suggestions in case of error too
+      setShowNoResults(true);
       const suggestedCats = [...categories]
         .sort(() => 0.5 - Math.random())
         .slice(0, 4);
@@ -263,7 +259,8 @@ const FurnitureMarketplace = () => {
   };
 
   const handleCategoryClick = (categoryId) => {
-    navigate(`/category/${categoryId}`);
+    // Navigate to category products page with correct URL structure
+    navigate(`/categories/${categoryId}/products`);
     if (mobileMenuOpen) {
       setMobileMenuOpen(false);
     }
@@ -474,4 +471,4 @@ const FurnitureMarketplace = () => {
   );
 };
 
-export default FurnitureMarketplace; 
+export default FurnitureMarketplace;

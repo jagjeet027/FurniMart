@@ -15,7 +15,7 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     // Always get the latest token from localStorage
-    const currentToken = localStorage.getItem("accessToken"); // Changed from "token" to "accessToken"
+    const currentToken = localStorage.getItem("accessToken"); 
     
     if (currentToken) {
       config.headers.Authorization = `Bearer ${currentToken}`;

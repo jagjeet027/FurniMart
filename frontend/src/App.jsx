@@ -1,3 +1,5 @@
+// App.js - Updated routing configuration
+
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import Header from './components/Header';
@@ -9,29 +11,25 @@ import SignupPage from './components/SignUpPage';
 import { AuthProvider } from './contexts/AuthContext';
 import Dashboard from './components/manufacturer/Dashboard';
 import PrivateRoute from './components/PrivateRoute';
+import ProductCard from './components/ProductCardDetails.jsx';
 import ProductDetailPage from './components/ProductDetailPage';
 import ManufacturerRegistration from './components/manufacturer/ManufacturerRegistration';
 import PremiumFeatures from './components/manufacturer/PremiumFeatures'
-// import HomePage from './services/AuthService.jsx';
+import IssuesPage from './components/manufacturer/IdeaPage.jsx';
+import IssueDetailPage from './components/manufacturer/IdeaDetailPage.jsx';
 import Profile from './components/manufacturer/Profile';
-import Recruitment from './components/Recruitment/pages/Recruitment';
 import StaffHiring from './components/Recruitment/pages/StaffHiring'
 import Faq from './components/Faqsection/Faq.jsx'
-import Orders from './pages/CheckoutPage.jsx'
-import OrderTrackingPage from './pages/OrderTrackingPage.jsx';
+import Orders from './orderpages/CheckoutPage.jsx'
+import OrderTrackingPage from './orderpages/OrderTrackingPage.jsx';
 import ChatScreen from './components/userDashBoard/ChatScreen.jsx';
 import ProductManagement from './components/manufacturer/ProductManagement';
 import EditProduct from './components/manufacturer/EditProduct.jsx';
-import CheckoutPage from './pages/CheckoutPage';
-import Admin from './components/admin/Admin.jsx';
-import ManufactDetailsAdmin from './components/admin/ManufactDetailsAdmin.jsx';
-import Userdashboard from './components/admin/Userdashboard.jsx';
-import WishlistPage from './pages/wishlistPage.jsx';
+import CheckoutPage from './orderpages/CheckoutPage.jsx';
+import WishlistPage from './orderpages/wishlistPage.jsx';
+import CartPage from './orderpages/CartPage.jsx';
 import CategoryProductsPage from './components/userDashBoard/CategoryProductsPage.jsx';
-
-// NEW IMPORTS - Add these new components
 import CategoriesOverviewPage from './components/userDashBoard/CategoriesOverviewPage.jsx';
-import CategoryManagement from './components/userDashBoard/CategoryManagement';
 import APIDebugComponent from './services/APIDebugComponent.jsx';
 import CareerHomePage from './careerPortal/CareerHomePage.jsx';
 
@@ -77,9 +75,8 @@ const App = () => {
 
   // Paths that should not show header/footer
   const noHeaderFooterPaths = [
-    '/admin',
-    '/admin/manufacturer/dashboard',
-    '/userdashboard',
+    '/ideas',
+    '/idea/:id',
     '/manufacturer/register',
     '/manufacturer/dashboard',
     '/manufactdetails',
@@ -88,7 +85,7 @@ const App = () => {
     '/premium',
     '/manufacturer/faqsection',
     '/products/management',
-    '/categories/management', // Add this for category management
+    '/categories/management',
   ];
 
   // Improved check for paths that should hide header/footer
@@ -103,82 +100,64 @@ const App = () => {
     }
   );
 
-  // Special check for product management vs product details
   const isProductManagementPath = location.pathname === '/products' || location.pathname.startsWith('/products/management');
   const isProductDetailsPath = location.pathname.match(/^\/products\/[^/]+$/) && !isProductManagementPath;
 
-  // Final decision on header/footer visibility
   const hideHeaderFooter = shouldHideHeaderFooter && !isProductDetailsPath;
-
-  // Check if current path should have mobile footer
   const shouldShowMobileFooter = !hideHeaderFooter && !location.pathname.startsWith('/manufacturer/dashboard');
 
   return (
-    <AuthProvider>
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        {!hideHeaderFooter && <Header />}
-        <main className={`flex-1 ${shouldShowMobileFooter ? 'pb-16 md:pb-0' : ''}`}>
-          <Routes>
-            <Route path="/chatsupport" element={<Navigate to="/chat" />} />
-            <Route path="/chat" element={<ChatScreen issues={issues} messages={messages} onIssueSelect={handleIssueClick} />} />
-            <Route path="/" element={
-              <div className="space-y-0">
-                <FurnitureMarketplace />
-                <CategoryProductsPage />
-                <Recruitment/>    
-              </div>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {!hideHeaderFooter && <Header />}
+      <main className={`flex-1 ${shouldShowMobileFooter ? 'pb-16 md:pb-0' : ''}`}>
+        <Routes>
+          <Route path="/chatsupport" element={<Navigate to="/chat" />} />
+          <Route path="/chat" element={<ChatScreen issues={issues} messages={messages} onIssueSelect={handleIssueClick} />} />
+          
+          {/* HOME PAGE ROUTE */}
+          <Route path="/" element={
+            <div className="space-y-0">
+            <FurnitureMarketplace />
+            <ProductCard />
+            </div>
             } />
+          
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/profile" element={<PrivateRoute><Profile/></PrivateRoute>} />
 
-            {/* Admin Routes */}
-            <Route path="/admin/*" element={<Admin />} />
-            <Route path="/manufactdetails" element={<ManufactDetailsAdmin/>} />
-            <Route path="/userdashboard/*" element={<Userdashboard />} />
 
-            {/* Authentication Routes */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/profile" element={<Profile/>} />
+          <Route path="/products" element={<PrivateRoute><ProductManagement /></PrivateRoute>} />
+          <Route path="/products/:id" element={<ProductDetailPage />} />
+          <Route path="/products/:id/edit" element={<PrivateRoute><EditProduct /></PrivateRoute>} />
 
-            {/* Product Routes */}
-            <Route path="/products" element={<ProductManagement />} />
-            <Route path="/products/:id" element={<ProductDetailPage />} />
-            <Route path="/products/:id/edit" element={<EditProduct />} />
+          <Route path="/categories" element={<Navigate to="/categories/overview" replace />} />
+          <Route path="/categories/overview" element={<CategoriesOverviewPage />} />
+          
+          <Route path="/categories/:categoryId/products" element={<CategoryProductsPage />} />
+          <Route path="/category/:id" element={<Navigate to="/categories/:id/products" replace />} />
+          <Route path="/order" element={<Orders />} />
+          <Route path="/faqsection" element={<Faq />} />
+          <Route path="/manufacturer/register" element={<ManufacturerRegistration />} />
+          <Route path="/manufacturer/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>}/>
+          
+          <Route path="ideas" element={<PrivateRoute><IssuesPage /></PrivateRoute>} />
+          <Route path="idea/:id" element={<PrivateRoute><IssueDetailPage /></PrivateRoute>} />
 
-            {/* UPDATED CATEGORY ROUTES - Replace these existing routes */}
-            {/* Old route - keep for backward compatibility */}
-            <Route path="/categories" element={<Navigate to="/categories/overview" replace />} />
-            <Route path="/category/:id" element={<Navigate to="/categories/:id/products" replace />} />
-            
-            {/* NEW CATEGORY ROUTES */}
-            <Route path="/categories/overview" element={<CategoriesOverviewPage />} />
-            <Route path="/categories/:categoryId/products" element={<CategoryProductsPage />} />
-            <Route path="/categories/management" element={<PrivateRoute><CategoryManagement /></PrivateRoute>} />
+          <Route path="/premium" element={<PrivateRoute><PremiumFeatures /></PrivateRoute>}/>
+          <Route path="/recruitment/staff/dashboard" element={<PrivateRoute><StaffHiring/></PrivateRoute>}/>
+          <Route path="/checkout" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
+          <Route path="/order-tracking" element={<PrivateRoute><OrderTrackingPage /></PrivateRoute>} />
+          <Route path="/wishlist" element={<PrivateRoute><WishlistPage /></PrivateRoute>} />
+          <Route path= "/cart" element={<PrivateRoute><CartPage/></PrivateRoute>} />
+          <Route path="/debug-api" element={<APIDebugComponent />} />
+          <Route path="/career/portal" element={<CareerHomePage />} />
+        </Routes>
+      </main>
 
-            {/* Alternative routes for easier navigation */}
-            <Route path="/browse/categories" element={<CategoriesOverviewPage />} />
-            <Route path="/browse/:categoryId" element={<CategoryProductsPage />} />
-
-            {/* Other Routes */}
-            <Route path="/order" element={<Orders />} />
-            <Route path="/faqsection" element={<Faq />} />
-            <Route path="/manufacturer/register" element={<ManufacturerRegistration />} />
-            <Route path="/furniture" element={<FurnitureMarketplace />} />
-            <Route path="/manufacturer/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>}/>
-            {/* <Route path="/hompageStaff" element={<HomePage />} /> */}
-            <Route path="/premium" element={<PremiumFeatures />}/>
-            <Route path="/recruitment/staff/dashboard" element={<StaffHiring/>}/>
-            <Route path="/checkout" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
-            <Route path="/order-tracking" element={<OrderTrackingPage />} />
-            <Route path="/wishlist" element={<WishlistPage />} />
-            <Route path="/debug-api" element={<APIDebugComponent />} />
-            <Route path="/career/portal" element={<CareerHomePage />} />
-          </Routes>
-        </main>
-
-        {/* Footer */}
-        {!hideHeaderFooter && <Footer />}
-      </div>
-    </AuthProvider>
+      {/* Footer */}
+      {!hideHeaderFooter && <Footer />}
+    </div>
   );
 };
 

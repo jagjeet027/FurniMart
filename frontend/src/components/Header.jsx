@@ -632,7 +632,6 @@ const Header = () => {
             <div className="flex items-center space-x-2">
               {isAuthenticated && (
                 <>
-                  {/* Wishlist link for mobile with animation */}
                   <Link to="/wishlist" className="relative p-2 hover:bg-orange-100 rounded-full">
                     <Heart 
                       className={`h-6 w-6 text-rose-600 ${wishlistAnimation ? 'animate-pulse scale-110' : ''}`} 

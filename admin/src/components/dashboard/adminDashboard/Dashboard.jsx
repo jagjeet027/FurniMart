@@ -39,7 +39,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import api from "../../axios/axiosInstance";
+import api from "../../../axios/axiosInstance";
 const Admin = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
@@ -55,24 +55,54 @@ const Admin = () => {
   setIsLoading(true);
   setError(null);
   try {
-    const response = await api.get('/manufacturers/all', {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-    });
+    const response = await api.get('/manufacturers/all');
     
-    // With axios, the response data is directly available in response.data
-    const manufacturersArray = response.data.data || [];
-    setManufacturers(manufacturersArray);
+    console.log('Response:', response.data); // Debug log
+    
+    // Handle the response properly
+    if (response.data && response.data.success) {
+      const manufacturersArray = response.data.data || [];
+      setManufacturers(manufacturersArray);
+    } else {
+      // If response doesn't have expected structure, try direct data
+      const manufacturersArray = Array.isArray(response.data) ? response.data : [];
+      setManufacturers(manufacturersArray);
+    }
     
   } catch (error) {
-    console.error("Error fetching manufacturers:", error);
-    setError("Failed to load manufacturers");
+    console.error("Error fetching manufacturers:", {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      originalError: error
+    });
+    
+    // More specific error messages
+    let errorMessage = "Failed to load manufacturers";
+    if (error.response) {
+      if (error.response.status === 401) {
+        errorMessage = "Authentication failed. Please login again.";
+        // Redirect to login or refresh token
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      } else if (error.response.status === 403) {
+        errorMessage = "Access denied. Admin privileges required.";
+      } else if (error.response.status === 500) {
+        errorMessage = "Server error. Please try again later.";
+      } else {
+        errorMessage = error.response.data?.message || "Unable to connect to server";
+      }
+    } else if (error.request) {
+      errorMessage = "Unable to connect to the server. Please check your internet connection.";
+    }
+    
+    setError(errorMessage);
     setManufacturers([]);
+  } finally {
+    setIsLoading(false);
   }
-  setIsLoading(false);
 };
+
 
   useEffect(() => {
     fetchManufacturers();
@@ -235,6 +265,14 @@ const Admin = () => {
               User Dashboard
             </button>
             <button
+              onClick={() => navigate("/recruitment")}
+              className="flex items-center justify-center px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-green-600 to-teal-600 rounded-lg 
+                transform transition-all duration-300 hover:scale-105 hover:shadow-lg w-full sm:w-auto"
+            >
+              <Target className="mr-2" size={20} />
+              Recruitment Dashboard
+            </button>
+            <button
               onClick={() => navigate("/manufactdetails")}
               className="flex items-center justify-center px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-orange-600 to-red-600 rounded-lg 
                 transform transition-all duration-300 hover:scale-105 hover:shadow-lg w-full sm:w-auto"
@@ -242,7 +280,7 @@ const Admin = () => {
               <Settings className="mr-2" size={20} />
               Manufacturer Dashboard
             </button>
-          </div>
+          </div>  
         </div>
 
         {/* Stats Grid */}

@@ -81,17 +81,55 @@ export const getAllProducts = async (req, res) => {
   }
 };
 
-// Get products by category
+// Get products by category - FIXED with better error handling
 export const getProductsByCategory = async (req, res) => {
   try {
     const { categoryId } = req.params;
     
-    const products = await Product.find({ category: categoryId });
+    console.log('Fetching products for category:', categoryId);
     
-    res.status(200).json({ success: true, products });
+    // Validate if categoryId is a valid ObjectId
+    if (!categoryId || !mongoose.Types.ObjectId.isValid(categoryId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid category ID format",
+        categoryId: categoryId
+      });
+    }
+    
+    // Check if category exists
+    const category = await Category.findById(categoryId);
+    if (!category) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Category not found",
+        categoryId: categoryId
+      });
+    }
+    
+    // Find products that belong to this category
+    const products = await Product.find({ category: categoryId }).sort({ createdAt: -1 });
+    
+    console.log(`Found ${products.length} products for category ${categoryId}`);
+    
+    res.status(200).json({ 
+      success: true, 
+      products,
+      category: {
+        _id: category._id,
+        name: category.name,
+        description: category.description
+      },
+      count: products.length
+    });
+    
   } catch (error) {
     console.error("Error fetching products by category:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch products by category" });
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to fetch products by category",
+      error: error.message 
+    });
   }
 };
 
@@ -100,7 +138,16 @@ export const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const product = await Product.findById(id);
+    // Validate if id is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid product ID format" 
+      });
+    }
+    
+    // Populate category information
+    const product = await Product.findById(id).populate('category', 'name description');
     if (!product) {
       return res.status(404).json({ success: false, message: "Product not found" });
     }
@@ -120,6 +167,16 @@ export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const productData = req.body;
+    
+    // Validate if id is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid product ID format" 
+      });
+    }
     
     // Handle category if it's being updated
     if (productData.category) {
@@ -201,6 +258,16 @@ export const deleteProduct = async (req, res) => {
   
   try {
     const { id } = req.params;
+    
+    // Validate if id is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid product ID format" 
+      });
+    }
     
     const product = await Product.findById(id);
     
