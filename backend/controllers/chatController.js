@@ -1,57 +1,26 @@
 import { ChatRoom, Message } from '../models/chat.js';
 import Product from '../models/product.js';
-import multer from 'multer';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { User } from '../models/Users.js';
+import { Manufacturer } from '../models/manufacturer.js';
 import mongoose from 'mongoose';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Multer configuration for image uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/chat-images/');
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'chat-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed!'));
-    }
-  }
-});
 
 // Helper function to validate ObjectId
 const isValidObjectId = (id) => {
   return mongoose.Types.ObjectId.isValid(id);
 };
 
-// Create or get existing chat room
+// Create or get existing chat room - FIXED VERSION
 export const createOrGetChatRoom = async (req, res) => {
   try {
-    const { productId, userId, userType, userName, userEmail } = req.body;
+    const { productId, userId, userType, userName, userEmail, productName, manufacturerId, manufacturerName } = req.body;
+
+    console.log('Creating chat room with data:', req.body);
 
     // Validate required fields
-    if (!productId || !userId || !userType || !userName || !userEmail) {
+    if (!productId || !userId || !userType || !userName) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields'
+        message: 'Missing required fields: productId, userId, userType, userName'
       });
     }
 
@@ -62,19 +31,16 @@ export const createOrGetChatRoom = async (req, res) => {
         message: 'Invalid product ID format'
       });
     }
-
-    // Convert userId to ObjectId if it's a valid format, otherwise generate a new one
-    let userObjectId;
-    if (isValidObjectId(userId)) {
-      userObjectId = userId;
-    } else {
-      // For demo purposes, generate a consistent ObjectId based on the string
-      // In production, you should have proper user authentication with real ObjectIds
-      userObjectId = new mongoose.Types.ObjectId();
-      console.log(`Generated new ObjectId ${userObjectId} for user: ${userId}`);
+    
+    // Validate ObjectId format for userId
+    if (!isValidObjectId(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format'
+      });
     }
 
-    // Get product details
+    // Get product details to find manufacturer
     const product = await Product.findById(productId);
     if (!product) {
       return res.status(404).json({
@@ -83,21 +49,51 @@ export const createOrGetChatRoom = async (req, res) => {
       });
     }
 
-    // Check if chat room already exists for this product and user
+    // FIXED: Handle manufacturer info stored as strings in Product model
+    let actualManufacturerId = manufacturerId || product.manufacturer;
+    const actualManufacturerName = manufacturerName || product.manufacturerInfo || 'Manufacturer';
+
+    // Validate manufacturer ID exists
+    if (!actualManufacturerId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Manufacturer information not found for this product'
+      });
+    }
+
+    // FIXED: Since your products store manufacturer as string, we'll create a virtual manufacturer ObjectId
+    // This approach doesn't require a separate Manufacturer collection
+    let manufacturerObjectId;
+    
+    if (isValidObjectId(actualManufacturerId)) {
+      // If it's already a valid ObjectId, use it
+      manufacturerObjectId = new mongoose.Types.ObjectId(actualManufacturerId);
+    } else {
+      // If it's a string (like "Jaggie brand"), create a consistent ObjectId from it
+      // This ensures the same manufacturer name always gets the same ObjectId
+      const crypto = await import('crypto');
+      const hash = crypto.createHash('md5').update(actualManufacturerId).digest('hex');
+      // Take first 24 chars of hash to create a valid ObjectId
+      const objectIdString = hash.substring(0, 24);
+      manufacturerObjectId = new mongoose.Types.ObjectId(objectIdString);
+    }
+    
+    // Convert string IDs to Mongoose ObjectIds for the query
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+
+    // FIXED: Check if chat room already exists between this user and manufacturer for this product
     let chatRoom = await ChatRoom.findOne({
-      product: productId,
-      'participants.userId': userObjectId
+      product: new mongoose.Types.ObjectId(productId),
+      participants: {
+        $all: [
+          { $elemMatch: { userId: userObjectId, userType: userType } },
+          { $elemMatch: { userId: manufacturerObjectId, userType: 'manufacturer' } }
+        ]
+      }
     });
 
     if (chatRoom) {
-      // Update participant info if changed
-      const participantIndex = chatRoom.participants.findIndex(p => p.userId.toString() === userObjectId.toString());
-      if (participantIndex !== -1) {
-        chatRoom.participants[participantIndex].name = userName;
-        chatRoom.participants[participantIndex].email = userEmail;
-        await chatRoom.save();
-      }
-
+      console.log('Existing chat room found:', chatRoom._id);
       return res.status(200).json({
         success: true,
         chatRoom: chatRoom
@@ -110,30 +106,27 @@ export const createOrGetChatRoom = async (req, res) => {
         userId: userObjectId,
         userType: userType,
         name: userName,
-        email: userEmail
+        email: userEmail || 'user@example.com'
+      },
+      {
+        userId: manufacturerObjectId,
+        userType: 'manufacturer',
+        name: actualManufacturerName,
+        email: 'manufacturer@example.com'
       }
     ];
 
-    // Add manufacturer as participant
-    if (userType === 'wholeseller') {
-      // Generate or use a consistent manufacturer ObjectId
-      const manufacturerObjectId = new mongoose.Types.ObjectId();
-      participants.push({
-        userId: manufacturerObjectId,
-        userType: 'manufacturer',
-        name: product.manufacturer || 'Manufacturer',
-        email: product.manufacturerEmail || 'manufacturer@example.com'
-      });
-    }
-
     chatRoom = new ChatRoom({
       participants: participants,
-      product: productId,
-      productName: product.name,
-      manufacturerName: product.manufacturer || 'Manufacturer'
+      product: new mongoose.Types.ObjectId(productId),
+      productName: productName || product.name,
+      manufacturerName: actualManufacturerName,
+      unreadCount: new Map(),
+      isActive: true
     });
 
     await chatRoom.save();
+    console.log('New chat room created:', chatRoom._id);
 
     res.status(201).json({
       success: true,
@@ -150,13 +143,91 @@ export const createOrGetChatRoom = async (req, res) => {
   }
 };
 
+// Get manufacturer's chat rooms - FIXED
+export const getManufacturerChatRooms = async (req, res) => {
+  try {
+    const { manufacturerId } = req.params;
+
+    console.log('Getting chat rooms for manufacturer:', manufacturerId);
+
+    // FIXED: Handle both ObjectId and string manufacturer identifiers
+    let manufacturerObjectId;
+    
+    if (isValidObjectId(manufacturerId)) {
+      manufacturerObjectId = new mongoose.Types.ObjectId(manufacturerId);
+    } else {
+      // Create consistent ObjectId from string manufacturer name
+      const crypto = await import('crypto');
+      const hash = crypto.createHash('md5').update(manufacturerId).digest('hex');
+      const objectIdString = hash.substring(0, 24);
+      manufacturerObjectId = new mongoose.Types.ObjectId(objectIdString);
+    }
+
+    const chatRooms = await ChatRoom.find({
+      participants: {
+        $elemMatch: {
+          userId: manufacturerObjectId,
+          userType: 'manufacturer'
+        }
+      },
+      isActive: true
+    })
+    .populate('product', 'name images price')
+    .sort({ updatedAt: -1 });
+
+    // Add last message and unread count for each chat room
+    const chatRoomsWithDetails = await Promise.all(
+      chatRooms.map(async (room) => {
+        // Get last message
+        const lastMessage = await Message.findOne({ chatRoom: room._id })
+          .sort({ createdAt: -1 })
+          .select('content sender createdAt');
+
+        // Get unread count for this manufacturer
+        const unreadCount = await Message.countDocuments({
+          chatRoom: room._id,
+          'sender.userId': { $ne: manufacturerObjectId },
+          deliveryStatus: { $ne: 'read' }
+        });
+
+        const roomObj = room.toObject();
+        if (lastMessage) {
+          roomObj.lastMessage = {
+            message: lastMessage.content,
+            sender: lastMessage.sender.name,
+            timestamp: lastMessage.createdAt
+          };
+        }
+        
+        // FIXED: Properly handle unreadCount as a regular object instead of Map
+        roomObj.unreadCount = { [manufacturerId]: unreadCount };
+        
+        return roomObj;
+      })
+    );
+
+    console.log(`Found ${chatRooms.length} chat rooms for manufacturer`);
+
+    res.status(200).json({
+      success: true,
+      chatRooms: chatRoomsWithDetails
+    });
+
+  } catch (error) {
+    console.error('Error getting manufacturer chat rooms:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
 // Get user's chat rooms
 export const getUserChatRooms = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { userType } = req.query;
 
-    // Validate userId format
     if (!isValidObjectId(userId)) {
       return res.status(400).json({
         success: false,
@@ -165,7 +236,12 @@ export const getUserChatRooms = async (req, res) => {
     }
 
     const chatRooms = await ChatRoom.find({
-      'participants.userId': userId,
+      participants: {
+        $elemMatch: {
+          userId: new mongoose.Types.ObjectId(userId),
+          userType: { $ne: 'manufacturer' }
+        }
+      },
       isActive: true
     })
     .populate('product', 'name images price')
@@ -192,7 +268,6 @@ export const getChatMessages = async (req, res) => {
     const { chatRoomId } = req.params;
     const { page = 1, limit = 50 } = req.query;
 
-    // Validate chatRoomId format
     if (!isValidObjectId(chatRoomId)) {
       return res.status(400).json({
         success: false,
@@ -207,7 +282,7 @@ export const getChatMessages = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      messages: messages.reverse() // Reverse to show oldest first
+      messages: messages.reverse() // Show oldest first
     });
 
   } catch (error) {
@@ -225,6 +300,8 @@ export const sendMessage = async (req, res) => {
   try {
     const { chatRoomId, senderId, senderType, senderName, content } = req.body;
 
+    console.log('Sending message:', req.body);
+
     if (!chatRoomId || !senderId || !senderType || !senderName || !content) {
       return res.status(400).json({
         success: false,
@@ -232,22 +309,10 @@ export const sendMessage = async (req, res) => {
       });
     }
 
-    // Validate ObjectId formats
     if (!isValidObjectId(chatRoomId)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid chat room ID format'
-      });
-    }
-
-    // Convert senderId to ObjectId if needed
-    let senderObjectId;
-    if (isValidObjectId(senderId)) {
-      senderObjectId = senderId;
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid sender ID format'
       });
     }
 
@@ -260,8 +325,10 @@ export const sendMessage = async (req, res) => {
       });
     }
 
+    // FIXED: Better participant validation
+    const senderObjectId = new mongoose.Types.ObjectId(senderId);
     const isParticipant = chatRoom.participants.some(p => 
-      p.userId.toString() === senderObjectId.toString() && p.userType === senderType
+      p.userId.equals(senderObjectId) && p.userType === senderType
     );
 
     if (!isParticipant) {
@@ -280,7 +347,9 @@ export const sendMessage = async (req, res) => {
         name: senderName
       },
       messageType: 'text',
-      content: content
+      content: content,
+      deliveryStatus: 'sent',
+      readBy: []
     });
 
     await message.save();
@@ -291,12 +360,10 @@ export const sendMessage = async (req, res) => {
       timestamp: new Date(),
       sender: senderName
     };
+    chatRoom.updatedAt = new Date();
     await chatRoom.save();
 
-    // Emit to socket.io if available
-    if (req.io) {
-      req.io.to(chatRoomId).emit('new-message', message);
-    }
+    console.log('Message saved successfully:', message._id);
 
     res.status(201).json({
       success: true,
@@ -313,114 +380,11 @@ export const sendMessage = async (req, res) => {
   }
 };
 
-// Send image message
-export const sendImageMessage = async (req, res) => {
-  try {
-    const { chatRoomId, senderId, senderType, senderName, caption } = req.body;
-
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No image file provided'
-      });
-    }
-
-    if (!chatRoomId || !senderId || !senderType || !senderName) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields'
-      });
-    }
-
-    // Validate ObjectId formats
-    if (!isValidObjectId(chatRoomId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid chat room ID format'
-      });
-    }
-
-    let senderObjectId;
-    if (isValidObjectId(senderId)) {
-      senderObjectId = senderId;
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid sender ID format'
-      });
-    }
-
-    // Verify chat room exists and user is participant
-    const chatRoom = await ChatRoom.findById(chatRoomId);
-    if (!chatRoom) {
-      return res.status(404).json({
-        success: false,
-        message: 'Chat room not found'
-      });
-    }
-
-    const isParticipant = chatRoom.participants.some(p => 
-      p.userId.toString() === senderObjectId.toString() && p.userType === senderType
-    );
-
-    if (!isParticipant) {
-      return res.status(403).json({
-        success: false,
-        message: 'You are not a participant in this chat'
-      });
-    }
-
-    const imageUrl = `/uploads/chat-images/${req.file.filename}`;
-
-    // Create message
-    const message = new Message({
-      chatRoom: chatRoomId,
-      sender: {
-        userId: senderObjectId,
-        userType: senderType,
-        name: senderName
-      },
-      messageType: 'image',
-      content: caption || 'Image',
-      imageUrl: imageUrl
-    });
-
-    await message.save();
-
-    // Update chat room's last message
-    chatRoom.lastMessage = {
-      message: caption || 'Sent an image',
-      timestamp: new Date(),
-      sender: senderName
-    };
-    await chatRoom.save();
-
-    // Emit to socket.io if available
-    if (req.io) {
-      req.io.to(chatRoomId).emit('new-message', message);
-    }
-
-    res.status(201).json({
-      success: true,
-      message: message
-    });
-
-  } catch (error) {
-    console.error('Error sending image message:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
-  }
-};
-
 // Mark messages as read
 export const markMessagesAsRead = async (req, res) => {
   try {
     const { chatRoomId, userId } = req.body;
 
-    // Validate ObjectId formats
     if (!isValidObjectId(chatRoomId) || !isValidObjectId(userId)) {
       return res.status(400).json({
         success: false,
@@ -428,21 +392,22 @@ export const markMessagesAsRead = async (req, res) => {
       });
     }
 
-    await Message.updateMany(
+    const result = await Message.updateMany(
       { 
         chatRoom: chatRoomId,
-        'sender.userId': { $ne: userId },
-        isRead: false
+        'sender.userId': { $ne: new mongoose.Types.ObjectId(userId) },
+        deliveryStatus: { $ne: 'read' }
       },
       { 
-        $set: { isRead: true },
-        $push: { readBy: { userId: userId, readAt: new Date() } }
+        $set: { deliveryStatus: 'read' },
+        $addToSet: { readBy: { userId: new mongoose.Types.ObjectId(userId), readAt: new Date() } }
       }
     );
 
     res.status(200).json({
       success: true,
-      message: 'Messages marked as read'
+      message: 'Messages marked as read',
+      modifiedCount: result.modifiedCount
     });
 
   } catch (error) {
@@ -454,5 +419,3 @@ export const markMessagesAsRead = async (req, res) => {
     });
   }
 };
-
-export { upload };

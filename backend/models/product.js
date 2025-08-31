@@ -56,7 +56,6 @@ const productSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
-// ✅ Model ko overwrite hone se bachane ke liye check karna
 const Product = mongoose.models.Product || mongoose.model("Product", productSchema);
 
 export default Product;

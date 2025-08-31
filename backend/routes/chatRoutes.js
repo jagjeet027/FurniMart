@@ -2,11 +2,10 @@ import express from 'express';
 import {
   createOrGetChatRoom,
   getUserChatRooms,
+  getManufacturerChatRooms,
   getChatMessages,
   sendMessage,
-  sendImageMessage,
-  markMessagesAsRead,
-  upload
+  markMessagesAsRead
 } from '../controllers/chatController.js';
 
 const router = express.Router();
@@ -15,18 +14,18 @@ const router = express.Router();
 router.post('/room', createOrGetChatRoom);
 
 // Get user's chat rooms
-router.get('/rooms/:userId', getUserChatRooms);
+router.get('/user/:userId/rooms', getUserChatRooms);
+
+// Get manufacturer's chat rooms
+router.get('/manufacturer/:manufacturerId/rooms', getManufacturerChatRooms);
 
 // Get messages for a chat room
 router.get('/messages/:chatRoomId', getChatMessages);
 
-// Send text message
+// Send message
 router.post('/message', sendMessage);
 
-// Send image message
-router.post('/message/image', upload.single('image'), sendImageMessage);
-
 // Mark messages as read
-router.patch('/messages/read', markMessagesAsRead);
+router.post('/messages/read', markMessagesAsRead);
 
 export default router;

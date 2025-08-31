@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useCart } from '../contexts/CartContext'; // Add this import
 
 // Updated menu sections with conditional rendering
 const menuSections = [
@@ -543,9 +544,9 @@ const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
+  const { cartCount } = useCart(); // Use cartCount from context
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileProfileOpen, setMobileProfileOpen] = useState(false);
-  const [cartItemCount, setCartItemCount] = useState(2); // Example cart count
   const [wishlistCount, setWishlistCount] = useState(0);
   const [wishlistAnimation, setWishlistAnimation] = useState(false);
 
@@ -612,6 +613,18 @@ const Header = () => {
     };
   }, []);
 
+  // Add notification handler
+  useEffect(() => {
+    const handleNotification = (e) => {
+      // Show toast/notification based on e.detail.message and e.detail.type
+      console.log(e.detail.message); // Replace with actual notification system
+      // You can implement a toast library here like react-toastify
+    };
+    
+    window.addEventListener('showNotification', handleNotification);
+    return () => window.removeEventListener('showNotification', handleNotification);
+  }, []);
+
   // Early return for manufacturer routes
   if (location.pathname.startsWith('/manufacturer') && user?.isManufacturer) {
     return null;
@@ -644,9 +657,9 @@ const Header = () => {
                   </Link>
                   <Link to="/cart" className="relative p-2 hover:bg-orange-100 rounded-full">
                     <ShoppingCart className="h-6 w-6 text-orange-600" />
-                    {cartItemCount > 0 && (
+                    {cartCount > 0 && (
                       <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {cartItemCount}
+                        {cartCount}
                       </span>
                     )}
                   </Link>
@@ -674,41 +687,41 @@ const Header = () => {
                     Become a Manufacturer
                   </Link>
                 )}
-                {isAuthenticated && user?.isManufacturer ? (
-                <Link
-                  to="/manufacturer/dashboard"
-                  className="px-4 py-2 text-white bg-emerald-600 rounded-xl shadow-md hover:bg-emerald-700 hover:scale-105 transition-all duration-300"
-                >
-                  Dashboard
-                </Link>
-              ) : isAuthenticated && !user?.isManufacturer && (
-                <Link
-                  to="/manufacturer/register"
-                  className="px-4 py-2 text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300"
-                >
-                  Become a Manufacturer
-                </Link>
-              )}
-              {!isAuthenticated ? (
-                <>
+                
+                {isAuthenticated && user?.isManufacturer && (
                   <Link
-                    to="/login"
-                    className="px-4 py-2 text-white bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300"
+                    to="/manufacturer/dashboard"
+                    className="block w-full text-center px-4 py-3 text-white bg-emerald-600 rounded-lg shadow-md hover:bg-emerald-700 hover:scale-105 transition-all duration-300"
+                    onClick={() => setMobileMenuOpen(false)}
                   >
-                    Login
+                    Dashboard
                   </Link>
-                  <Link
-                    to="/signup"
-                    className="px-4 py-2 text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300"
-                  >
-                    SignUp
-                  </Link>
-                </>
-              ) : (
-                <ProfileMenu user={user} handleLogout={handleLogout} />
-              )}
+                )}
+                
+                {!isAuthenticated ? (
+                  <>
+                    <Link
+                      to="/login"
+                      className="block w-full text-center px-4 py-3 text-white bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Login
+                    </Link>
+                    <Link
+                      to="/signup"
+                      className="block w-full text-center px-4 py-3 text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Sign Up
+                    </Link>
+                  </>
+                ) : (
+                  <div onClick={() => setMobileMenuOpen(false)}>
+                    <ProfileMenu user={user} handleLogout={handleLogout} />
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
           )}
 
           {/* Desktop Header */}
@@ -717,10 +730,28 @@ const Header = () => {
               to="/"
               className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 text-transparent bg-clip-text"
             > 
-
               FurniMart
             </Link>
+            
             <div className="flex items-center space-x-6"> 
+              {isAuthenticated && user?.isManufacturer && (
+                <Link
+                  to="/manufacturer/dashboard"
+                  className="px-4 py-2 text-white bg-emerald-600 rounded-xl shadow-md hover:bg-emerald-700 hover:scale-105 transition-all duration-300"
+                >
+                  Dashboard
+                </Link>
+              )}
+              
+              {isAuthenticated && !user?.isManufacturer && (
+                <Link
+                  to="/manufacturer/register"
+                  className="px-4 py-2 text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300"
+                >
+                  Become a Manufacturer
+                </Link>
+              )}
+              
               {isAuthenticated && (
                 <>
                   <WishlistButton 
@@ -729,9 +760,9 @@ const Header = () => {
                   />
                   <Link to="/cart" className="relative p-2 hover:bg-orange-100 rounded-full">
                     <ShoppingCart className="h-6 w-6 text-orange-600" />
-                    {cartItemCount > 0 && (
+                    {cartCount > 0 && (
                       <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {cartItemCount}
+                        {cartCount}
                       </span>
                     )}
                   </Link>
@@ -739,6 +770,7 @@ const Header = () => {
                   <ProfileMenu user={user} handleLogout={handleLogout} />
                 </>
               )}
+              
               {!isAuthenticated && (
                 <>
                   <Link
@@ -751,7 +783,7 @@ const Header = () => {
                     to="/signup"
                     className="px-4 py-2 text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
                   >
-                    SignUp
+                    Sign Up
                   </Link> 
                 </>
               )}
@@ -780,4 +812,4 @@ const Header = () => {
   );
 };
 
-export default Header;
+export default Header;  

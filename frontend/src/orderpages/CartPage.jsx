@@ -22,9 +22,11 @@ import {
   Tag,
   Percent
 } from 'lucide-react';
+import { useCart } from '../contexts/CartContext';
 
 const CartPage = () => {
-  const [cartItems, setCartItems] = useState([]);
+  const { cartItems, updateCartQuantity, removeFromCart, clearCart } = useCart();
+  const [cartProducts, setCartProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState('');
@@ -38,43 +40,20 @@ const CartPage = () => {
 
   useEffect(() => {
     fetchCartItems();
-  }, []);
+  }, [cartItems]);
 
   const fetchCartItems = async () => {
     try {
       setLoading(true);
       setError('');
-
-      // Try to get cart from localStorage first (similar to your wishlist approach)
-      const localCartData = localStorage.getItem('cart');
-      let cartProductIds = [];
       
-      if (localCartData) {
-        try {
-          const parsedCart = JSON.parse(localCartData);
-          if (Array.isArray(parsedCart)) {
-            cartProductIds = parsedCart;
-          } else if (parsedCart.items && Array.isArray(parsedCart.items)) {
-            cartProductIds = parsedCart.items.map(item => ({
-              productId: item.productId || item.id,
-              quantity: item.quantity || 1
-            }));
-          }
-        } catch (parseError) {
-          console.error('Error parsing cart data:', parseError);
-        }
-      }
-
-      if (cartProductIds.length === 0) {
-        setCartItems([]);
+      if (cartItems.size === 0) {
+        setCartProducts([]);
         return;
       }
 
-      // Fetch product details for cart items
-      const cartPromises = cartProductIds.map(async (item) => {
-        const productId = typeof item === 'string' ? item : item.productId;
-        const quantity = typeof item === 'object' ? item.quantity : 1;
-        
+      // Fetch product details for cart items using the Map from context
+      const cartPromises = Array.from(cartItems.entries()).map(async ([productId, quantity]) => {
         try {
           const response = await fetch(`${API_BASE_URL}/products/${productId}`);
           if (!response.ok) {
@@ -96,7 +75,7 @@ const CartPage = () => {
       const resolvedItems = await Promise.all(cartPromises);
       const validItems = resolvedItems.filter(item => item !== null);
       
-      setCartItems(validItems);
+      setCartProducts(validItems);
     } catch (err) {
       console.error('Error fetching cart items:', err);
       setError(`Failed to load cart: ${err.message}`);
@@ -105,35 +84,25 @@ const CartPage = () => {
     }
   };
 
-  const updateCartInStorage = (newCartItems) => {
-    const cartData = newCartItems.map(item => ({
-      productId: item._id,
-      quantity: item.quantity
-    }));
-    localStorage.setItem('cart', JSON.stringify(cartData));
-    
-    // Dispatch custom event for cart updates (similar to wishlist pattern)
-    window.dispatchEvent(new CustomEvent('cartUpdated', { 
-      detail: { cart: cartData, count: newCartItems.length } 
-    }));
-  };
-
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const updateQuantity = async (id, newQuantity) => {
+  const updateQuantity = async (productId, newQuantity) => {
     if (newQuantity < 1) return;
     
     setUpdating(true);
     try {
-      const updatedItems = cartItems.map(item => 
-        item._id === id ? { ...item, quantity: newQuantity } : item
+      updateCartQuantity(productId, newQuantity);
+      
+      // Update local state immediately for better UX
+      setCartProducts(prevProducts => 
+        prevProducts.map(item => 
+          item._id === productId ? { ...item, quantity: newQuantity } : item
+        )
       );
       
-      setCartItems(updatedItems);
-      updateCartInStorage(updatedItems);
       showNotification('Quantity updated');
     } catch (err) {
       console.error('Error updating quantity:', err);
@@ -143,11 +112,15 @@ const CartPage = () => {
     }
   };
 
-  const removeItem = (id) => {
+  const removeItem = (productId) => {
     try {
-      const updatedItems = cartItems.filter(item => item._id !== id);
-      setCartItems(updatedItems);
-      updateCartInStorage(updatedItems);
+      removeFromCart(productId);
+      
+      // Update local state
+      setCartProducts(prevProducts => 
+        prevProducts.filter(item => item._id !== productId)
+      );
+      
       setShowRemoveModal(null);
       showNotification('Item removed from cart');
     } catch (err) {
@@ -178,7 +151,7 @@ const CartPage = () => {
         }));
       }
       
-      // Remove from cart
+      // Remove from cart using context
       removeItem(item._id);
       showNotification('Item moved to wishlist');
     } catch (err) {
@@ -260,8 +233,8 @@ const CartPage = () => {
     ));
   };
 
-  // Calculate totals
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  // Calculate totals using cartProducts instead of cartItems
+  const subtotal = cartProducts.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shipping = subtotal > 500 ? 0 : 50;
   const tax = subtotal * 0.08; // 8% tax
   
@@ -275,6 +248,9 @@ const CartPage = () => {
   }
   
   const total = Math.max(0, subtotal + shipping + tax - promoDiscount);
+
+  // Get total quantity from context
+  const totalQuantity = Array.from(cartItems.values()).reduce((sum, qty) => sum + qty, 0);
 
   if (loading) {
     return (
@@ -350,14 +326,14 @@ const CartPage = () => {
               <div>
                 <h1 className="text-3xl font-bold text-gray-800">Shopping Cart</h1>
                 <p className="text-gray-600 mt-1">
-                  {cartItems.length} item{cartItems.length !== 1 ? 's' : ''} in your cart
+                  {cartProducts.length} item{cartProducts.length !== 1 ? 's' : ''} in your cart
                 </p>
               </div>
             </div>
             <div className="hidden md:flex items-center gap-4">
               <div className="bg-blue-100 text-blue-800 px-3 py-1.5 rounded-full text-sm font-medium">
                 <ShoppingCart className="w-4 h-4 inline mr-1" />
-                {cartItems.reduce((sum, item) => sum + item.quantity, 0)} Items
+                {totalQuantity} Items
               </div>
             </div>
           </div>
@@ -365,7 +341,7 @@ const CartPage = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {cartItems.length === 0 ? (
+        {cartProducts.length === 0 ? (
           // Empty Cart State
           <div className="bg-white rounded-lg shadow-sm p-12 text-center">
             <ShoppingBag className="w-24 h-24 text-gray-300 mx-auto mb-6" />
@@ -397,7 +373,7 @@ const CartPage = () => {
                 </div>
                 
                 <div className="divide-y divide-gray-200">
-                  {cartItems.map((item) => (
+                  {cartProducts.map((item) => (
                     <div key={item.cartId || item._id} className="p-6 hover:bg-gray-50 transition-colors">
                       <div className="flex flex-col sm:flex-row gap-4">
                         {/* Product Image */}
@@ -572,7 +548,7 @@ const CartPage = () => {
                   
                   <div className="space-y-3 mb-6">
                     <div className="flex justify-between text-gray-600">
-                      <span>Subtotal ({cartItems.reduce((sum, item) => sum + item.quantity, 0)} items)</span>
+                      <span>Subtotal ({totalQuantity} items)</span>
                       <span>{formatPrice(subtotal)}</span>
                     </div>
                     

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 // Corrected import: added Minus and Plus
 import { ShoppingCart, Eye, Heart, Star, Package, Filter, Search, Loader2, RefreshCw, Truck, Shield, ArrowLeft, Minus, Plus, Trash2 } from 'lucide-react';
 
+import { useCart } from '../contexts/CartContext'
+
 const ProductCardDetails = () => {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
@@ -11,14 +13,15 @@ const ProductCardDetails = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [priceRange, setPriceRange] = useState({ min: '', max: '' });
   const [wishlist, setWishlist] = useState(new Set());
-  const [cart, setCart] = useState(new Map()); // Changed to Map to store quantities
+  
+  // Use CartProvider context instead of local cart state
+  const { addToCart, updateCartQuantity, removeFromCart, getCartItemQuantity, isInCart, getTotalItems } = useCart();
 
   // Mock API base URL - replace with your actual backend URL
   const API_BASE_URL = 'http://localhost:5000/api';
 
   useEffect(() => {
     fetchProducts();
-    loadCartFromStorage();
     loadWishlistFromStorage();
   }, []);
 
@@ -26,28 +29,7 @@ const ProductCardDetails = () => {
     filterAndSortProducts();
   }, [products, searchTerm, sortBy, priceRange]);
 
-  const loadCartFromStorage = () => {
-    try {
-      const storedCart = localStorage.getItem('cart');
-      if (storedCart) {
-        const cartData = JSON.parse(storedCart);
-        const cartMap = new Map();
-        
-        if (Array.isArray(cartData)) {
-          cartData.forEach(item => {
-            if (typeof item === 'string') {
-              cartMap.set(item, 1);
-            } else if (item.productId) {
-              cartMap.set(item.productId, item.quantity || 1);
-            }
-          });
-        }
-        setCart(cartMap);
-      }
-    } catch (error) {
-      console.error('Error loading cart from storage:', error);
-    }
-  };
+  // Remove loadCartFromStorage and updateCartInStorage functions as they're handled by context
 
   const loadWishlistFromStorage = () => {
     try {
@@ -60,19 +42,6 @@ const ProductCardDetails = () => {
     } catch (error) {
       console.error('Error loading wishlist from storage:', error);
     }
-  };
-
-  const updateCartInStorage = (newCart) => {
-    const cartData = Array.from(newCart.entries()).map(([productId, quantity]) => ({
-      productId,
-      quantity
-    }));
-    localStorage.setItem('cart', JSON.stringify(cartData));
-    
-    // Dispatch custom event for cart updates
-    window.dispatchEvent(new CustomEvent('cartUpdated', { 
-      detail: { cart: cartData, count: cartData.reduce((sum, item) => sum + item.quantity, 0) } 
-    }));
   };
 
   const fetchProducts = async () => {
@@ -182,43 +151,16 @@ const ProductCardDetails = () => {
     updateWishlist(newWishlist);
   };
 
+  // Updated toggle cart function using context
   const toggleCart = (productId) => {
-    const newCart = new Map(cart);
-    const currentQuantity = newCart.get(productId) || 0;
-    
-    if (currentQuantity > 0) {
-      // Remove from cart
-      newCart.delete(productId);
+    if (isInCart(productId)) {
+      removeFromCart(productId);
     } else {
-      // Add to cart with quantity 1
-      newCart.set(productId, 1);
+      addToCart(productId, 1);
     }
-    
-    setCart(newCart);
-    updateCartInStorage(newCart);
   };
 
-  const updateCartQuantity = (productId, quantity) => {
-    const newCart = new Map(cart);
-    
-    if (quantity <= 0) {
-      newCart.delete(productId);
-    } else {
-      newCart.set(productId, quantity);
-    }
-    
-    setCart(newCart);
-    updateCartInStorage(newCart);
-  };
-
-  const addToCart = (productId, quantity = 1) => {
-    const newCart = new Map(cart);
-    const currentQuantity = newCart.get(productId) || 0;
-    newCart.set(productId, currentQuantity + quantity);
-    
-    setCart(newCart);
-    updateCartInStorage(newCart);
-  };
+  // Remove duplicate addToCart function as it's provided by context
 
   const formatPrice = (price) => {
     if (!price || isNaN(price)) return '$0.00';
@@ -306,7 +248,7 @@ const ProductCardDetails = () => {
               </div>
               <div className="bg-green-100 text-green-800 px-3 py-1.5 rounded-full text-sm font-medium">
                 <ShoppingCart className="w-3 h-3 inline mr-1" />
-                {Array.from(cart.values()).reduce((sum, qty) => sum + qty, 0)} In Cart
+                {getTotalItems()} In Cart
               </div>
             </div>
           </div>
@@ -422,8 +364,9 @@ const ProductCardDetails = () => {
             ) : (
               <div className="space-y-6">
                 {filteredProducts.map((product) => {
-                  const cartQuantity = cart.get(product._id) || 0;
-                  const isInCart = cartQuantity > 0;
+                  // Updated to use context methods
+                  const cartQuantity = getCartItemQuantity(product._id);
+                  const isItemInCart = isInCart(product._id);
                   
                   return (
                     <div 
@@ -483,7 +426,7 @@ const ProductCardDetails = () => {
                           )}
 
                           {/* Cart Badge */}
-                          {isInCart && (
+                          {isItemInCart && (
                             <div className="absolute bottom-4 right-4 bg-green-500 text-white px-2 py-1 rounded-lg text-xs font-bold">
                               In Cart ({cartQuantity})
                             </div>
@@ -586,7 +529,7 @@ const ProductCardDetails = () => {
                               {/* Action Buttons */}
                               <div className="flex gap-3">
                                 {/* Enhanced Cart Button with Quantity Controls */}
-                                {isInCart ? (
+                                {isItemInCart ? (
                                   <div className="flex items-center gap-2">
                                     <div className="flex items-center border border-gray-300 rounded-lg">
                                       <button
@@ -667,7 +610,7 @@ const ProductCardDetails = () => {
             </div>
             <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl">
               <div className="text-3xl font-bold text-green-600 mb-2">
-                {Array.from(cart.values()).reduce((sum, qty) => sum + qty, 0)}
+                {getTotalItems()}
               </div>
               <div className="text-gray-700 font-medium">Cart Items</div>
             </div>

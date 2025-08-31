@@ -1,4 +1,4 @@
-// App.js - Updated routing configuration
+// App.js - Updated routing configuration with CartProvider
 
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
@@ -9,7 +9,8 @@ import './index.css';
 import Footer from './components/Footer';
 import SignupPage from './components/SignUpPage';
 import { AuthProvider } from './contexts/AuthContext';
-import Dashboard from './components/manufacturer/Dashboard';
+import { CartProvider } from './contexts/CartContext'; // Import CartProvider
+import Dashboard from './components/manufacturer/Dashboard';    
 import PrivateRoute from './components/PrivateRoute';
 import ProductCard from './components/ProductCardDetails.jsx';
 import ProductDetailPage from './components/ProductDetailPage';
@@ -164,7 +165,9 @@ const App = () => {
 const AppWrapper = () => (
   <Router>
     <AuthProvider>
-      <App />
+      <CartProvider>
+        <App />
+      </CartProvider>
     </AuthProvider>
   </Router>
 );

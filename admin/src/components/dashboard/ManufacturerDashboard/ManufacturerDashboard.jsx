@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell } from 'lucide-react';
+import { Bell, Building, Users, Briefcase } from 'lucide-react';
 
 // Import all components
 import Sidebar from '../ManufacturerDashboard/Sidebar';
@@ -9,7 +9,13 @@ import RevenueSection from '../ManufacturerDashboard/RevenueSection';
 import InnovationsSection from '../ManufacturerDashboard/InnovationsSection';
 import ManufacturersSection from '../ManufacturerDashboard/ManufacturersSection';
 import NotificationsPanel from '../ManufacturerDashboard/NotificationsPanel';
+import AdminJobDashboard from './career/AdminJobDashboard';
+import IdeaDetailsPage from './IdeaDetailPage';
 import { mockApi } from '../../../services/api';
+import OrganizationSection from './career/OrganizationSection';
+// Import your existing Organization and Individuals components
+
+// import IndividualsSection from './IndividualsSection';
 
 const ManufacturerDashboard = () => {
   const [manufacturers, setManufacturers] = useState([]);
@@ -57,13 +63,30 @@ const ManufacturerDashboard = () => {
     fetchData();
   }, []);
 
+  const getSectionTitle = (section) => {
+    const titles = {
+      dashboard: 'Dashboard Overview',
+      manufacturers: 'Manufacturers',
+      organization: 'Organization',
+      individuals: 'Individuals',
+      jobBoard: 'Job Board',
+      revenue: 'Revenue Analysis',
+      innovations: 'Innovations List',
+      products: 'Logistic',
+      reports: 'Reports',
+      analytics: 'Analytics',
+      settings: 'Settings'
+    };
+    return titles[section] || section.replace(/([A-Z])/g, ' $1');
+  };
+
   const renderActiveSection = () => {
-    if (loading) {
+    if (loading && !['organization', 'individuals', 'jobBoard'].includes(activeSection)) {
       return (
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-white/20 border-t-white mx-auto mb-4"></div>
-            <p className="text-white/70">Loading {activeSection}...</p>
+            <p className="text-white/70">Loading {getSectionTitle(activeSection)}...</p>
           </div>
         </div>
       );
@@ -78,6 +101,16 @@ const ManufacturerDashboard = () => {
         return <RevenueSection manufacturers={manufacturers} />;
       case 'innovations':
         return <InnovationsSection />;
+      
+      case 'organization':
+        return <OrganizationSection />;
+      // case 'individuals':
+      //   return <IndividualsSection />;
+      case 'jobBoard':
+        return <AdminJobDashboard />;
+      
+      case 'reports':
+        return <IdeaDetailsPage />;
       default:
         return (
           <div className="flex items-center justify-center min-h-[60vh]">
@@ -112,7 +145,7 @@ const ManufacturerDashboard = () => {
               {/* Title Section */}
               <div className="flex items-center space-x-4">
                 <h1 className="text-2xl sm:text-3xl font-bold text-white capitalize tracking-tight">
-                  {activeSection === 'dashboard' ? 'Dashboard Overview' : activeSection.replace(/([A-Z])/g, ' $1')}
+                  {getSectionTitle(activeSection)}
                 </h1>
                 <div className="hidden sm:block">
                   <span className="px-3 py-1 bg-white/10 rounded-full text-xs text-white/70 font-medium">
@@ -176,7 +209,7 @@ const ManufacturerDashboard = () => {
         <MobileMenuButton onClick={() => setSidebarOpen(true)} />
       </div>
     </div>
-  );
+  );  
 };
 
 export default ManufacturerDashboard;

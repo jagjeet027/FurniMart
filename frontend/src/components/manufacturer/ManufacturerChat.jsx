@@ -1,235 +1,345 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  X,
+  MessageCircle,
   Send,
+  Search,
+  User,
+  Clock,
+  Check,
+  CheckCheck,
   Image,
   Phone,
   Video,
   MoreVertical,
-  Paperclip,
   Loader2,
   AlertCircle,
-  Check,
-  CheckCheck,
-  Users,
-  Package,
-  Clock,
-  Star,
-  MapPin,
-  Search
+  RefreshCw,
+  X
 } from 'lucide-react';
 import io from 'socket.io-client';
 
-const ManufacturerChat = ({ manufacturerId }) => {
+const ManufacturerChat = ({ manufacturerInfo }) => {
   const [chatRooms, setChatRooms] = useState([]);
-  const [selectedChatRoom, setSelectedChatRoom] = useState(null);
+  const [selectedChat, setSelectedChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [socket, setSocket] = useState(null);
-  const [isTyping, setIsTyping] = useState(false);
-  const [typingUser, setTypingUser] = useState('');
   const [onlineUsers, setOnlineUsers] = useState(new Set());
-  const [searchTerm, setSearchTerm] = useState('');
+  const [typingUsers, setTypingUsers] = useState(new Map());
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
 
   const messagesEndRef = useRef(null);
-  const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
   const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
-  
-  // Get manufacturer info - replace with actual auth system
-  const manufacturerInfo = {
-    id: manufacturerId || localStorage.getItem('manufacturerId') || localStorage.getItem('userId'),
-    name: localStorage.getItem('manufacturerName') || 'Manufacturer',
-    email: localStorage.getItem('manufacturerEmail') || 'manufacturer@example.com',
-    type: 'manufacturer'
+
+  // Get manufacturer identifier with better fallback logic
+  const getManufacturerIdentifier = () => {
+    if (!manufacturerInfo) return null;
+    
+    console.log('Manufacturer Info:', manufacturerInfo);
+    
+    return manufacturerInfo.id || 
+           manufacturerInfo._id || 
+           manufacturerInfo.manufacturerId ||
+           manufacturerInfo.name || 
+           manufacturerInfo.businessName || 
+           manufacturerInfo.manufacturerName ||
+           manufacturerInfo.email ||
+           null;
   };
+
+  const manufacturerId = getManufacturerIdentifier();
 
   // Initialize socket connection
   useEffect(() => {
-    if (!manufacturerInfo.id) {
-      setError('Manufacturer ID not found. Please login again.');
-      return;
-    }
+    let socketInstance = null;
 
-    const newSocket = io(SOCKET_URL, {
-      forceNew: true,
-      timeout: 5000,
-      transports: ['websocket']
-    });
-    
-    newSocket.on('connect', () => {
-      console.log('Manufacturer connected to socket server');
-      newSocket.emit('user-join', {
-        userId: manufacturerInfo.id,
-        userType: manufacturerInfo.type,
-        userName: manufacturerInfo.name
-      });
-    });
+    const connectSocket = () => {
+      if (manufacturerId && !socketInstance) {
+        console.log('Connecting manufacturer to socket...', manufacturerId);
+        setConnectionStatus('connecting');
 
-    newSocket.on('disconnect', () => {
-      console.log('Disconnected from socket server');
-    });
-
-    // **CRITICAL: Listen for new chat rooms**
-    newSocket.on('new-chat-room', (data) => {
-      console.log('New chat room created:', data);
-      // Reload chat rooms to show new conversation
-      loadChatRooms();
-    });
-
-    // **CRITICAL: Listen for new messages**
-    newSocket.on('new-message', (message) => {
-      console.log('New message received:', message);
-      
-      if (selectedChatRoom && message.chatRoom === selectedChatRoom._id) {
-        setMessages(prev => {
-          const exists = prev.find(msg => msg._id === message._id);
-          if (exists) return prev;
-          return [...prev, message];
+        socketInstance = io(SOCKET_URL, {
+          forceNew: true,
+          timeout: 10000,
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000
         });
-        scrollToBottom();
-      }
-      
-      // Update chat room list with new message
-      setChatRooms(prev => 
-        prev.map(room => 
-          room._id === message.chatRoom 
-            ? {
-                ...room,
-                lastMessage: {
-                  message: message.content,
-                  sender: message.sender.name,
-                  timestamp: message.createdAt
-                }
+
+        socketInstance.on('connect', () => {
+          console.log('Manufacturer connected to socket');
+          setConnectionStatus('connected');
+          setError('');
+          
+          socketInstance.emit('user-join', {
+            userId: manufacturerId,
+            userType: 'manufacturer',
+            userName: manufacturerInfo?.name || manufacturerInfo?.businessName || 'Manufacturer'
+          });
+        });
+
+        socketInstance.on('connect_error', (error) => {
+          console.error('Socket connection error:', error);
+          setConnectionStatus('error');
+          setError('Connection failed. Retrying...');
+          
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+          }
+          reconnectTimeoutRef.current = setTimeout(() => {
+            if (socketInstance && socketInstance.connected === false) {
+              socketInstance.connect();
+            }
+          }, 5000);
+        });
+
+        socketInstance.on('disconnect', (reason) => {
+          console.log('Socket disconnected:', reason);
+          setConnectionStatus('disconnected');
+        });
+
+        // Listen for new messages
+        socketInstance.on('new-message', (messageData) => {
+          try {
+            console.log('New message received:', messageData);
+            
+            updateChatRoomsList();
+            
+            if (selectedChat && 
+                (messageData.chatRoomId === selectedChat._id || 
+                 messageData.chatRoom === selectedChat._id)) {
+              
+              setMessages(prev => {
+                const exists = prev.find(msg => 
+                  msg._id === messageData._id || 
+                  msg._id === messageData.message?._id
+                );
+                if (exists) return prev;
+                
+                const newMsg = messageData.message || messageData;
+                return [...prev, newMsg];
+              });
+              
+              scrollToBottom();
+              
+              if (messageData.sender?.userId !== manufacturerId) {
+                setTimeout(() => markMessagesAsRead(selectedChat._id), 500);
               }
-            : room
-        )
-      );
-    });
+            }
+          } catch (error) {
+            console.error('Error handling new message:', error);
+          }
+        });
 
-    // **CRITICAL: Listen for chat notifications**
-    newSocket.on('new-chat-notification', (data) => {
-      console.log('New chat notification:', data);
-      // Show notification or update UI
-      loadChatRooms();
-    });
+        socketInstance.on('new-chat-message', (data) => {
+          try {
+            console.log('New chat message received:', data);
+            updateChatRoomsList();
+            
+            if (selectedChat && selectedChat._id === data.chatRoomId) {
+              setMessages(prev => {
+                const exists = prev.find(msg => msg._id === data.message._id);
+                if (exists) return prev;
+                return [...prev, data.message];
+              });
+              scrollToBottom();
+            }
+          } catch (error) {
+            console.error('Error handling new chat message:', error);
+          }
+        });
 
-    newSocket.on('user-typing', (data) => {
-      if (data.userId !== manufacturerInfo.id && selectedChatRoom && data.chatRoomId === selectedChatRoom._id) {
-        setIsTyping(data.isTyping);
-        setTypingUser(data.userName);
-        
-        if (data.isTyping) {
-          setTimeout(() => {
-            setIsTyping(false);
-            setTypingUser('');
-          }, 3000);
-        }
+        // Message status updates
+        socketInstance.on('message-delivered', (data) => {
+          setMessages(prev => prev.map(msg => 
+            msg._id === data.messageId 
+              ? { ...msg, deliveryStatus: 'delivered' }
+              : msg
+          ));
+        });
+
+        socketInstance.on('messages-read', (data) => {
+          setMessages(prev => prev.map(msg => 
+            msg.sender?.userId !== manufacturerId 
+              ? { ...msg, deliveryStatus: 'read' }
+              : msg
+          ));
+        });
+
+        // Typing indicators
+        socketInstance.on('typing-start', (data) => {
+          if (selectedChat && data.chatRoomId === selectedChat._id && data.userId !== manufacturerId) {
+            setTypingUsers(prev => {
+              const newMap = new Map(prev);
+              newMap.set(data.userId, data.userName);
+              return newMap;
+            });
+          }
+        });
+
+        socketInstance.on('typing-stop', (data) => {
+          if (selectedChat && data.chatRoomId === selectedChat._id) {
+            setTypingUsers(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(data.userId);
+              return newMap;
+            });
+          }
+        });
+
+        socketInstance.on('user-typing', (data) => {
+          if (selectedChat && data.chatRoomId === selectedChat._id && data.userId !== manufacturerId) {
+            setTypingUsers(prev => {
+              const newMap = new Map(prev);
+              if (data.isTyping) {
+                newMap.set(data.userId, data.userName);
+              } else {
+                newMap.delete(data.userId);
+              }
+              return newMap;
+            });
+          }
+        });
+
+        // Online/offline status
+        socketInstance.on('user-online', (user) => {
+          setOnlineUsers(prev => new Set(prev).add(user.userId));
+        });
+
+        socketInstance.on('user-offline', (user) => {
+          setOnlineUsers(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(user.userId);
+            return newSet;
+          });
+        });
+
+        setSocket(socketInstance);
       }
-    });
+    };
 
-    newSocket.on('user-online', (userId) => {
-      setOnlineUsers(prev => new Set([...prev, userId]));
-    });
-
-    newSocket.on('user-offline', (userId) => {
-      setOnlineUsers(prev => {
-        const updated = new Set(prev);
-        updated.delete(userId);
-        return updated;
-      });
-    });
-
-    setSocket(newSocket);
+    connectSocket();
 
     return () => {
-      newSocket.disconnect();
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      if (socketInstance) {
+        console.log('Cleaning up socket connection');
+        socketInstance.removeAllListeners();
+        socketInstance.disconnect();
+        socketInstance = null;
+      }
+      setSocket(null);
+      setConnectionStatus('disconnected');
     };
-  }, [selectedChatRoom]);
+  }, [manufacturerId, selectedChat]);
 
-  // Load chat rooms on component mount
+  // Load manufacturer chat rooms
   useEffect(() => {
-    if (manufacturerInfo.id) {
+    if (manufacturerId) {
       loadChatRooms();
     }
-  }, [manufacturerInfo.id]);
+  }, [manufacturerId]);
 
-  // Join selected chat room
-  useEffect(() => {
-    if (selectedChatRoom && socket) {
-      socket.emit('join-chat', selectedChatRoom._id);
-      loadMessages(selectedChatRoom._id);
-    }
-  }, [selectedChatRoom, socket]);
-
-  // Scroll to bottom when messages change
+  // Auto-scroll to bottom
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const updateChatRoomsList = async () => {
+    try {
+      console.log('Updating chat rooms for manufacturer:', manufacturerId);
+      const response = await fetch(`${API_BASE_URL}/chat/manufacturer/${encodeURIComponent(manufacturerId)}/rooms`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setChatRooms(data.chatRooms);
+        } else {
+          console.error('Failed to update chat rooms:', data.message);
+        }
+      } else {
+        console.error('HTTP error updating chat rooms:', response.status);
+      }
+    } catch (error) {
+      console.error('Error updating chat rooms:', error);
+    }
   };
 
   const loadChatRooms = async () => {
     setLoading(true);
     setError('');
-
+    
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/chat/rooms/${manufacturerInfo.id}?userType=manufacturer`,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-          }
+      console.log('Loading chat rooms for manufacturer:', manufacturerId);
+      const response = await fetch(`${API_BASE_URL}/chat/manufacturer/${encodeURIComponent(manufacturerId)}/rooms`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         }
-      );
+      });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data.success) {
-        setChatRooms(data.chatRooms || []);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Chat rooms loaded:', data);
+        if (data.success) {
+          setChatRooms(data.chatRooms);
+        } else {
+          setError(data.message || 'Failed to load chat rooms');
+        }
       } else {
-        throw new Error(data.message || 'Failed to load chat rooms');
+        setError(`Server error: ${response.status}`);
       }
     } catch (error) {
       console.error('Error loading chat rooms:', error);
-      setError(`Failed to load chat rooms: ${error.message}`);
+      setError('Failed to connect to server');
     } finally {
       setLoading(false);
     }
   };
 
   const loadMessages = async (chatRoomId) => {
-    setMessages([]); // Clear previous messages
-    
     try {
+      console.log('Loading messages for chat room:', chatRoomId);
       const response = await fetch(`${API_BASE_URL}/chat/messages/${chatRoomId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         }
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data.success) {
-        setMessages(data.messages || []);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Messages loaded:', data);
+        if (data.success) {
+          setMessages(data.messages || []);
+          await markMessagesAsRead(chatRoomId);
+        } else {
+          setError('Failed to load messages');
+        }
       } else {
-        throw new Error(data.message || 'Failed to load messages');
+        setError(`Failed to load messages: ${response.status}`);
       }
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -237,51 +347,108 @@ const ManufacturerChat = ({ manufacturerId }) => {
     }
   };
 
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    
-    if (!newMessage.trim() || !selectedChatRoom || sending) return;
-
-    setSending(true);
-    const messageContent = newMessage.trim();
-    setNewMessage('');
-
-    // Stop typing indicator
-    if (socket) {
-      socket.emit('typing-stop', {
-        chatRoomId: selectedChatRoom._id,
-        userId: manufacturerInfo.id,
-        userName: manufacturerInfo.name
-      });
-    }
-
+  const markMessagesAsRead = async (chatRoomId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/chat/message`, {
+      const response = await fetch(`${API_BASE_URL}/chat/messages/read`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         },
         body: JSON.stringify({
-          chatRoomId: selectedChatRoom._id,
-          senderId: manufacturerInfo.id,
-          senderType: manufacturerInfo.type,
-          senderName: manufacturerInfo.name,
-          content: messageContent
+          chatRoomId,
+          userId: manufacturerId
         })
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (response.ok && socket && socket.connected) {
+        socket.emit('messages-read-bulk', {
+          chatRoomId,
+          userId: manufacturerId
+        });
       }
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+    }
+  };
 
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to send message');
+  const handleChatSelect = async (chatRoom) => {
+    console.log('Selecting chat room:', chatRoom);
+    setSelectedChat(chatRoom);
+    setMessages([]);
+    setError('');
+    
+    if (socket && socket.connected) {
+      if (selectedChat) {
+        socket.emit('leave-chat', selectedChat._id);
       }
+      socket.emit('join-chat', chatRoom._id);
+    }
+    
+    await loadMessages(chatRoom._id);
+  };
 
-      // Message will be added via socket event
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    
+    if (!newMessage.trim() || !selectedChat || sending) return;
+
+    setSending(true);
+    const messageContent = newMessage.trim();
+    setNewMessage('');
+
+    if (socket && socket.connected) {
+      socket.emit('typing-stop', {
+        chatRoomId: selectedChat._id,
+        userId: manufacturerId,
+        userName: manufacturerInfo?.name || manufacturerInfo?.businessName || 'Manufacturer'
+      });
+    }
+
+    try {
+      console.log('Sending message from manufacturer:', manufacturerId);
+      const messageData = {
+        chatRoomId: selectedChat._id,
+        senderId: manufacturerId,
+        senderType: 'manufacturer',
+        senderName: manufacturerInfo?.name || manufacturerInfo?.businessName || 'Manufacturer',
+        content: messageContent
+      };
+
+      const response = await fetch(`${API_BASE_URL}/chat/message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
+        body: JSON.stringify(messageData)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Message sent successfully:', data);
+        if (data.success) {
+          setMessages(prev => {
+            const exists = prev.find(msg => msg._id === data.message._id);
+            if (exists) return prev;
+            return [...prev, data.message];
+          });
+          
+          scrollToBottom();
+          
+          if (socket && socket.connected) {
+            socket.emit('new-message', {
+              ...data.message,
+              chatRoomId: selectedChat._id,
+              chatRoom: selectedChat._id
+            });
+          }
+        } else {
+          throw new Error(data.message || 'Failed to send message');
+        }
+      } else {
+        throw new Error(`Server error: ${response.status}`);
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       setError(`Failed to send message: ${error.message}`);
@@ -291,74 +458,12 @@ const ManufacturerChat = ({ manufacturerId }) => {
     }
   };
 
-  const handleImageSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setError('Image size should be less than 5MB');
-        return;
-      }
-
-      if (!file.type.startsWith('image/')) {
-        setError('Please select a valid image file');
-        return;
-      }
-
-      sendImageMessage(file);
-    }
-  };
-
-  const sendImageMessage = async (imageFile) => {
-    if (!selectedChatRoom || sending) return;
-
-    setSending(true);
-    setError('');
-
-    try {
-      const formData = new FormData();
-      formData.append('image', imageFile);
-      formData.append('chatRoomId', selectedChatRoom._id);
-      formData.append('senderId', manufacturerInfo.id);
-      formData.append('senderType', manufacturerInfo.type);
-      formData.append('senderName', manufacturerInfo.name);
-
-      const response = await fetch(`${API_BASE_URL}/chat/message/image`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to send image');
-      }
-
-      // Message will be added via socket event
-    } catch (error) {
-      console.error('Error sending image:', error);
-      setError(`Failed to send image: ${error.message}`);
-    } finally {
-      setSending(false);
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
   const handleTyping = () => {
-    if (socket && selectedChatRoom) {
+    if (socket && socket.connected && selectedChat) {
       socket.emit('typing-start', {
-        chatRoomId: selectedChatRoom._id,
-        userId: manufacturerInfo.id,
-        userName: manufacturerInfo.name
+        chatRoomId: selectedChat._id,
+        userId: manufacturerId,
+        userName: manufacturerInfo?.name || manufacturerInfo?.businessName || 'Manufacturer'
       });
 
       if (typingTimeoutRef.current) {
@@ -366,11 +471,11 @@ const ManufacturerChat = ({ manufacturerId }) => {
       }
 
       typingTimeoutRef.current = setTimeout(() => {
-        if (socket) {
+        if (socket && socket.connected) {
           socket.emit('typing-stop', {
-            chatRoomId: selectedChatRoom._id,
-            userId: manufacturerInfo.id,
-            userName: manufacturerInfo.name
+            chatRoomId: selectedChat._id,
+            userId: manufacturerId,
+            userName: manufacturerInfo?.name || manufacturerInfo?.businessName || 'Manufacturer'
           });
         }
       }, 1000);
@@ -378,142 +483,230 @@ const ManufacturerChat = ({ manufacturerId }) => {
   };
 
   const formatTime = (timestamp) => {
-    return new Date(timestamp).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
+    try {
+      return new Date(timestamp).toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+    } catch (error) {
+      return '';
+    }
   };
 
   const formatDate = (timestamp) => {
-    return new Date(timestamp).toLocaleDateString();
+    try {
+      const date = new Date(timestamp);
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      if (date.toDateString() === today.toDateString()) {
+        return 'Today';
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+      } else {
+        return date.toLocaleDateString();
+      }
+    } catch (error) {
+      return '';
+    }
+  };
+
+  const getUnreadCount = (chatRoom) => {
+    try {
+      if (typeof chatRoom.unreadCount === 'number') {
+        return chatRoom.unreadCount;
+      }
+      return chatRoom.unreadCount?.[manufacturerId] || 0;
+    } catch (error) {
+      return 0;
+    }
   };
 
   const isMyMessage = (message) => {
-    return message.sender?.userId === manufacturerInfo.id;
+    return message.sender?.userId === manufacturerId ||
+           message.senderId === manufacturerId ||
+           message.senderType === 'manufacturer';
   };
 
-  const getWholeseller = (chatRoom) => {
-    return chatRoom.participants?.find(p => p.userType === 'wholeseller');
+  const getDeliveryStatusIcon = (message) => {
+    if (!isMyMessage(message)) return null;
+    
+    switch (message.deliveryStatus) {
+      case 'sent':
+        return <Check className="w-3 h-3" />;
+      case 'delivered':
+        return <CheckCheck className="w-3 h-3" />;
+      case 'read':
+        return <CheckCheck className="w-3 h-3 text-blue-500" />;
+      default:
+        return <Clock className="w-3 h-3" />;
+    }
   };
 
-  const isUserOnline = (userId) => {
-    return onlineUsers.has(userId);
+  const filteredChatRooms = chatRooms.filter(room => 
+    room.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    room.participants?.some(p => 
+      p.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  );
+
+  const getCurrentUserName = (chatRoom) => {
+    const user = chatRoom.participants?.find(p => p.userType !== 'manufacturer');
+    return user?.name || 'Customer';
   };
 
-  // Filter chat rooms based on search
-  const filteredChatRooms = chatRooms.filter(room => {
-    if (!searchTerm) return true;
-    const wholeseller = getWholeseller(room);
-    const searchLower = searchTerm.toLowerCase();
+  const isUserOnline = (chatRoom) => {
+    const user = chatRoom.participants?.find(p => p.userType !== 'manufacturer');
+    return user ? onlineUsers.has(user.userId) : false;
+  };
+
+  if (!manufacturerInfo || !manufacturerId) {
     return (
-      room.productName?.toLowerCase().includes(searchLower) ||
-      wholeseller?.name?.toLowerCase().includes(searchLower) ||
-      room.lastMessage?.message?.toLowerCase().includes(searchLower)
-    );
-  });
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  return (
-    <div className="h-screen bg-gray-50 flex">
-      {/* Sidebar - Chat Rooms */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b border-gray-200 bg-blue-600 text-white">
-          <div className="flex items-center space-x-3">
-            <Package className="w-8 h-8" />
-            <div>
-              <h2 className="font-semibold text-lg">Manufacturer Dashboard</h2>
-              <p className="text-blue-100 text-sm">{manufacturerInfo.name}</p>
-            </div>
+      <div className="flex h-full bg-gray-50 items-center justify-center">
+        <div className="text-center text-gray-500">
+          <AlertCircle className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+          <h3 className="text-lg font-medium mb-2">Manufacturer Information Required</h3>
+          <p>Please provide manufacturer information to access chat.</p>
+          <div className="mt-4 p-4 bg-gray-100 rounded-lg text-xs text-left max-w-md">
+            <strong>Current manufacturer info:</strong>
+            <pre>{JSON.stringify(manufacturerInfo, null, 2)}</pre>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Search/Filter */}
+  return (
+    <div className="flex h-full bg-gray-50">
+      {/* Chat List Sidebar */}
+      <div className="w-1/3 bg-white border-r border-gray-200 flex flex-col">
+        {/* Header */}
         <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-900">Customer Chats</h2>
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${
+                connectionStatus === 'connected' ? 'bg-green-500' : 
+                connectionStatus === 'connecting' ? 'bg-yellow-500' : 
+                'bg-red-500'
+              }`} title={`Connection: ${connectionStatus}`}></div>
+              
+              <button
+                onClick={loadChatRooms}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Refresh"
+                disabled={loading}
+              >
+                <RefreshCw className={`w-4 h-4 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          </div>
+          
           <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
-              placeholder="Search conversations..."
+              placeholder="Search chats..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
         </div>
 
-        {/* Chat Rooms List */}
+        {/* Error Display */}
+        {error && (
+          <div className="mx-4 my-2 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center">
+            <AlertCircle className="w-4 h-4 text-red-500 mr-2 flex-shrink-0" />
+            <span className="text-red-700 text-sm flex-1">{error}</span>
+            <button
+              onClick={() => setError('')}
+              className="ml-2 text-red-500 hover:text-red-700"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Debug Info */}
+        <div className="mx-4 my-2 p-2 bg-gray-100 rounded text-xs">
+          <div><strong>Manufacturer ID:</strong> {manufacturerId}</div>
+          <div><strong>Chat Rooms:</strong> {chatRooms.length}</div>
+          <div><strong>Selected:</strong> {selectedChat?._id || 'None'}</div>
+          <div><strong>Messages:</strong> {messages.length}</div>
+          <div><strong>Connection:</strong> {connectionStatus}</div>
+        </div>
+
+        {/* Chat List */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
             </div>
           ) : filteredChatRooms.length === 0 ? (
-            <div className="text-center p-8 text-gray-500">
-              <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              {searchTerm ? (
-                <>
-                  <p>No conversations found</p>
-                  <p className="text-sm">Try different search terms</p>
-                </>
-              ) : (
-                <>
-                  <p>No conversations yet</p>
-                  <p className="text-sm">Wholesellers will appear here when they start chatting</p>
-                </>
-              )}
+            <div className="flex flex-col items-center justify-center h-32 text-gray-500">
+              <MessageCircle className="w-8 h-8 mb-2" />
+              <p className="text-sm">No chat requests yet</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Manufacturer: {manufacturerInfo?.name || manufacturerInfo?.businessName || manufacturerId}
+              </p>
             </div>
           ) : (
             filteredChatRooms.map((chatRoom) => {
-              const wholeseller = getWholeseller(chatRoom);
-              const isOnline = wholeseller ? isUserOnline(wholeseller.userId) : false;
-              
+              const userName = getCurrentUserName(chatRoom);
+              const unreadCount = getUnreadCount(chatRoom);
+              const userOnline = isUserOnline(chatRoom);
+
               return (
                 <div
                   key={chatRoom._id}
-                  onClick={() => setSelectedChatRoom(chatRoom)}
+                  onClick={() => handleChatSelect(chatRoom)}
                   className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
-                    selectedChatRoom?._id === chatRoom._id ? 'bg-blue-50 border-blue-200' : ''
+                    selectedChat?._id === chatRoom._id ? 'bg-blue-50 border-blue-200' : ''
                   }`}
                 >
-                  <div className="flex items-start space-x-3">
-                    <div className="relative">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Users className="w-5 h-5 text-blue-600" />
-                      </div>
-                      {isOnline && (
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-medium text-gray-900 truncate">
-                          {wholeseller?.name || 'Wholeseller'}
-                        </h3>
-                        {chatRoom.lastMessage && (
-                          <span className="text-xs text-gray-500">
-                            {formatTime(chatRoom.lastMessage.timestamp)}
-                          </span>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-3 flex-1 min-w-0">
+                      <div className="relative flex-shrink-0">
+                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                          <User className="w-5 h-5 text-gray-600" />
+                        </div>
+                        {userOnline && (
+                          <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
                         )}
                       </div>
-                      <p className="text-sm text-gray-600 truncate flex items-center">
-                        <Package className="w-3 h-3 mr-1" />
-                        {chatRoom.productName}
-                      </p>
-                      {chatRoom.lastMessage && (
-                        <p className="text-xs text-gray-500 mt-1 truncate">
-                          {chatRoom.lastMessage.sender}: {chatRoom.lastMessage.message}
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-medium text-gray-900 truncate">
+                            {userName}
+                          </h3>
+                          {chatRoom.lastMessage?.timestamp && (
+                            <span className="text-xs text-gray-500">
+                              {formatTime(chatRoom.lastMessage.timestamp)}
+                            </span>
+                          )}
+                        </div>
+                        
+                        <p className="text-sm text-gray-600 truncate mb-1">
+                          {chatRoom.productName}
                         </p>
-                      )}
+                        
+                        {chatRoom.lastMessage && (
+                          <p className="text-sm text-gray-500 truncate">
+                            {chatRoom.lastMessage.sender === 'Manufacturer' ? 'You: ' : ''}
+                            {chatRoom.lastMessage.message}
+                          </p>
+                        )}
+                      </div>
                     </div>
+                    
+                    {unreadCount > 0 && (
+                      <div className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center ml-2 flex-shrink-0">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -522,202 +715,151 @@ const ManufacturerChat = ({ manufacturerId }) => {
         </div>
       </div>
 
-      {/* Main Chat Area */}
+      {/* Chat Area */}
       <div className="flex-1 flex flex-col">
-        {selectedChatRoom ? (
+        {selectedChat ? (
           <>
             {/* Chat Header */}
-            <div className="p-4 border-b border-gray-200 bg-white flex items-center justify-between">
+            <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="relative">
-                  <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                    <Users className="w-5 h-5 text-gray-600" />
+                  <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                    <User className="w-5 h-5 text-gray-600" />
                   </div>
-                  {getWholeseller(selectedChatRoom) && 
-                   isUserOnline(getWholeseller(selectedChatRoom).userId) && (
-                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                  {isUserOnline(selectedChat) && (
+                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
                   )}
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">
-                    {getWholeseller(selectedChatRoom)?.name || 'Wholeseller'}
+                    {getCurrentUserName(selectedChat)}
                   </h3>
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Package className="w-4 h-4 mr-1" />
-                    {selectedChatRoom.productName}
-                  </div>
+                  <p className="text-sm text-gray-600">
+                    {selectedChat.productName}
+                  </p>
+                  {isUserOnline(selectedChat) && (
+                    <p className="text-xs text-green-600">Online</p>
+                  )}
                 </div>
               </div>
+              
               <div className="flex items-center space-x-2">
-                <button className="p-2 hover:bg-gray-100 rounded-full">
-                  <Phone className="w-5 h-5 text-gray-600" />
+                <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                  <Phone className="w-4 h-4 text-gray-600" />
                 </button>
-                <button className="p-2 hover:bg-gray-100 rounded-full">
-                  <Video className="w-5 h-5 text-gray-600" />
+                <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                  <Video className="w-4 h-4 text-gray-600" />
                 </button>
-                <button className="p-2 hover:bg-gray-100 rounded-full">
-                  <MoreVertical className="w-5 h-5 text-gray-600" />
+                <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                  <MoreVertical className="w-4 h-4 text-gray-600" />
                 </button>
               </div>
             </div>
 
-            {/* Error Display */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 p-3 mx-4 mt-2 rounded-lg flex items-center">
-                <AlertCircle className="w-4 h-4 text-red-500 mr-2" />
-                <span className="text-red-700 text-sm flex-1">{error}</span>
-                <button
-                  onClick={() => setError('')}
-                  className="ml-auto text-red-500 hover:text-red-700"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-gray-500">
                   <div className="text-center">
-                    <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>No messages yet</p>
-                    <p className="text-sm">Start the conversation with this wholeseller</p>
+                    <MessageCircle className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                    <p>Start a conversation</p>
+                    <p className="text-xs text-gray-400 mt-1">Room ID: {selectedChat._id}</p>
                   </div>
                 </div>
               ) : (
-                messages.map((message) => {
-                  const isMine = isMyMessage(message);
-                  
-                  return (
-                    <div
-                      key={message._id}
-                      className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                          isMine
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-800 shadow-sm border'
-                        }`}
-                      >
-                        {!isMine && (
-                          <div className="text-xs font-medium text-gray-600 mb-1">
-                            {message.sender?.name || 'Wholeseller'}
-                          </div>
-                        )}
+                <>
+                  {messages.map((message, index) => {
+                    const showDate = index === 0 || 
+                      formatDate(messages[index - 1].createdAt) !== formatDate(message.createdAt);
 
-                        {message.messageType === 'image' ? (
-                          <div>
-                            <img
-                              src={message.imageUrl?.startsWith('http') 
-                                ? message.imageUrl 
-                                : `${API_BASE_URL}${message.imageUrl}`}
-                              alt="Shared image"
-                              className="rounded-lg mb-1 max-w-full h-auto cursor-pointer hover:opacity-90"
-                              onClick={() => window.open(
-                                message.imageUrl?.startsWith('http') 
-                                  ? message.imageUrl 
-                                  : `${API_BASE_URL}${message.imageUrl}`, 
-                                '_blank'
-                              )}
-                              onError={(e) => {
-                                e.target.style.display = 'none';
-                                console.error('Image failed to load:', message.imageUrl);
-                              }}
-                            />
-                            {message.content && message.content !== 'Image' && (
-                              <p className="text-sm">{message.content}</p>
-                            )}
+                    return (
+                      <div key={message._id || `msg-${index}`}>
+                        {showDate && (
+                          <div className="text-center my-4">
+                            <span className="bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full">
+                              {formatDate(message.createdAt)}
+                            </span>
                           </div>
-                        ) : (
-                          <p className="text-sm">{message.content}</p>
                         )}
                         
-                        <div className={`flex items-center justify-end mt-1 space-x-1 text-xs ${
-                          isMine ? 'text-blue-100' : 'text-gray-500'
-                        }`}>
-                          <span>{formatTime(message.createdAt)}</span>
-                          {isMine && (
-                            <div className="flex">
-                              {message.isRead ? (
-                                <CheckCheck className="w-3 h-3" />
-                              ) : (
-                                <Check className="w-3 h-3" />
-                              )}
+                        <div className={`flex ${isMyMessage(message) ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-xs lg:max-w-md px-3 py-2 rounded-lg ${
+                            isMyMessage(message)
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-white text-gray-800 border border-gray-200'
+                          }`}>
+                            {!isMyMessage(message) && (
+                              <div className="text-xs font-medium text-gray-600 mb-1">
+                                {message.sender?.name || message.senderName || 'Customer'}
+                              </div>
+                            )}
+                            
+                            {message.messageType === 'image' && message.imageUrl && (
+                              <div className="mb-2">
+                                <img
+                                  src={`${API_BASE_URL.replace('/api', '')}${message.imageUrl}`}
+                                  alt="Shared image"
+                                  className="rounded-lg max-w-full h-auto"
+                                />
+                              </div>
+                            )}
+                            
+                            <p className="text-sm">{message.content}</p>
+                            
+                            <div className={`flex items-center justify-end mt-1 space-x-1 ${
+                              isMyMessage(message) ? 'text-blue-200' : 'text-gray-500'
+                            }`}>
+                              <span className="text-xs">{formatTime(message.createdAt)}</span>
+                              {getDeliveryStatusIcon(message)}
                             </div>
-                          )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Typing Indicator */}
+                  {typingUsers.size > 0 && (
+                    <div className="flex justify-start">
+                      <div className="bg-white border border-gray-200 px-3 py-2 rounded-lg">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-600">
+                            {Array.from(typingUsers.values()).join(', ')} typing...
+                          </span>
+                          <div className="flex space-x-1">
+                            <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"></div>
+                            <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                            <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  );
-                })
-              )}
+                  )}
 
-              {/* Typing Indicator */}
-              {isTyping && (
-                <div className="flex justify-start">
-                  <div className="bg-white text-gray-800 px-4 py-2 rounded-lg shadow-sm border">
-                    <div className="flex items-center space-x-1">
-                      <span className="text-sm">{typingUser} is typing</span>
-                      <div className="flex space-x-1">
-                        <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  <div ref={messagesEndRef} />
+                </>
               )}
-
-              <div ref={messagesEndRef} />
             </div>
 
             {/* Message Input */}
-            <div className="border-t border-gray-200 bg-white p-4">
-              <div className="flex items-center space-x-3">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+            <div className="bg-white border-t border-gray-200 p-4">
+              <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => {
+                    setNewMessage(e.target.value);
+                    handleTyping();
+                  }}
+                  placeholder="Type a message..."
+                  className="flex-1 border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   disabled={sending}
-                >
-                  <Image className="w-5 h-5" />
-                </button>
+                />
                 
                 <button
-                  type="button"
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                  disabled={sending}
-                >
-                  <Paperclip className="w-5 h-5" />
-                </button>
-
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => {
-                      setNewMessage(e.target.value);
-                      handleTyping();
-                    }}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage(e);
-                      }
-                    }}
-                    placeholder="Type a message..."
-                    className="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    disabled={sending}
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleSendMessage}
+                  type="submit"
                   disabled={!newMessage.trim() || sending}
-                  className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {sending ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -725,30 +867,20 @@ const ManufacturerChat = ({ manufacturerId }) => {
                     <Send className="w-5 h-5" />
                   )}
                 </button>
-              </div>
-
-              {/* Hidden file input */}
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleImageSelect}
-                accept="image/*"
-                className="hidden"
-              />
+              </form>
             </div>
           </>
         ) : (
-          /* No Chat Selected */
           <div className="flex-1 flex items-center justify-center bg-gray-50">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Package className="w-8 h-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Manufacturer Chat Dashboard
-              </h3>
-              
-              
+            <div className="text-center text-gray-500">
+              <MessageCircle className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+              <h3 className="text-lg font-medium mb-2">Select a Chat</h3>
+              <p>Choose a customer conversation from the sidebar to start chatting</p>
+              {connectionStatus !== 'connected' && (
+                <p className="text-sm text-red-500 mt-2">
+                  Connection status: {connectionStatus}
+                </p>
+              )}
             </div>
           </div>
         )}

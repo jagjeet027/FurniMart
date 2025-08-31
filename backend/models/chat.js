@@ -1,16 +1,17 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 // Chat Room Schema
 const chatRoomSchema = new mongoose.Schema({
   participants: [{
     userId: {
       type: mongoose.Schema.Types.ObjectId,
-      required: true
+      required: true,
+      refPath: 'participants.userType'
     },
     userType: {
       type: String,
-      enum: ['wholeseller', 'manufacturer'],
-      required: true
+      required: true,
+      enum: ['wholeseller', 'retailer', 'manufacturer', 'user']
     },
     name: {
       type: String,
@@ -19,6 +20,10 @@ const chatRoomSchema = new mongoose.Schema({
     email: {
       type: String,
       required: true
+    },
+    joinedAt: {
+      type: Date,
+      default: Date.now
     }
   }],
   product: {
@@ -34,17 +39,34 @@ const chatRoomSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
   lastMessage: {
     message: String,
     timestamp: Date,
     sender: String
+  },
+  unreadCount: {
+    type: Map,
+    of: Number,
+    default: new Map()
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
   }
-}, {
-  timestamps: true
+});
+
+// Update the updatedAt field before saving
+chatRoomSchema.pre('save', function(next) {
+  this.updatedAt = new Date();
+  next();
 });
 
 // Message Schema
@@ -61,8 +83,8 @@ const messageSchema = new mongoose.Schema({
     },
     userType: {
       type: String,
-      enum: ['wholeseller', 'manufacturer'],
-      required: true
+      required: true,
+      enum: ['wholeseller', 'retailer', 'manufacturer', 'user']
     },
     name: {
       type: String,
@@ -71,40 +93,73 @@ const messageSchema = new mongoose.Schema({
   },
   messageType: {
     type: String,
-    enum: ['text', 'image'],
+    enum: ['text', 'image', 'file', 'system'],
     default: 'text'
   },
   content: {
     type: String,
-    required: true
+    required: function() {
+      return this.messageType === 'text' || this.messageType === 'system';
+    }
   },
   imageUrl: {
-    type: String
+    type: String,
+    required: function() {
+      return this.messageType === 'image';
+    }
   },
-  isRead: {
-    type: Boolean,
-    default: false
+  fileUrl: {
+    type: String,
+    required: function() {
+      return this.messageType === 'file';
+    }
+  },
+  fileName: {
+    type: String,
+    required: function() {
+      return this.messageType === 'file';
+    }
+  },
+  deliveryStatus: {
+    type: String,
+    enum: ['sent', 'delivered', 'read'],
+    default: 'sent'
   },
   readBy: [{
-    userId: mongoose.Schema.Types.ObjectId,
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true
+    },
     readAt: {
       type: Date,
       default: Date.now
     }
-  }]
-}, {
-  timestamps: true
+  }],
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
 });
 
-// Indexes for better performance
-chatRoomSchema.index({ 'participants.userId': 1 });
+// Update the updatedAt field before saving
+messageSchema.pre('save', function(next) {
+  this.updatedAt = new Date();
+  next();
+});
+
+// Create indexes for better query performance
+chatRoomSchema.index({ 'participants.userId': 1, 'participants.userType': 1 });
 chatRoomSchema.index({ product: 1 });
-chatRoomSchema.index({ createdAt: -1 });
+chatRoomSchema.index({ updatedAt: -1 });
 
 messageSchema.index({ chatRoom: 1, createdAt: -1 });
 messageSchema.index({ 'sender.userId': 1 });
+messageSchema.index({ deliveryStatus: 1 });
 
-const ChatRoom = mongoose.models.ChatRoom || mongoose.model('ChatRoom', chatRoomSchema);
-const Message = mongoose.models.Message || mongoose.model('Message', messageSchema);
-
-export { ChatRoom, Message };
+// Export models
+export const ChatRoom = mongoose.models.ChatRoom || mongoose.model('ChatRoom', chatRoomSchema);
+export const Message = mongoose.models.Message || mongoose.model('Message', messageSchema);
