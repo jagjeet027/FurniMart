@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-// Corrected import: added Minus and Plus
+import { useNavigate } from 'react-router-dom'; // Added useNavigate import
 import { ShoppingCart, Eye, Heart, Star, Package, Filter, Search, Loader2, RefreshCw, Truck, Shield, ArrowLeft, Minus, Plus, Trash2 } from 'lucide-react';
 
 import { useCart } from '../contexts/CartContext'
 
 const ProductCardDetails = () => {
+  const navigate = useNavigate(); // Added navigate hook
+  
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,14 +31,13 @@ const ProductCardDetails = () => {
     filterAndSortProducts();
   }, [products, searchTerm, sortBy, priceRange]);
 
-  // Remove loadCartFromStorage and updateCartInStorage functions as they're handled by context
-
   const loadWishlistFromStorage = () => {
     try {
       const storedWishlist = localStorage.getItem('wishlist');
       if (storedWishlist) {
         const wishlistData = JSON.parse(storedWishlist);
-        const wishlistSet = new Set(wishlistData.map(item => item.id || item));
+        // Handle both array of objects and array of IDs
+        const wishlistSet = new Set(wishlistData.map(item => item._id || item.id || item));
         setWishlist(wishlistSet);
       }
     } catch (error) {
@@ -117,15 +118,17 @@ const ProductCardDetails = () => {
   const updateWishlist = (newWishlist) => {
     setWishlist(newWishlist);
     
-    // Convert Set to array format for storage
+    // Convert Set to array format for storage - match ProductDetailPage format
     const wishlistArray = Array.from(newWishlist).map(productId => {
       const product = products.find(p => p._id === productId);
       return {
-        id: productId,
+        _id: productId, // Use _id to match ProductDetailPage format
         name: product?.name || 'Unknown Product',
         price: product?.price || 0,
+        rating: product?.rating,
+        reviews: product?.reviews,
         image: product?.image || null,
-        addedAt: new Date().toISOString()
+        images: product?.images
       };
     });
     
@@ -133,7 +136,12 @@ const ProductCardDetails = () => {
     
     // Dispatch event to notify other components
     window.dispatchEvent(new CustomEvent('wishlistUpdated', { 
-      detail: { wishlist: wishlistArray, action: 'update' } 
+      detail: { 
+        productId: Array.from(newWishlist)[Array.from(newWishlist).length - 1],
+        inWishlist: newWishlist.size > wishlist.size,
+        wishlist: wishlistArray, 
+        action: 'update' 
+      } 
     }));
   };
 
@@ -160,20 +168,27 @@ const ProductCardDetails = () => {
     }
   };
 
-  // Remove duplicate addToCart function as it's provided by context
-
+  // Fixed formatPrice function to match ProductDetailPage format
   const formatPrice = (price) => {
-    if (!price || isNaN(price)) return '$0.00';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(price);
+    // Handle different price formats - just return the price with $ symbol like ProductDetailPage
+    if (!price) return '$0';
+    
+    // If price is already a string with $, return as is
+    if (typeof price === 'string' && price.includes('$')) {
+      return price;
+    }
+    
+    // If it's a number, add $ symbol
+    const numPrice = parseFloat(price);
+    if (isNaN(numPrice)) return '$0';
+    
+    return `$${numPrice}`;
   };
 
+  // Fixed handleViewProduct function to actually navigate
   const handleViewProduct = (productId) => {
     console.log('Viewing product:', productId);
-    // Add navigation logic here if needed
-    // Example: navigate(`/products/${productId}`)
+    navigate(`/products/${productId}`); // Navigate to product detail page
   };
 
   const getStarRating = (rating = 4.0) => {
@@ -376,9 +391,9 @@ const ProductCardDetails = () => {
                       <div className="flex flex-col md:flex-row">
                         {/* Product Image */}
                         <div className="md:w-72 h-64 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center relative overflow-hidden group">
-                          {product.image ? (
+                          {product.image || (product.images && product.images[0]) ? (
                             <img 
-                              src={product.image} 
+                              src={product.images?.[0] || product.image} 
                               alt={product.name || 'Product Image'}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                               onError={(e) => {
@@ -392,7 +407,7 @@ const ProductCardDetails = () => {
                           {/* Fallback when no image or image fails to load */}
                           <div 
                             className="absolute inset-0 flex flex-col items-center justify-center text-center bg-gray-100"
-                            style={{ display: product.image ? 'none' : 'flex' }}
+                            style={{ display: (product.image || (product.images && product.images[0])) ? 'none' : 'flex' }}
                           >
                             <Package className="w-16 h-16 text-gray-400 mb-2" />
                             <p className="text-gray-500 text-sm font-medium">No Image Available</p>
@@ -439,7 +454,10 @@ const ProductCardDetails = () => {
                             {/* Header */}
                             <div className="flex-1">
                               <div className="flex justify-between items-start mb-3">
-                                <h3 className="text-xl font-bold text-gray-800 hover:text-blue-600 transition-colors cursor-pointer leading-tight">
+                                <h3 
+                                  className="text-xl font-bold text-gray-800 hover:text-blue-600 transition-colors cursor-pointer leading-tight"
+                                  onClick={() => handleViewProduct(product._id)}
+                                >
                                   {product.name || 'Product Name'}
                                 </h3>
                                 {product.categoryName && (
@@ -510,18 +528,18 @@ const ProductCardDetails = () => {
                               {/* Price Section */}
                               <div>
                                 <div className="flex items-center gap-3">
-                                  <span className="text-2xl font-bold text-green-600">
+                                  <span className="text-2xl font-bold text-blue-600">
                                     {formatPrice(product.price)}
                                   </span>
-                                  {product.originalPrice && product.originalPrice > product.price && (
+                                  {product.originalPrice && parseFloat(product.originalPrice) > parseFloat(product.price) && (
                                     <span className="text-sm text-gray-500 line-through">
                                       {formatPrice(product.originalPrice)}
                                     </span>
                                   )}
                                 </div>
-                                {product.originalPrice && product.originalPrice > product.price && (
+                                {product.originalPrice && parseFloat(product.originalPrice) > parseFloat(product.price) && (
                                   <p className="text-sm text-green-600 font-medium">
-                                    Save {formatPrice(product.originalPrice - product.price)}
+                                    Save {formatPrice(parseFloat(product.originalPrice) - parseFloat(product.price))}
                                   </p>
                                 )}
                               </div>

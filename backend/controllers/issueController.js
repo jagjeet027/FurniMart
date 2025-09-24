@@ -6,7 +6,7 @@ import { Manufacturer } from '../models/manufacturer.js';
 // Create new issue
 export const createIssue = async (req, res) => {
   try {
-    const { name, description, category, priority } = req.body;
+    const { name, description, category, } = req.body;
     const userId = req.user.id; // From auth middleware
 
     // Validate required fields
@@ -34,7 +34,6 @@ export const createIssue = async (req, res) => {
       userId,
       manufacturerId: manufacturer._id,
       category: category || 'general',
-      priority: priority || 'medium'
     });
 
     const savedIssue = await newIssue.save();
@@ -70,7 +69,6 @@ export const getAllIssues = async (req, res) => {
       page = 1,
       limit = 10,
       status,
-      priority,
       category,
       search,
       sortBy = 'createdAt',
@@ -102,7 +100,6 @@ export const getAllIssues = async (req, res) => {
     };
     
     if (status) filter.status = status;
-    if (priority) filter.priority = priority;
     if (category) filter.category = category;
     
     // Search functionality
@@ -230,7 +227,7 @@ export const getIssueById = async (req, res) => {
 export const updateIssue = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, status, priority, category, resolution } = req.body;
+    const { name, description, status, category, resolution } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
@@ -276,7 +273,6 @@ export const updateIssue = async (req, res) => {
     if (name) updateData.name = name.trim();
     if (description !== undefined) updateData.description = description.trim();
     if (category) updateData.category = category;
-    if (priority) updateData.priority = priority;
     
     // Only allow status update to specific values by manufacturer
     if (status && ['open', 'closed'].includes(status)) {
@@ -534,7 +530,7 @@ export const getIssueStats = async (req, res) => {
     console.log('Filtering issues with:', baseFilter);
 
     // Get statistics with error handling for each aggregation
-    const [totalIssues, statusStats, priorityStats, categoryStats, recentIssues] = await Promise.allSettled([
+    const [totalIssues, statusStats,  categoryStats, recentIssues] = await Promise.allSettled([
       // Total issues
       Issue.countDocuments(baseFilter),
       
@@ -543,13 +539,7 @@ export const getIssueStats = async (req, res) => {
         { $match: baseFilter },
         { $group: { _id: '$status', count: { $sum: 1 } } }
       ]),
-      
-      // By priority
-      Issue.aggregate([
-        { $match: baseFilter },
-        { $group: { _id: '$priority', count: { $sum: 1 } } }
-      ]),
-      
+            
       // By category
       Issue.aggregate([
         { $match: baseFilter },
@@ -576,7 +566,6 @@ export const getIssueStats = async (req, res) => {
     const resolvedStats = {
       total: handleResult(totalIssues, 0),
       statusStats: handleResult(statusStats, []),
-      priorityStats: handleResult(priorityStats, []),
       categoryStats: handleResult(categoryStats, []),
       recent: handleResult(recentIssues, 0)
     };
@@ -586,7 +575,6 @@ export const getIssueStats = async (req, res) => {
       total: resolvedStats.total,
       recent: resolvedStats.recent,
       byStatus: {},
-      byPriority: {},
       byCategory: {}
     };
 
@@ -594,10 +582,7 @@ export const getIssueStats = async (req, res) => {
     ['open', 'in-progress', 'resolved', 'closed'].forEach(status => {
       formattedStats.byStatus[status] = 0;
     });
-    ['low', 'medium', 'high', 'critical'].forEach(priority => {
-      formattedStats.byPriority[priority] = 0;
-    });
-    ['technical', 'billing', 'order', 'product', 'general'].forEach(category => {
+    ['technical', 'billing', 'order', 'product', 'general','other'].forEach(category => {
       formattedStats.byCategory[category] = 0;
     });
 
@@ -607,11 +592,7 @@ export const getIssueStats = async (req, res) => {
         formattedStats.byStatus[stat._id] = stat.count;
       }
     });
-    resolvedStats.priorityStats.forEach(stat => {
-      if (stat._id && typeof stat.count === 'number') {
-        formattedStats.byPriority[stat._id] = stat.count;
-      }
-    });
+
     resolvedStats.categoryStats.forEach(stat => {
       if (stat._id && typeof stat.count === 'number') {
         formattedStats.byCategory[stat._id] = stat.count;

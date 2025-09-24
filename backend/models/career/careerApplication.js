@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 const applicationSchema = new mongoose.Schema({
+  jobId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Job',
+    required: true
+  },
   
   applicantInfo: {
     name: {
@@ -21,8 +26,7 @@ const applicationSchema = new mongoose.Schema({
     },
     experience: {
       type: String,
-      required: true,
-      enum: ['0-1', '1-3', '3-5', '5-8', '8+']
+      required: true
     },
     linkedin: {
       type: String,
@@ -31,37 +35,59 @@ const applicationSchema = new mongoose.Schema({
     portfolio: {
       type: String,
       trim: true
+    },
+    
+    // Student/Educational Details
+    university: {
+      type: String,
+      trim: true
+    },
+    degree: {
+      type: String,
+      trim: true
+    },
+    graduationYear: {
+      type: String,
+      trim: true
+    },
+    cgpa: {
+      type: String,
+      trim: true
+    },
+    skills: {
+      type: String,
+      trim: true
+    },
+    address: {
+      type: String,
+      trim: true
     }
   },
+  
+  coverLetter: {
+    type: String,
+    required: true
+  },
+  
   resume: {
     filename: String,
     originalName: String,
     mimetype: String,
     size: Number,
-    path: String,
-    uploadDate: {
-      type: Date,
-      default: Date.now
-    }
+    path: String
   },
-  coverLetter: {
-    type: String,
-    required: true,
-    maxlength: 2000
-  },
+  
   status: {
     type: String,
-    enum: ['Submitted', 'Under Review', 'Shortlisted', 'Interview Scheduled', 'Interview Completed', 'Selected', 'Rejected', 'Withdrawn'],
-    default: 'Submitted'
+    enum: ['submitted', 'under-review', 'shortlisted', 'interview-scheduled', 'selected', 'rejected'],
+    default: 'submitted'
   },
+  
   applicationDate: {
     type: Date,
     default: Date.now
   },
-  lastStatusUpdate: {
-    type: Date,
-    default: Date.now
-  },
+  
   reviewNotes: [{
     reviewer: {
       type: mongoose.Schema.Types.ObjectId,
@@ -78,61 +104,34 @@ const applicationSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
+  
   interview: {
-    scheduled: {
-      type: Boolean,
-      default: false
-    },
-    date: Date,
-    time: String,
+    scheduledDate: Date,
     interviewer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
     },
-    mode: {
+    notes: String,
+    feedback: String,
+    result: {
       type: String,
-      enum: ['In-person', 'Video Call', 'Phone'],
-      default: 'Video Call'
-    },
-    feedback: {
-      technical: Number,
-      communication: Number,
-      cultureFit: Number,
-      overall: Number,
-      comments: String
+      enum: ['pending', 'passed', 'failed']
     }
   },
-  source: {
-    type: String,
-    enum: ['Website', 'LinkedIn', 'Referral', 'Job Portal', 'Campus', 'Walk-in'],
-    default: 'Website'
-  },
-  referredBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+  
+  lastUpdated: {
+    type: Date,
+    default: Date.now
   }
 }, {
   timestamps: true
 });
 
 // Indexes for better query performance
-applicationSchema.index({ jobId: 1, status: 1 });
-applicationSchema.index({ 'applicantInfo.email': 1 });
+applicationSchema.index({ jobId: 1, 'applicantInfo.email': 1 }, { unique: true });
+applicationSchema.index({ status: 1 });
 applicationSchema.index({ applicationDate: -1 });
-applicationSchema.index({ status: 1, lastStatusUpdate: -1 });
-
-// Update lastStatusUpdate when status changes
-applicationSchema.pre('save', function(next) {
-  if (this.isModified('status')) {
-    this.lastStatusUpdate = new Date();
-  }
-  next();
-});
-
-// Virtual for days since application
-applicationSchema.virtual('daysSinceApplication').get(function() {
-  return Math.floor((Date.now() - this.applicationDate) / (1000 * 60 * 60 * 24));
-});
+applicationSchema.index({ 'applicantInfo.university': 1 });
 
 const Application = mongoose.model('Application', applicationSchema);
 

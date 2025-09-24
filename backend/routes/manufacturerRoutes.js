@@ -1,9 +1,9 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
-// import { authenticateToken } from '../middleware/authMiddleware.js';
+import { authenticateToken } from '../middleware/authMiddleware.js';
 import { Manufacturer } from '../models/manufacturer.js';
-import {User}from '../models/Users.js'; 
+import { User } from '../models/Users.js'; 
 import fs from 'fs';
 
 const router = express.Router();
@@ -38,7 +38,6 @@ const upload = multer({
   }
 });
 
-// GET /api/manufacturers/all - Get all manufacturers (admin only) - MOVED TO TOP
 router.get('/all',  async (req, res) => {
   try {
     console.log('=== GET ALL MANUFACTURERS ===');
@@ -72,7 +71,7 @@ router.get('/all',  async (req, res) => {
 });
 
 // GET /api/manufacturers/me - Get current user's manufacturer info
-router.get('/me',  async (req, res) => {
+router.get('/me', authenticateToken, async (req, res) => {
   try {
     console.log('=== GET MY MANUFACTURER INFO ===');
     console.log('User ID:', req.userId);
@@ -106,6 +105,7 @@ router.get('/me',  async (req, res) => {
 
 // POST /api/manufacturers/register
 router.post('/register', 
+  authenticateToken,
   upload.fields([
     { name: 'businessLicense', maxCount: 1 },
     { name: 'taxCertificate', maxCount: 1 },
@@ -216,9 +216,6 @@ router.post('/register',
 
       await manufacturer.save();
 
-      // Update user's manufacturer status
-      await User.findByIdAndUpdate(req.userId, { isManufacturer: true });
-
       console.log('✅ Manufacturer registered successfully');
 
       res.status(201).json({
@@ -253,7 +250,7 @@ router.post('/register',
 );
 
 // GET /api/manufacturers/:id - Get manufacturer by ID
-router.get('/:id',  async (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -262,7 +259,7 @@ router.get('/:id',  async (req, res) => {
     console.log('Requesting user:', req.userId);
     
     const manufacturer = await Manufacturer.findById(id)
-      .populate('userId', 'email username')
+      .populate('userId', 'email name')
       .lean();
 
     if (!manufacturer) {
@@ -270,6 +267,15 @@ router.get('/:id',  async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Manufacturer not found'
+      });
+    }
+
+    // Check if user has permission to view this manufacturer
+    // Allow if: user is the manufacturer owner, or user is admin
+    if (manufacturer.userId._id.toString() !== req.userId && !req.user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
       });
     }
 
@@ -290,7 +296,7 @@ router.get('/:id',  async (req, res) => {
 });
 
 // Enhanced document download route with better error handling and security
-router.get('/documents/:filename',  async (req, res) => {
+router.get('/documents/:filename', authenticateToken, async (req, res) => {
   try {
     const { filename } = req.params;
     console.log('=== DOWNLOAD DOCUMENT ===');
@@ -432,8 +438,8 @@ router.get('/documents/:filename',  async (req, res) => {
   }
 });
 
-// PATCH /api/manufacturers/:id/status - Update manufacturer status
-router.patch('/:id/status',  async (req, res) => {
+// PATCH /api/manufacturers/:id/status - Update manufacturer status (admin only)
+router.patch('/:id/status', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -441,7 +447,14 @@ router.patch('/:id/status',  async (req, res) => {
     console.log('=== UPDATE MANUFACTURER STATUS ===');
     console.log('Manufacturer ID:', id);
     console.log('New Status:', status);
-    console.log('User:', req.userId);
+
+    // Check if user is admin
+    if (!req.user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
 
     // Validate status
     if (!['pending', 'approved', 'rejected'].includes(status)) {
@@ -451,19 +464,29 @@ router.patch('/:id/status',  async (req, res) => {
       });
     }
 
-    // Find and update manufacturer
-    const manufacturer = await Manufacturer.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true }
-    ).populate('userId', 'email username');
-
-    if (!manufacturer) {
+    // Find manufacturer first to get userId
+    const manufacturerBeforeUpdate = await Manufacturer.findById(id);
+    if (!manufacturerBeforeUpdate) {
       console.log('❌ Manufacturer not found');
       return res.status(404).json({
         success: false,
         message: 'Manufacturer not found'
       });
+    }
+
+    // Update manufacturer status
+    const manufacturer = await Manufacturer.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true }
+    ).populate('userId', 'email name'); // Only populate User fields that exist
+
+    // If status is approved, update user's isManufacturer to true
+    // If status is rejected, set isManufacturer to false
+    if (status === 'approved') {
+      await User.findByIdAndUpdate(manufacturerBeforeUpdate.userId, { isManufacturer: true });
+    } else if (status === 'rejected') {
+      await User.findByIdAndUpdate(manufacturerBeforeUpdate.userId, { isManufacturer: false });
     }
 
     console.log('✅ Status updated successfully');
@@ -479,6 +502,84 @@ router.patch('/:id/status',  async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error while updating status',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// DELETE /api/manufacturers/:id - Delete manufacturer (admin only)
+router.delete('/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log('=== DELETE MANUFACTURER ===');
+    console.log('Manufacturer ID:', id);
+    console.log('User:', req.userId);
+
+    // Check if user is admin
+    if (!req.user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
+    // Find manufacturer to get file paths and userId
+    const manufacturer = await Manufacturer.findById(id);
+    if (!manufacturer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Manufacturer not found'
+      });
+    }
+
+    // Delete associated files
+    const filesToDelete = [];
+    
+    if (manufacturer.documents.businessLicense?.path) {
+      filesToDelete.push(manufacturer.documents.businessLicense.path);
+    }
+    
+    if (manufacturer.documents.taxCertificate?.path) {
+      filesToDelete.push(manufacturer.documents.taxCertificate.path);
+    }
+    
+    if (manufacturer.documents.qualityCertifications) {
+      manufacturer.documents.qualityCertifications.forEach(cert => {
+        if (cert.path) filesToDelete.push(cert.path);
+      });
+    }
+
+    // Delete files from filesystem
+    filesToDelete.forEach(filePath => {
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`✅ Deleted file: ${filePath}`);
+        }
+      } catch (error) {
+        console.error(`❌ Error deleting file ${filePath}:`, error);
+      }
+    });
+
+    // Delete manufacturer record
+    await Manufacturer.findByIdAndDelete(id);
+
+    // Update user's isManufacturer status to false
+    await User.findByIdAndUpdate(manufacturer.userId, { isManufacturer: false });
+
+    console.log('✅ Manufacturer deleted successfully');
+
+    res.json({
+      success: true,
+      message: 'Manufacturer deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Error deleting manufacturer:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while deleting manufacturer',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

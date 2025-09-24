@@ -27,14 +27,10 @@ const issueSchema = new mongoose.Schema({
     enum: ['open', 'in-progress', 'resolved', 'closed'],
     default: 'open'
   },
-  priority: {
-    type: String,
-    enum: ['low', 'medium', 'high', 'critical'],
-    default: 'medium'
-  },
+
   category: {
     type: String,
-    enum: ['technical', 'billing', 'order', 'product', 'general'],
+    enum: ['technical', 'billing', 'order', 'product', 'general', 'other'],
     default: 'general'
   },
   assignedTo: {

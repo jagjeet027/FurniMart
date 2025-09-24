@@ -53,7 +53,7 @@ const candidateSchema = new mongoose.Schema({
   skills: [{
     type: String,
     trim: true,
-    maxlength: [50, 'Each skill cannot exceed 50 characters']
+    maxlength: [100, 'Each skill cannot exceed 50 characters']
   }],
   projects: [{ 
     title: {

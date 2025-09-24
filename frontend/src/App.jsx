@@ -1,5 +1,3 @@
-// App.js - Updated routing configuration with CartProvider
-
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import Header from './components/Header';
@@ -9,7 +7,7 @@ import './index.css';
 import Footer from './components/Footer';
 import SignupPage from './components/SignUpPage';
 import { AuthProvider } from './contexts/AuthContext';
-import { CartProvider } from './contexts/CartContext'; // Import CartProvider
+import { CartProvider } from './contexts/CartContext';
 import Dashboard from './components/manufacturer/Dashboard';    
 import PrivateRoute from './components/PrivateRoute';
 import ProductCard from './components/ProductCardDetails.jsx';
@@ -19,7 +17,6 @@ import PremiumFeatures from './components/manufacturer/PremiumFeatures'
 import IssuesPage from './components/manufacturer/IdeaPage.jsx';
 import IssueDetailPage from './components/manufacturer/IdeaDetailPage.jsx';
 import Profile from './components/manufacturer/Profile';
-import StaffHiring from './components/Recruitment/pages/StaffHiring'
 import Faq from './components/Faqsection/Faq.jsx'
 import Orders from './orderpages/CheckoutPage.jsx'
 import OrderTrackingPage from './orderpages/OrderTrackingPage.jsx';
@@ -32,47 +29,9 @@ import CartPage from './orderpages/CartPage.jsx';
 import CategoryProductsPage from './components/userDashBoard/CategoryProductsPage.jsx';
 import CategoriesOverviewPage from './components/userDashBoard/CategoriesOverviewPage.jsx';
 import APIDebugComponent from './services/APIDebugComponent.jsx';
-import CareerHomePage from './careerPortal/CareerHomePage.jsx';
-
-import { socket } from "./services/socketService";
 
 const App = () => {
   const location = useLocation();
-  const [issues, setIssues] = useState({});
-  const [messages, setMessages] = useState([]);
-
-  useEffect(() => {
-    // Socket event handlers
-    const handleSupportIssues = (data) => setIssues(data);
-    const handleIssueResponse = (data) => {
-      setMessages((prev) => [ 
-        ...prev,
-        {
-          type: "response",
-          title: data.issue,
-          content: data.response,
-        },
-      ]);
-    };
-    socket.on("supportIssues", handleSupportIssues);
-    socket.on("issueResponse", handleIssueResponse);
-    return () => {
-      socket.off("supportIssues", handleSupportIssues);
-      socket.off("issueResponse", handleIssueResponse);
-    };
-  }, []);
-
-  const handleIssueClick = (key) => {
-    setMessages((prev) => [
-      ...prev,
-      {
-        type: "issue",
-        title: issues[key].title,
-        content: issues[key].title,
-      },
-    ]);
-    socket.emit("selectIssue", key);
-  };
 
   // Paths that should not show header/footer
   const noHeaderFooterPaths = [
@@ -112,47 +71,60 @@ const App = () => {
       {!hideHeaderFooter && <Header />}
       <main className={`flex-1 ${shouldShowMobileFooter ? 'pb-16 md:pb-0' : ''}`}>
         <Routes>
+          {/* AUTHENTICATION ROUTES - First Priority */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          
+          {/* EXACT STATIC ROUTES - Second Priority */}
+          <Route path="/checkout" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/wishlist" element={<PrivateRoute><WishlistPage /></PrivateRoute>} />
+          <Route path="/order-tracking" element={<PrivateRoute><OrderTrackingPage /></PrivateRoute>} />
+          
+          {/* CHAT AND SUPPORT ROUTES */}
           <Route path="/chatsupport" element={<Navigate to="/chat" />} />
-          <Route path="/chat" element={<ChatScreen issues={issues} messages={messages} onIssueSelect={handleIssueClick} />} />
+          <Route path="/chat" element={<ChatScreen />} />
           
           {/* HOME PAGE ROUTE */}
           <Route path="/" element={
             <div className="space-y-0">
-            <FurnitureMarketplace />
-            <ProductCard />
+              <FurnitureMarketplace />
+              <ProductCard />
             </div>
-            } />
+          } />
           
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
+          {/* PROFILE ROUTES */}
           <Route path="/profile" element={<PrivateRoute><Profile/></PrivateRoute>} />
 
-
-          <Route path="/products" element={<PrivateRoute><ProductManagement /></PrivateRoute>} />
-          <Route path="/products/:id" element={<ProductDetailPage />} />
-          <Route path="/products/:id/edit" element={<PrivateRoute><EditProduct /></PrivateRoute>} />
-
+          {/* PRODUCT MANAGEMENT ROUTES - Before dynamic product routes */}
+          <Route path="/products/management" element={<PrivateRoute><ProductManagement /></PrivateRoute>} />
+          
+          {/* CATEGORIES ROUTES */}
           <Route path="/categories" element={<Navigate to="/categories/overview" replace />} />
           <Route path="/categories/overview" element={<CategoriesOverviewPage />} />
-          
           <Route path="/categories/:categoryId/products" element={<CategoryProductsPage />} />
           <Route path="/category/:id" element={<Navigate to="/categories/:id/products" replace />} />
+          
+          {/* FAQ AND ORDER ROUTES */}
           <Route path="/order" element={<Orders />} />
           <Route path="/faqsection" element={<Faq />} />
-          <Route path="/manufacturer/register" element={<ManufacturerRegistration />} />
-          <Route path="/manufacturer/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>}/>
           
-          <Route path="ideas" element={<PrivateRoute><IssuesPage /></PrivateRoute>} />
-          <Route path="idea/:id" element={<PrivateRoute><IssueDetailPage /></PrivateRoute>} />
-
+          {/* MANUFACTURER ROUTES */}
+          <Route path="/manufacturer/register" element={<ManufacturerRegistration />} />
+          <Route path="/manufacturer/dashboard" element={<PrivateRoute><Dashboard /> </PrivateRoute>}/>
           <Route path="/premium" element={<PrivateRoute><PremiumFeatures /></PrivateRoute>}/>
-          <Route path="/recruitment/staff/dashboard" element={<PrivateRoute><StaffHiring/></PrivateRoute>}/>
-          <Route path="/checkout" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
-          <Route path="/order-tracking" element={<PrivateRoute><OrderTrackingPage /></PrivateRoute>} />
-          <Route path="/wishlist" element={<PrivateRoute><WishlistPage /></PrivateRoute>} />
-          <Route path= "/cart" element={<PrivateRoute><CartPage/></PrivateRoute>} />
+          
+          {/* IDEAS ROUTES */}
+          <Route path="/ideas" element={<PrivateRoute><IssuesPage /></PrivateRoute>} />
+          <Route path="/idea/:id" element={<PrivateRoute><IssueDetailPage /></PrivateRoute>} />
+
+          {/* DEBUG ROUTE */}
           <Route path="/debug-api" element={<APIDebugComponent />} />
-          <Route path="/career/portal" element={<CareerHomePage />} />
+          
+          {/* DYNAMIC PRODUCT ROUTES - Must come LAST */}
+          <Route path="/products" element={<ProductManagement />} />
+          <Route path="/products/:id/edit" element={<PrivateRoute><EditProduct /></PrivateRoute>} />
+          <Route path="/products/:id" element={<ProductDetailPage />} />
         </Routes>
       </main>
 

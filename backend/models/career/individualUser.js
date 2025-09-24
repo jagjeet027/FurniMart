@@ -40,7 +40,12 @@ const individualUserSchema = new mongoose.Schema({
     experienceLevel: {
       type: String,
       required: true,
-      enum: ['Entry Level (0-1 years)', 'Junior (1-3 years)','Mid Level (2-5 years)', 'Senior Level (5-10 years)', 'Expert Level (10+ years)']
+      enum: ['Entry Level (0-1 years)',
+    'Junior (1-3 years)',
+    'Mid Level (3-5 years)',
+    'Senior (5-8 years)',
+    'Lead (8+ years)',
+    'Executive (10+ years)']
     },
     skills: [{
       type: String,

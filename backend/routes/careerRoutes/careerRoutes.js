@@ -3,52 +3,42 @@ import Job from '../../models/career/job.js';
 import Application from '../../models/career/careerApplication.js';
 import * as jobController from '../../controllers/careerController/jobController.js';
 import * as applicationController from '../../controllers/careerController/careerApplicationController.js';
+import multer from 'multer';
 // import { authenticateToken, isAdmin } from '../middleware/auth.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const router = express.Router();
-
 
 // Public routes - No authentication required for viewing jobs
 router.get('/jobs', jobController.getAllJobs);
 router.get('/jobs/:id', jobController.getJobById);
 router.get('/departments', jobController.getDepartments);
 
+// Job management routes (Admin)
 router.post('/jobs', jobController.createJob);
 router.put('/jobs/:id', jobController.updateJob);
-router.delete('/jobs/:id',  jobController.deleteJob);
-router.get('/admin/jobs/stats', jobController.getJobStats);
+router.delete('/jobs/:id', jobController.deleteJob);
 
+// IMPORTANT: Stats routes must come BEFORE parameterized routes
+router.get('/admin/jobs/stats', jobController.getJobStats);
+router.get('/admin/applications/stats', applicationController.getApplicationStats);
+
+// Application routes
 router.post('/jobs/:jobId/apply',
   applicationController.upload.single('resume'),
   applicationController.submitApplication
 );
 
-router.get('/admin/applications',
-  applicationController.getAllApplications
-);
+// Admin application management routes
+router.get('/admin/applications', applicationController.getAllApplications);
 
-router.get('/admin/applications/:id',
-  applicationController.getApplicationById
-);
+// IMPORTANT: Specific routes (stats, resume) must come before parameterized routes (:id)
+router.get('/admin/resume/:filename', applicationController.downloadResume);
 
-router.put('/admin/applications/:id/status',
-  applicationController.updateApplicationStatus
-);
+// Parameterized routes come AFTER specific routes
+router.get('/admin/applications/:id', applicationController.getApplicationById);
+router.put('/admin/applications/:id/status', applicationController.updateApplicationStatus);
 
-router.post('/admin/applications/:id/interview',
-  applicationController.scheduleInterview
-);
-
-router.get('/admin/analytics',
-  applicationController.getApplicationAnalytics
-);
-
-
+// File upload test route
 router.post('/upload-resume',
   applicationController.upload.single('resume'),
   (req, res) => {
@@ -61,24 +51,14 @@ router.post('/upload-resume',
       file: {
         filename: req.file.filename,
         originalName: req.file.originalname,
-        size: req.file.size
+        size: req.file.size,
+        path: req.file.path
       }
     });
   }
 );
 
-router.get('/admin/resume/:filename', (req, res) => {
-  const { filename } = req.params;
-  const filePath = path.join(__dirname, '../uploads/resumes/', filename);
-  
-  res.download(filePath, (err) => {
-    if (err) {
-      res.status(404).json({ message: 'File not found' });
-    }
-  });
-});
-
-
+// Error handling middleware
 router.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {

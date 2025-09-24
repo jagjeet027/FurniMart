@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
 import mongoSanitize from 'express-mongo-sanitize';
 import xss from 'xss-clean';
 import compression from 'compression';
@@ -16,6 +15,7 @@ import connectDB from './db/db.js';
 import { setupSocket } from './config/socketConfig.js';
 import { predefinedIssues } from './data/issues.js';
 
+import adminRoutes from './routes/adminRoutes.js';
 // Routes
 import userRoutes from './routes/userRoutes.js';
 import manufacturerRoutes from './routes/manufacturerRoutes.js';
@@ -171,35 +171,12 @@ app.use(
   })
 );
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: {
-    status: 'error',
-    message: 'Too many requests from this IP, please try again later.'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
-// Apply rate limiter to API routes
-app.use('/api/', limiter);
 
 // Body parser middleware
 app.use(express.json({ limit: '10mb' })); // Increased for chat images
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Request timeout middleware
-app.use((req, res, next) => {
-  res.setTimeout(30000, () => {
-    res.status(408).json({
-      status: 'error',
-      message: 'Request Timeout'
-    });
-  });
-  next();
-});
 
 // Security middleware
 app.use(mongoSanitize());
@@ -235,6 +212,7 @@ app.get('/api/health', (req, res) => {
 // API Routes
 app.use('/api/users', userRoutes);
 app.use('/api/manufacturers', manufacturerRoutes);
+app.use('/api/admin', adminRoutes);   
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/products', productRoutes);
@@ -256,6 +234,15 @@ app.post('/api/chatbot', (req, res) => {
       message: 'User input is required'
     });
   }
+
+  app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+// Serve main page
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
   
   // Simple matching algorithm - can be enhanced with fuzzy search
   const matchedIssue = predefinedIssues.find(item => 

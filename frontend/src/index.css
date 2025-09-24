@@ -20,12 +20,17 @@
 .animate-fadeIn {
   animation: fadeIn 1.5s ease-in-out;
 }
+html {
+  scroll-behavior: smooth;
+}
 
 body {
   margin: 0;
   font-family: "Roboto", sans-serif;
   background: linear-gradient(to bottom, #f4f4f4, #e0e0e0);
+  overflow-x: hidden;
 }
+
 
 .card:hover {
   transition: transform 0.3s ease;

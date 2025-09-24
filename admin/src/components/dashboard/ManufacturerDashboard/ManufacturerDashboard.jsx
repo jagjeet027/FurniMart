@@ -10,7 +10,7 @@ import InnovationsSection from '../ManufacturerDashboard/InnovationsSection';
 import ManufacturersSection from '../ManufacturerDashboard/ManufacturersSection';
 import NotificationsPanel from '../ManufacturerDashboard/NotificationsPanel';
 import AdminJobDashboard from './career/AdminJobDashboard';
-import IdeaDetailsPage from './IdeaDetailPage';
+import IdeaDetailsPage from './IdeaPage';
 import { mockApi } from '../../../services/api';
 import OrganizationSection from './career/OrganizationSection';
 // Import your existing Organization and Individuals components

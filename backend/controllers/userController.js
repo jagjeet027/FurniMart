@@ -173,6 +173,7 @@ const loginUser = asyncHandler(async (req, res) => {
       id: user._id, 
       email: user.email,
       isManufacturer: user.isManufacturer || false,
+      isAdmin: user.isAdmin || false,
       role: user.role || 'user'
     },
     process.env.JWT_SECRET,
@@ -183,10 +184,11 @@ const loginUser = asyncHandler(async (req, res) => {
     { 
       id: user._id,
       email: user.email,
-      isManufacturer: user.isManufacturer || false
+      isManufacturer: user.isManufacturer || false,
+      isAdmin: user.isAdmin || false
     },
     process.env.JWT_REFRESH_SECRET,
-    { expiresIn: '7d' }  // Extended refresh token duration
+    { expiresIn: '7d' }
   );
 
   // Update user with new refresh token
@@ -194,62 +196,190 @@ const loginUser = asyncHandler(async (req, res) => {
   user.refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   await user.save({ validateBeforeSave: false });
 
+  // FIXED: Set refresh token as httpOnly cookie with proper settings
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Changed for CORS
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/' // Ensure cookie is available for all paths
+  };
+
+  console.log('Setting refresh token cookie with options:', cookieOptions);
+  res.cookie('refreshToken', refreshToken, cookieOptions);
+
   // Respond with tokens
   res.status(200).json({
     success: true,
     accessToken,
-    refreshToken,  // Include refresh token in response
+    refreshToken,  // Include refresh token in response for debugging
     expiresIn: '1h',
     user: {
       id: user._id,
       email: user.email,
       name: user.name,
-      isManufacturer: user.isManufacturer || false
+      isManufacturer: user.isManufacturer || false,
+      isAdmin: user.isAdmin || false
     }
   });
 });
 
 const refreshToken = asyncHandler(async (req, res) => {
   try {
-    const { refreshToken } = req.cookies;
+    console.log('=== REFRESH TOKEN REQUEST ===');
+    console.log('All Cookies:', req.cookies);
+    console.log('Headers:', req.headers);
+    console.log('Body:', req.body);
 
-    if (!refreshToken) {
-      return res.status(401).json({ message: 'Refresh token not found' });
+    // FIXED: Try multiple ways to get the refresh token
+    let token = req.cookies?.refreshToken || 
+                req.body?.refreshToken || 
+                req.headers['x-refresh-token'] ||
+                (req.headers.authorization && req.headers.authorization.startsWith('Refresh ') 
+                  ? req.headers.authorization.slice(8) : null);
+
+    console.log('Extracted refresh token:', token ? 'Token present' : 'No token found');
+
+    if (!token) {
+      console.log('❌ No refresh token found in cookies, body, or headers');
+      
+      // Clear any invalid refresh token cookie
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        path: '/'
+      });
+      
+      return res.status(401).json({ 
+        success: false,
+        message: 'Refresh token not found',
+        debug: {
+          cookiesPresent: !!req.cookies,
+          bodyPresent: !!req.body,
+          refreshTokenInBody: !!req.body?.refreshToken
+        }
+      });
     }
 
+    console.log('🔍 Verifying refresh token...');
+
     // Verify refresh token
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+    console.log('✅ Token decoded:', { userId: decoded.id, email: decoded.email });
+
+    // FIXED: Find user and validate refresh token
     const user = await User.findOne({
       _id: decoded.id,
-      refreshToken,
+      refreshToken: token,
       refreshTokenExpiresAt: { $gt: new Date() }
     });
 
     if (!user) {
-      return res.status(401).json({ message: 'Invalid refresh token' });
+      console.log('❌ User not found or refresh token expired/invalid');
+      console.log('Expected token in DB:', user?.refreshToken);
+      console.log('Received token:', token);
+      
+      // Clear the invalid refresh token cookie
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        path: '/'
+      });
+      
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid or expired refresh token' 
+      });
     }
+
+    console.log('✅ User found, generating new access token...');
 
     // Generate new access token
     const accessToken = jwt.sign(
-      { id: user._id, email: user.email },
+      { 
+        id: user._id, 
+        email: user.email,
+        isManufacturer: user.isManufacturer || false,
+        isAdmin: user.isAdmin || false,
+        role: user.role || 'user'
+      },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
+    // OPTIONAL: Generate new refresh token for rotation
+    const newRefreshToken = jwt.sign(
+      { 
+        id: user._id,
+        email: user.email,
+        isManufacturer: user.isManufacturer || false,
+        isAdmin: user.isAdmin || false
+      },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Update user with new refresh token
+    user.refreshToken = newRefreshToken;
+    user.refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await user.save({ validateBeforeSave: false });
+
+    // Set new refresh token cookie
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/'
+    };
+    
+    res.cookie('refreshToken', newRefreshToken, cookieOptions);
+
+    console.log('✅ New access token generated successfully');
+
     res.status(200).json({
+      success: true,
       accessToken,
+      refreshToken: newRefreshToken, // Include in response for debugging
       expiresIn: '1h'
     });
   } catch (error) {
-    console.error('Error refreshing token:', error);
-    res.status(401).json({ message: 'Invalid refresh token' });
+    console.error('❌ Error refreshing token:', error.name, error.message);
+    
+    // Clear the invalid refresh token cookie
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      path: '/'
+    });
+
+    // Handle different JWT errors
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Refresh token has expired' 
+      });
+    } else if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid refresh token format' 
+      });
+    } else {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid refresh token' 
+      });
+    }
   }
 });
 
-// ADD THIS NEW FUNCTION - Get User Profile
+// Get User Profile
 const getUserProfile = asyncHandler(async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password -refreshToken');
+    const user = await User.findById(req.user.id || req.userId).select('-password -refreshToken');
     
     if (!user) {
       return res.status(404).json({ 
@@ -259,15 +389,18 @@ const getUserProfile = asyncHandler(async (req, res) => {
     }
 
     res.status(200).json({
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      isManufacturer: user.isManufacturer || false,
-      role: user.role || 'user',
-      manufacturerProfile: user.manufacturerProfile || null,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        isManufacturer: user.isManufacturer || false,
+        isAdmin: user.isAdmin || false,
+        role: user.role || 'user',
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      }
     });
   } catch (error) {
     console.error('Error fetching user profile:', error);
@@ -279,7 +412,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
 });
 
 const updateUserToManufacturer = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id);
+  const user = await User.findById(req.user.id || req.userId);
 
   if (!user) {
     res.status(404);
@@ -293,18 +426,20 @@ const updateUserToManufacturer = asyncHandler(async (req, res) => {
   const updatedUser = await user.save();
 
   res.json({
-    id: updatedUser._id,
-    name: updatedUser.name,
-    email: updatedUser.email,
-    isManufacturer: updatedUser.isManufacturer,
-    manufacturerProfile: updatedUser.manufacturerProfile,
+    success: true,
+    user: {
+      id: updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      isManufacturer: updatedUser.isManufacturer,
+    }
   });
 });
 
 const logoutUser = asyncHandler(async (req, res) => {
   try {
     // Get user from the request (assuming auth middleware sets req.user)
-    const userId = req.user.id;
+    const userId = req.user.id || req.userId;
     
     if (!userId) {
       return res.status(401).json({ 
@@ -328,8 +463,13 @@ const logoutUser = asyncHandler(async (req, res) => {
     user.refreshTokenExpiresAt = undefined;
     await user.save({ validateBeforeSave: false });
     
-    // Clear refresh token cookie if you're using cookies
-    res.clearCookie('refreshToken');
+    // Clear refresh token cookie with proper options
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      path: '/'
+    });
     
     return res.status(200).json({
       success: true,
@@ -350,8 +490,7 @@ export {
   registerUser, 
   loginUser, 
   refreshToken, 
-  getUserProfile,  // ADD THIS EXPORT
+  getUserProfile,
   updateUserToManufacturer,
   logoutUser 
 };
-

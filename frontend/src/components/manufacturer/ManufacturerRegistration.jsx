@@ -4,6 +4,41 @@ import { useAuth } from '../../contexts/AuthContext';
 import { motion } from 'framer-motion';
 import api from '../../axios/axiosInstance'; // Use the configured api instance
 
+// AlreadySubmittedPopup component
+const AlreadySubmittedPopup = ({ onClose }) => (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+  >
+    <motion.div
+      initial={{ scale: 0.9, y: 20 }}
+      animate={{ scale: 1, y: 0 }}
+      exit={{ scale: 0.9, y: 20 }}
+      className="bg-blue-950 p-8 rounded-lg max-w-md mx-4 border border-blue-800"
+    >
+      <div className="text-center">
+        <div className="mb-4">
+          <svg className="w-16 h-16 mx-auto text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h3 className="text-xl font-bold text-blue-400 mb-4">Already Submitted</h3>
+        <p className="text-blue-100 mb-6">
+          You have already submitted your manufacturer registration. Please wait for admin approval.
+        </p>
+        <button
+          onClick={onClose}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md transition-colors"
+        >
+          Got it
+        </button>
+      </div>
+    </motion.div>
+  </motion.div>
+);
+
 const ManufacturerRegistration = () => {
   const { user, refreshUserData } = useAuth();
   const navigate = useNavigate();
@@ -16,6 +51,10 @@ const ManufacturerRegistration = () => {
     'partnership',
     'sole_proprietorship'
   ]);
+
+  // New states for submission status checking
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [showAlreadySubmittedPopup, setShowAlreadySubmittedPopup] = useState(false);
 
   const [formData, setFormData] = useState({
     businessName: '',
@@ -46,6 +85,28 @@ const ManufacturerRegistration = () => {
       return () => clearTimeout(timer);
     }
   }, [user, navigate]);
+
+  // Check if user has already submitted registration
+  useEffect(() => {
+    const checkSubmissionStatus = async () => {
+      try {
+        const response = await api.get('/manufacturers/me');
+        if (response.data.success) {
+          setHasSubmitted(true);
+          setShowAlreadySubmittedPopup(true);
+        }
+      } catch (error) {
+        // If 404, user hasn't submitted yet - this is normal
+        if (error.response?.status !== 404) {
+          console.error('Error checking submission status:', error);
+        }
+      }
+    };
+
+    if (user && !user.isManufacturer) {
+      checkSubmissionStatus();
+    }
+  }, [user]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -114,6 +175,12 @@ const ManufacturerRegistration = () => {
     setErrorMessage('');
     setSuccessMessage('');
 
+    // Check if already submitted before proceeding
+    if (hasSubmitted) {
+      setShowAlreadySubmittedPopup(true);
+      return;
+    }
+
     if (!validateForm()) {
       return;
     }
@@ -141,7 +208,6 @@ const ManufacturerRegistration = () => {
         formDataToSend.append('qualityCertifications', file);
       });
 
-      // Use the configured api instance and correct endpoint
       const response = await api.post('/manufacturers/register', formDataToSend, {
         headers: {
           'Content-Type': 'multipart/form-data'
@@ -149,11 +215,14 @@ const ManufacturerRegistration = () => {
       });
 
       if (response.data.success) {
-        setSuccessMessage('Registration successful! Your application is pending approval.');
+        setSuccessMessage('Registration submitted successfully! Redirecting...');
+        setHasSubmitted(true);
         await refreshUserData(); 
+        
+        // Redirect to home page after successful submission
         setTimeout(() => {
-          navigate('/dashboard');
-        }, 3000);
+          navigate('/');
+        }, 2000);
       }
     } catch (error) {
       console.error('Registration error:', error);
@@ -187,6 +256,16 @@ const ManufacturerRegistration = () => {
 
   return (
     <div className="py-10 px-4 min-h-screen bg-gradient-to-r from-blue-900 to-indigo-900 text-blue-50 font-sans">
+      {/* Already Submitted Popup */}
+      {showAlreadySubmittedPopup && (
+        <AlreadySubmittedPopup 
+          onClose={() => {
+            setShowAlreadySubmittedPopup(false);
+            navigate('/');
+          }} 
+        />
+      )}
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

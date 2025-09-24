@@ -1,7 +1,6 @@
 import Job from '../../models/career/job.js';
 import Application from '../../models/career/careerApplication.js';
 
-// Get all active jobs
 export const getAllJobs = async (req, res) => {
   try {
     const { department, location, experience, search, page = 1, limit = 10 } = req.query;
@@ -29,18 +28,44 @@ export const getAllJobs = async (req, res) => {
       query.experience = experience;
     }
     
-    const jobs = await Job.find(query)
-      .populate('applications')
-      .sort({ urgency: -1, postedDate: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+    // Fixed: Proper population and aggregation for application count
+    const jobs = await Job.aggregate([
+      { $match: query },
+      {
+        $lookup: {
+          from: 'applications', // Collection name in MongoDB
+          localField: '_id',
+          foreignField: 'jobId',
+          as: 'applications'
+        }
+      },
+      {
+        $addFields: {
+          applicationsCount: { $size: '$applications' }
+        }
+      },
+      {
+        $sort: { urgency: -1, postedDate: -1 }
+      },
+      {
+        $skip: (page - 1) * limit
+      },
+      {
+        $limit: parseInt(limit)
+      },
+      {
+        $project: {
+          applications: 0 // Remove applications array from response for performance
+        }
+      }
+    ]);
     
     const totalJobs = await Job.countDocuments(query);
     
     res.json({
       jobs,
       totalPages: Math.ceil(totalJobs / limit),
-      currentPage: page,
+      currentPage: parseInt(page),
       totalJobs
     });
   } catch (error) {

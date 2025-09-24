@@ -1,12 +1,7 @@
-// ==================== src/contexts/AuthContext.jsx ====================
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import apiService from '../services/api';
-import { STORAGE_KEYS } from '../utils/constants';
+import React, { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react';
 
-// Create Auth Context
-const AuthContext = createContext(null);
+const AuthContext = createContext();
 
-// Custom hook to use auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -15,177 +10,520 @@ export const useAuth = () => {
   return context;
 };
 
-// Auth Provider Component
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(() => {
-    return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-  });
+  const [token, setToken] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(null);
+  const [lastActivity, setLastActivity] = useState(Date.now());
+  const [sessionExpiry, setSessionExpiry] = useState(null);
+  const [checkingRegistration, setCheckingRegistration] = useState(false);
+  const [refreshing, setRefreshing] = useState(false); // NEW: Track refresh state
 
-  // Initialize authentication on app load
-  useEffect(() => {
-    const initializeAuth = async () => {
-      if (token) {
-        try {
-          const result = await apiService.verifyToken(token);
-          if (result.success) {
-            setUser(result.user);
-            // Store user data in localStorage for quick access
-            localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(result.user));
-          } else {
-            throw new Error('Token verification failed');
-          }
-        } catch (error) {
-          console.error('Authentication initialization failed:', error);
-          // Clear invalid token and user data
-          clearAuthData();
-        }
-      } else {
-        // If no token, check if we have cached user data
-        const cachedUser = localStorage.getItem(STORAGE_KEYS.USER_DATA);
-        if (cachedUser) {
-          try {
-            const userData = JSON.parse(cachedUser);
-            // Only use cached data if it's recent (within 24 hours)
-            if (userData.cachedAt && Date.now() - userData.cachedAt < 24 * 60 * 60 * 1000) {
-              setUser(userData);
-            } else {
-              localStorage.removeItem(STORAGE_KEYS.USER_DATA);
-            }
-          } catch (error) {
-            console.error('Error parsing cached user data:', error);
-            localStorage.removeItem(STORAGE_KEYS.USER_DATA);
-          }
-        }
-      }
-      setLoading(false);
-    };
+  // Use ref to prevent multiple simultaneous calls
+  const checkingRef = useRef(false);
+  const initializedRef = useRef(false);
+  const refreshPromiseRef = useRef(null); // NEW: Prevent multiple simultaneous refresh calls
 
-    initializeAuth();
-  }, [token]);
+  const API_BASE = 'http://localhost:5000/api/admin';
 
-  // Clear authentication data
-  const clearAuthData = () => {
-    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.USER_DATA);
-    setToken(null);
-    setUser(null);
-  };
-
-  // Login function
-  const login = async (email, password) => {
+  // Enhanced login with comprehensive validation and error handling
+  const login = async (credentials) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const result = await apiService.login(email, password);
+      // Input validation
+      if (!credentials.adminId?.trim()) {
+        return { success: false, error: 'Admin ID is required' };
+      }
+      if (!credentials.password?.trim()) {
+        return { success: false, error: 'Password is required' };
+      }
+      if (!credentials.secretCode?.trim()) {
+        return { success: false, error: 'Secret code is required' };
+      }
+
+      const response = await fetch(`${API_BASE}/login`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+          ...credentials,
+          timestamp: Date.now()
+        })
+      });
       
-      if (result.success) {
-        // Store token and user data with timestamp
-        localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, result.token);
-        const userDataWithTimestamp = {
-          ...result.user,
-          cachedAt: Date.now()
+      const data = await response.json();
+      
+      if (response.ok) {
+        setToken(data.token);
+        setUser(data.admin);
+        setLastActivity(Date.now());
+        setSessionExpiry(Date.now() + (24 * 60 * 60 * 1000)); // 24 hours
+        
+        // Enhanced session storage
+        const sessionData = {
+          token: data.token,
+          user: data.admin,
+          loginTime: Date.now(),
+          expiryTime: Date.now() + (24 * 60 * 60 * 1000)
         };
-        localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userDataWithTimestamp));
         
-        setToken(result.token);
-        setUser(result.user);
+        try {
+          sessionStorage.setItem('admin_session', JSON.stringify(sessionData));
+        } catch (storageError) {
+          console.warn('Session storage failed:', storageError);
+        }
         
-        return { success: true, user: result.user };
+        return { success: true, data };
       } else {
-        throw new Error(result.message || 'Login failed');
+        return { 
+          success: false, 
+          error: data.message || `Login failed: ${response.status}` 
+        };
       }
     } catch (error) {
       console.error('Login error:', error);
-      return { 
-        success: false, 
-        error: error.message || 'An unexpected error occurred' 
-      };
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        return { success: false, error: 'Unable to connect to server. Please check if the server is running.' };
+      }
+      return { success: false, error: 'Login failed. Please try again.' };
     } finally {
       setLoading(false);
     }
   };
 
-  // Logout function
-  const logout = async () => {
+  // Enhanced registration with comprehensive validation
+  const register = async (userData) => {
+    setLoading(true);
     try {
-      setLoading(true);
+      // Enhanced validation
+      const errors = [];
       
-      if (token) {
-        await apiService.logout(token);
+      if (!userData.email?.trim()) errors.push('Email is required');
+      if (!userData.password?.trim()) errors.push('Password is required');
+      if (!userData.secretCode?.trim()) errors.push('Secret code is required');
+      
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (userData.email && !emailRegex.test(userData.email.trim())) {
+        errors.push('Please enter a valid email address');
+      }
+
+      // Password strength validation
+      if (userData.password) {
+        if (userData.password.length < 8) {
+          errors.push('Password must be at least 8 characters long');
+        }
+        if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(userData.password)) {
+          errors.push('Password must contain uppercase, lowercase, and number');
+        }
+      }
+
+      if (errors.length > 0) {
+        return { success: false, error: errors[0] };
+      }
+
+      const response = await fetch(`${API_BASE}/register`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+          ...userData,
+          email: userData.email.trim().toLowerCase(),
+          registrationTime: Date.now()
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setToken(data.token);
+        setUser(data.admin);
+        setIsRegistered(true);
+        setLastActivity(Date.now());
+        setSessionExpiry(Date.now() + (24 * 60 * 60 * 1000));
+        
+        // Store session data
+        const sessionData = {
+          token: data.token,
+          user: data.admin,
+          loginTime: Date.now(),
+          expiryTime: Date.now() + (24 * 60 * 60 * 1000)
+        };
+        
+        try {
+          sessionStorage.setItem('admin_session', JSON.stringify(sessionData));
+        } catch (storageError) {
+          console.warn('Session storage failed:', storageError);
+        }
+        
+        return { success: true, data };
+      } else {
+        return { 
+          success: false, 
+          error: data.message || `Registration failed: ${response.status}` 
+        };
       }
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Registration error:', error);
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        return { success: false, error: 'Unable to connect to server. Please check if the server is running.' };
+      }
+      return { success: false, error: 'Registration failed. Please try again.' };
     } finally {
-      clearAuthData();
       setLoading(false);
     }
   };
 
-  // Update user profile
-  const updateUser = (updatedUserData) => {
-    const newUserData = { 
-      ...user, 
-      ...updatedUserData,
-      cachedAt: Date.now()
+  // Enhanced logout with complete cleanup
+  const logout = useCallback(() => {
+    setToken(null);
+    setUser(null);
+    setLastActivity(null);
+    setSessionExpiry(null);
+    setRefreshing(false);
+    
+    // Clear refresh promise
+    refreshPromiseRef.current = null;
+    
+    // Clear all stored data
+    try {
+      sessionStorage.removeItem('admin_session');
+      sessionStorage.removeItem('admin_preferences');
+      localStorage.removeItem('admin_settings');
+    } catch (error) {
+      console.warn('Storage cleanup failed:', error);
+    }
+  }, []);
+
+  // FIXED: Memoized checkRegistrationStatus to prevent infinite calls
+  const checkRegistrationStatus = useCallback(async () => {
+    // Prevent multiple simultaneous calls
+    if (checkingRef.current) {
+      console.log('Registration check already in progress, skipping...');
+      return;
+    }
+    
+    checkingRef.current = true;
+    setCheckingRegistration(true);
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const timestamp = Date.now();
+      const response = await fetch(`${API_BASE}/check-registration?t=${timestamp}`, {
+        method: 'GET',
+        headers: { 
+          'X-Requested-With': 'XMLHttpRequest',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      setIsRegistered(data.isRegistered);
+      
+    } catch (error) {
+      console.error('Error checking registration:', error);
+      
+      // Only show user-friendly error for network issues
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        console.warn('Server appears to be offline. Using default settings.');
+      }
+      
+      // Set default values on error
+      setIsRegistered(false);
+    } finally {
+      setCheckingRegistration(false);
+      checkingRef.current = false;
+    }
+  }, [API_BASE]);
+
+  // ENHANCED: Token refresh functionality with better error handling and deduplication
+  const refreshToken = useCallback(async () => {
+    // Return early if no token or already refreshing
+    if (!token || refreshing) {
+      return false;
+    }
+
+    // If there's already a refresh in progress, wait for it
+    if (refreshPromiseRef.current) {
+      return await refreshPromiseRef.current;
+    }
+
+    // Create new refresh promise
+    const refreshPromise = (async () => {
+      setRefreshing(true);
+      
+      try {
+        console.log('Refreshing token...');
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+        
+        const response = await fetch(`${API_BASE}/refresh-token`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Validate response data
+          if (!data.token) {
+            throw new Error('Invalid refresh response: missing token');
+          }
+          
+          console.log('Token refreshed successfully');
+          
+          // Update state
+          setToken(data.token);
+          setSessionExpiry(Date.now() + (24 * 60 * 60 * 1000));
+          setLastActivity(Date.now());
+          
+          // Update session storage
+          try {
+            const existingSession = sessionStorage.getItem('admin_session');
+            const sessionData = existingSession ? JSON.parse(existingSession) : {};
+            
+            sessionData.token = data.token;
+            sessionData.refreshedAt = Date.now();
+            sessionData.expiryTime = Date.now() + (24 * 60 * 60 * 1000);
+            
+            sessionStorage.setItem('admin_session', JSON.stringify(sessionData));
+            console.log('Session storage updated');
+          } catch (storageError) {
+            console.warn('Session storage update failed:', storageError);
+          }
+          
+          return true;
+        } else {
+          // Handle different error responses
+          const errorData = await response.json().catch(() => ({}));
+          const errorMessage = errorData.message || `Refresh failed: ${response.status}`;
+          
+          console.error('Token refresh failed:', errorMessage);
+          
+          // If token is invalid/expired, logout user
+          if (response.status === 401 || response.status === 403) {
+            console.log('Token expired, logging out user');
+            logout();
+          }
+          
+          return false;
+        }
+      } catch (error) {
+        console.error('Token refresh error:', error);
+        
+        // Handle specific error types
+        if (error.name === 'AbortError') {
+          console.warn('Token refresh timed out');
+        } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          console.warn('Network error during token refresh');
+        } else {
+          console.error('Unexpected error during token refresh:', error);
+        }
+        
+        return false;
+      } finally {
+        setRefreshing(false);
+        refreshPromiseRef.current = null;
+      }
+    })();
+
+    // Store the promise to prevent duplicate calls
+    refreshPromiseRef.current = refreshPromise;
+    
+    return await refreshPromise;
+  }, [token, refreshing, logout, API_BASE]);
+
+  // Update activity with throttling
+  const updateActivity = useCallback((() => {
+    let lastUpdate = 0;
+    return () => {
+      const now = Date.now();
+      if (now - lastUpdate > 60000) { // Throttle to once per minute
+        setLastActivity(now);
+        lastUpdate = now;
+      }
     };
-    setUser(newUserData);
-    localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(newUserData));
-  };
+  })(), []);
 
-  // Check if user has specific role
-  const hasRole = (role) => {
-    return user?.role === role;
-  };
-
-  // Check if user has any of the specified roles
-  const hasAnyRole = (roles) => {
-    return roles.some(role => user?.role === role);
-  };
-
-  // Refresh user data
-  const refreshUser = async () => {
+  // ENHANCED: Session management with better refresh timing
+  useEffect(() => {
     if (!token) return;
 
-    try {
-      const result = await apiService.verifyToken(token);
-      if (result.success) {
-        const userDataWithTimestamp = {
-          ...result.user,
-          cachedAt: Date.now()
-        };
-        setUser(result.user);
-        localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userDataWithTimestamp));
-        return result.user;
+    const checkSession = async () => {
+      const now = Date.now();
+      
+      // Check session expiry
+      if (sessionExpiry && now > sessionExpiry) {
+        console.log('Session expired, logging out');
+        logout();
+        return;
       }
-    } catch (error) {
-      console.error('Failed to refresh user data:', error);
-      clearAuthData();
+      
+      // Check inactivity (30 minutes)
+      const inactiveTime = now - lastActivity;
+      const maxInactiveTime = 30 * 60 * 1000;
+
+      if (inactiveTime > maxInactiveTime) {
+        console.log('Session inactive, logging out');
+        logout();
+        return;
+      }
+      
+      // Auto-refresh token if needed (refresh 2 hours before expiry)
+      if (sessionExpiry && (sessionExpiry - now) < (2 * 60 * 60 * 1000)) {
+        console.log('Token approaching expiry, attempting refresh');
+        const refreshSuccess = await refreshToken();
+        
+        if (!refreshSuccess) {
+          console.log('Token refresh failed, logging out');
+          logout();
+        }
+      }
+    };
+
+    const interval = setInterval(checkSession, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [token, lastActivity, sessionExpiry, logout, refreshToken]);
+
+  // FIXED: Initialize only once on mount
+  useEffect(() => {
+    if (initializedRef.current) return; // Prevent re-initialization
+    initializedRef.current = true;
+    
+    const initializeAuth = async () => {
+      console.log('Initializing auth context...');
+      
+      // Restore session first
+      try {
+        const sessionData = sessionStorage.getItem('admin_session');
+        if (sessionData) {
+          const parsed = JSON.parse(sessionData);
+          const now = Date.now();
+          
+          // Check if session is still valid
+          if (parsed.expiryTime && now < parsed.expiryTime) {
+            setToken(parsed.token);
+            setUser(parsed.user);
+            setLastActivity(now);
+            setSessionExpiry(parsed.expiryTime);
+            console.log('Session restored successfully');
+            
+            // If token is close to expiry, refresh it
+            const timeToExpiry = parsed.expiryTime - now;
+            if (timeToExpiry < (2 * 60 * 60 * 1000)) { // Less than 2 hours
+              console.log('Restored token is close to expiry, refreshing...');
+              setTimeout(() => refreshToken(), 1000);
+            }
+          } else {
+            // Session expired, clean up
+            sessionStorage.removeItem('admin_session');
+            console.log('Session expired, cleaned up');
+          }
+        }
+      } catch (error) {
+        console.error('Session restoration failed:', error);
+        sessionStorage.removeItem('admin_session');
+      }
+      
+      // Then check registration status
+      await checkRegistrationStatus();
+    };
+
+    initializeAuth();
+  }, []); // Empty dependency array - only run once
+
+  // Network status monitoring with token refresh
+  useEffect(() => {
+    const handleOnline = async () => {
+      if (token && navigator.onLine) {
+        console.log('Network back online, refreshing token...');
+        // Small delay to ensure connection is stable
+        setTimeout(async () => {
+          const success = await refreshToken();
+          if (success) {
+            console.log('Token refreshed after network reconnection');
+          }
+        }, 2000);
+      }
+    };
+
+    const handleOffline = () => {
+      console.log('Network went offline');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [token, refreshToken]);
+
+  // NEW: Manual refresh token method that can be called from components
+  const manualRefreshToken = useCallback(async () => {
+    if (!token) {
+      return { success: false, error: 'No token available' };
     }
-  };
+
+    const success = await refreshToken();
+    return { 
+      success, 
+      error: success ? null : 'Failed to refresh token'
+    };
+  }, [token, refreshToken]);
 
   const contextValue = {
     // State
     user,
     token,
     loading,
-    isAuthenticated: !!user,
+    isRegistered,
+    lastActivity,
+    sessionExpiry,
+    checkingRegistration,
+    refreshing, // NEW: Expose refresh state
     
     // Methods
     login,
+    register,
     logout,
-    updateUser,
-    refreshUser,
+    checkRegistrationStatus,
+    refreshToken,
+    manualRefreshToken, // NEW: Expose manual refresh method
+    updateActivity,
     
-    // Role checking utilities
-    hasRole,
-    hasAnyRole,
+    // Config
+    API_BASE,
     
-    // User utilities
-    isAdmin: user?.role === 'admin',
-    isSuperAdmin: user?.role === 'super_admin',
-    userName: user?.name || user?.email || 'User',
-    userEmail: user?.email || '',
+    // Utils
+    isAuthenticated: !!token && !!user,
+    isSessionValid: sessionExpiry ? Date.now() < sessionExpiry : false,
+    timeToExpiry: sessionExpiry ? Math.max(0, sessionExpiry - Date.now()) : 0 // NEW: Time until token expires
   };
 
   return (
@@ -194,3 +532,5 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+
+export default AuthProvider;

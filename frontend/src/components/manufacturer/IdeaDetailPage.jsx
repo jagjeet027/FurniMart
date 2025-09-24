@@ -26,7 +26,6 @@ const IssueDetailPage = () => {
     name: '',
     description: '',
     category: 'general',
-    priority: 'medium',
     status: 'open'
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,7 +49,6 @@ const IssueDetailPage = () => {
         name: issueData.name,
         description: issueData.description || '',
         category: issueData.category,
-        priority: issueData.priority,
         status: issueData.status
       });
       setError(null);
@@ -137,16 +135,6 @@ const IssueDetailPage = () => {
     return statusMap[status] || statusMap.open;
   };
 
-  // Get priority color
-  const getPriorityColor = (priority) => {
-    const priorityMap = {
-      low: 'bg-green-100 text-green-800',
-      medium: 'bg-yellow-100 text-yellow-800',
-      high: 'bg-orange-100 text-orange-800',
-      critical: 'bg-red-100 text-red-800'
-    };
-    return priorityMap[priority] || priorityMap.medium;
-  };
 
   if (loading) {
     return (
@@ -243,9 +231,7 @@ const IssueDetailPage = () => {
                   <StatusIcon size={12} className="mr-1" />
                   {issue.status.charAt(0).toUpperCase() + issue.status.slice(1).replace('-', ' ')}
                 </span>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityColor(issue.priority)}`}>
-                  {issue.priority.charAt(0).toUpperCase() + issue.priority.slice(1)}
-                </span>
+                
               </div>
             </div>
             
@@ -371,10 +357,7 @@ const IssueDetailPage = () => {
                   {issue.status.charAt(0).toUpperCase() + issue.status.slice(1).replace('-', ' ')}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Priority:</span>
-                <span className="text-sm font-medium capitalize">{issue.priority}</span>
-              </div>
+              
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Category:</span>
                 <span className="text-sm font-medium capitalize">{issue.category}</span>
@@ -453,25 +436,10 @@ const IssueDetailPage = () => {
                   <option value="order">Order</option>
                   <option value="product">Product</option>
                   <option value="general">General</option>
+                  <option value="other">Other</option>
                 </select>
               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Priority
-                </label>
-                <select
-                  value={formData.priority}
-                  onChange={(e) => setFormData(prev => ({...prev, priority: e.target.value}))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="critical">Critical</option>
-                </select>
-              </div>
-              
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Description

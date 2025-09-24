@@ -337,7 +337,7 @@ const ProductDetailPage = () => {
 
           <div>
             <div className="flex items-center flex-wrap">
-              <span className="text-3xl font-bold text-blue-600 mr-2">${selectedProduct.price}</span>
+              <span className="text-3xl font-bold text-blue-600 mr-2">{selectedProduct.price}</span>
               {selectedProduct.discount && (
                 <>
                   <span className="line-through text-gray-500 mr-2">

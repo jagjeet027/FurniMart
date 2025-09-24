@@ -33,10 +33,10 @@ const LoginPage = () => {
     if (isAuthenticated && user) {
       const redirectPath = user.isManufacturer 
         ? '/manufacturer/dashboard'
-        : location.state?.from?.pathname || '/furniture';
+        : '/';
       navigate(redirectPath, { replace: true });
     }
-  }, [isAuthenticated, user, navigate, location]);
+  }, [isAuthenticated, user, navigate]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -62,14 +62,19 @@ const LoginPage = () => {
 
       const response = await login(formData.email.trim(), formData.password);
       
-      if (response?.success) {
-        // Navigation is handled by the useEffect above
-        // The AuthContext will handle storing tokens and user data
+      if (response?.success || response?.user) {
+        // Check if user is manufacturer and redirect accordingly
+        const loggedInUser = response.user;
+        const redirectPath = loggedInUser?.isManufacturer 
+          ? '/manufacturer/dashboard'
+          : '/';
+        
+        navigate(redirectPath, { replace: true });
       } else {
         throw new Error(response?.message || 'Login failed');
       }
     } catch (err) {
-      setError(err.message || authError || 'Invalid credentials. Please try again.');
+      setError(err.response?.data?.message || err.message || authError || 'Invalid credentials. Please try again.');
       setFormData(prev => ({
         ...prev,
         password: '' // Clear password on error
@@ -190,4 +195,4 @@ const LoginPage = () => {
   );
 };
 
-export default LoginPage;
+export default LoginPage;

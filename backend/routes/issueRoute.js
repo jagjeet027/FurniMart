@@ -1,3 +1,4 @@
+// routes/issueRoutes.js
 import express from 'express';
 import {
   createIssue,
@@ -8,20 +9,21 @@ import {
   addComment,
   getIssueStats
 } from '../controllers/issueController.js';
-import authMiddleware from '../middleware/auth.js';
+import adminAuth from '../middleware/adminAuth.js'; 
 
 const router = express.Router();
 
-// Apply auth middleware to all routes
-router.use(authMiddleware);
+router.use(adminAuth);
+router.get('/stats', getIssueStats);
 
-// Routes - all require authentication
-router.post('/', createIssue);                    // Create new issue
-router.get('/', getAllIssues);                    // Get all issues with filters
-router.get('/stats', getIssueStats);              // Get issue statistics
-router.get('/:id', getIssueById);                 // Get single issue by ID
-router.put('/:id', updateIssue);                  // Update issue
-router.delete('/:id', deleteIssue);               // Delete issue (soft delete)
-router.post('/:id/comments', addComment);         // Add comment to issue
+// CRUD routes
+router.get('/', getAllIssues);           
+router.post('/', createIssue);          
+router.get('/:id', getIssueById);      
+router.put('/:id', updateIssue);        
+router.delete('/:id', deleteIssue);     
+
+// Comments route
+router.post('/:id/comments', addComment); 
 
 export default router;

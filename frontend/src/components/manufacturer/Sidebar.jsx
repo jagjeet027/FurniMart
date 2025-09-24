@@ -94,7 +94,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const [ideaName, setIdeaName] = useState('');
   const [ideaDescription, setIdeaDescription] = useState('');
   const [ideaCategory, setIdeaCategory] = useState('general');
-  const [ideaPriority, setIdeaPriority] = useState('medium');
   const [isSubmittingIdea, setIsSubmittingIdea] = useState(false);
   
   // Chat modal state
@@ -230,7 +229,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         name: ideaName,
         description: ideaDescription,
         category: ideaCategory,
-        priority: ideaPriority
       };
 
       // Use the correct API endpoint matching your controller
@@ -245,7 +243,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
       setIdeaName('');
       setIdeaDescription('');
       setIdeaCategory('general');
-      setIdeaPriority('medium');
       setShowIdeaModal(false);
     } catch (error) {
       console.error('Error submitting idea:', error);
@@ -274,7 +271,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
       
       {/* Idea Submission Modal - Fixed to match controller */}
       {showIdeaModal && (
-        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-6">
           <div className="bg-white rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Submit New Idea</h3>
@@ -316,22 +313,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                   <option value="order">Process Improvement</option>
                   <option value="product">Product Design</option>
                   <option value="general">General Suggestion</option>
-                </select>
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Priority
-                </label>
-                <select
-                  value={ideaPriority}
-                  onChange={(e) => setIdeaPriority(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="critical">Critical</option>
+                  <option value="other">Other</option>
                 </select>
               </div>
               

@@ -18,7 +18,6 @@ const IssuesPage = () => {
   // Filters and pagination
   const [filters, setFilters] = useState({
     status: '',
-    priority: '',
     category: '',
     search: '',
     page: 1,
@@ -46,7 +45,6 @@ const IssuesPage = () => {
     name: '',
     description: '',
     category: 'general',
-    priority: 'medium'
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -120,7 +118,7 @@ const IssuesPage = () => {
       });
 
       setShowCreateModal(false);
-      setFormData({ name: '', description: '', category: 'general', priority: 'medium' });
+      setFormData({ name: '', description: '', category: 'general'});
       fetchIssues();
       fetchStats();
     } catch (err) {
@@ -190,7 +188,6 @@ const IssuesPage = () => {
       name: issue.name,
       description: issue.description || '',
       category: issue.category,
-      priority: issue.priority,
       status: issue.status
     });
     setShowEditModal(true);
@@ -207,16 +204,6 @@ const IssuesPage = () => {
     return statusMap[status] || statusMap.open;
   };
 
-  // Get priority color
-  const getPriorityColor = (priority) => {
-    const priorityMap = {
-      low: 'bg-green-100 text-green-800',
-      medium: 'bg-yellow-100 text-yellow-800',
-      high: 'bg-orange-100 text-orange-800',
-      critical: 'bg-red-100 text-red-800'
-    };
-    return priorityMap[priority] || priorityMap.medium;
-  };
 
   if (!user?.isManufacturer) {
     return (
@@ -312,19 +299,6 @@ const IssuesPage = () => {
             <option value="resolved">Resolved</option>
             <option value="closed">Closed</option>
           </select>
-
-          <select
-            value={filters.priority}
-            onChange={(e) => handleFilterChange('priority', e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-          >
-            <option value="">All Priority</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
-          </select>
-
           <select
             value={filters.category}
             onChange={(e) => handleFilterChange('category', e.target.value)}
@@ -336,6 +310,7 @@ const IssuesPage = () => {
             <option value="order">Order</option>
             <option value="product">Product</option>
             <option value="general">General</option>
+            <option value="other">Other</option>
           </select>
 
           <select
@@ -345,7 +320,6 @@ const IssuesPage = () => {
           >
             <option value="createdAt">Sort by Date</option>
             <option value="name">Sort by Name</option>
-            <option value="priority">Sort by Priority</option>
             <option value="status">Sort by Status</option>
           </select>
         </div>
@@ -387,9 +361,6 @@ const IssuesPage = () => {
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Priority
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Category
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -423,11 +394,7 @@ const IssuesPage = () => {
                           {issue.status.charAt(0).toUpperCase() + issue.status.slice(1).replace('-', ' ')}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityColor(issue.priority)}`}>
-                          {issue.priority.charAt(0).toUpperCase() + issue.priority.slice(1)}
-                        </span>
-                      </td>
+                    
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
                         {issue.category}
                       </td>
@@ -576,24 +543,11 @@ const IssuesPage = () => {
                   <option value="order">Order</option>
                   <option value="product">Product</option>
                   <option value="general">General</option>
+                  <option value="other">Other</option>
                 </select>
               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Priority
-                </label>
-                <select
-                  value={formData.priority}
-                  onChange={(e) => setFormData(prev => ({...prev, priority: e.target.value}))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="critical">Critical</option>
-                </select>
-              </div>
+              
               
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -690,21 +644,6 @@ const IssuesPage = () => {
                 </select>
               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Priority
-                </label>
-                <select
-                  value={formData.priority}
-                  onChange={(e) => setFormData(prev => ({...prev, priority: e.target.value}))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="critical">Critical</option>
-                </select>
-              </div>
               
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -761,9 +700,7 @@ const IssuesPage = () => {
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusInfo(selectedIssue.status).color}`}>
                     {selectedIssue.status.charAt(0).toUpperCase() + selectedIssue.status.slice(1).replace('-', ' ')}
                   </span>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityColor(selectedIssue.priority)}`}>
-                    {selectedIssue.priority.charAt(0).toUpperCase() + selectedIssue.priority.slice(1)}
-                  </span>
+                 
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                     {selectedIssue.category.charAt(0).toUpperCase() + selectedIssue.category.slice(1)}
                   </span>

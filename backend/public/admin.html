@@ -1,0 +1,220 @@
+<!-- <!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+        }
+
+        .navbar h1 {
+            font-size: 1.5rem;
+        }
+
+        .logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .welcome-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .welcome-card h2 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 2rem;
+        }
+
+        .welcome-card p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .admin-info {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-top: 1rem;
+        }
+
+        .admin-info h3 {
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .admin-info p {
+            margin: 0.25rem 0;
+            color: #555;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .feature-card h3 {
+            color: #333;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>🔐 Admin Dashboard</h1>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </nav>
+
+    <div class="dashboard-container">
+        <div class="welcome-card">
+            <h2>स्वागत है, Admin!</h2>
+            <p>आपने सफलतापूर्वक admin पैनल में प्रवेश किया है।</p>
+            
+            <div class="admin-info" id="adminInfo">
+                <h3>Admin Information:</h3>
+                <p><strong>Loading admin information...</strong></p>
+            </div>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🛡️</div>
+                <h3>Secure Authentication</h3>
+                <p>Multi-layer security with password, secret code, and security questions ensures maximum protection.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Single Admin Access</h3>
+                <p>Only one admin can be registered at a time, ensuring exclusive administrative control.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">❓</div>
+                <h3>Security Questions</h3>
+                <p>Random security questions during login provide an additional layer of authentication security.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Token-based Sessions</h3>
+                <p>JWT tokens ensure secure session management with automatic expiration for enhanced security.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api/admin';
+        const token = localStorage.getItem('adminToken');
+
+        // Check if logged in
+        if (!token) {
+            window.location.href = '/';
+        }
+
+        // Load admin dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAdminInfo();
+        });
+
+        async function loadAdminInfo() {
+            try {
+                const response = await fetch(`${API_BASE}/dashboard`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    displayAdminInfo(data.admin);
+                } else {
+                    // Token might be expired or invalid
+                    logout();
+                }
+            } catch (error) {
+                console.error('Error loading admin info:', error);
+                logout();
+            }
+        }
+
+        function displayAdminInfo(admin) {
+            const adminInfoEl = document.getElementById('adminInfo');
+            adminInfoEl.innerHTML = `
+                <h3>Admin Information:</h3>
+                <p><strong>Email:</strong> ${admin.email}</p>
+                <p><strong>Admin ID:</strong> ${admin.adminId}</p>
+                <p><strong>Status:</strong> Active</p>
+                <p><strong>Last Login:</strong> ${new Date().toLocaleString()}</p>
+            `;
+        }
+
+        function logout() {
+            localStorage.removeItem('adminToken');
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html> -->
