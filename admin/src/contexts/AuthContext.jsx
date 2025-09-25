@@ -18,16 +18,16 @@ export const AuthProvider = ({ children }) => {
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [sessionExpiry, setSessionExpiry] = useState(null);
   const [checkingRegistration, setCheckingRegistration] = useState(false);
-  const [refreshing, setRefreshing] = useState(false); // NEW: Track refresh state
+  const [refreshing, setRefreshing] = useState(false);
 
   // Use ref to prevent multiple simultaneous calls
   const checkingRef = useRef(false);
   const initializedRef = useRef(false);
-  const refreshPromiseRef = useRef(null); // NEW: Prevent multiple simultaneous refresh calls
+  const refreshPromiseRef = useRef(null);
 
   const API_BASE = 'http://localhost:5000/api/admin';
 
-  // Enhanced login with comprehensive validation and error handling
+  // Enhanced login with proper token storage
   const login = async (credentials) => {
     setLoading(true);
     try {
@@ -57,6 +57,9 @@ export const AuthProvider = ({ children }) => {
       const data = await response.json();
       
       if (response.ok) {
+        // FIXED: Store token in localStorage for axios to access
+        localStorage.setItem('adminToken', data.token);
+        
         setToken(data.token);
         setUser(data.admin);
         setLastActivity(Date.now());
@@ -76,6 +79,7 @@ export const AuthProvider = ({ children }) => {
           console.warn('Session storage failed:', storageError);
         }
         
+        console.log('✅ Admin login successful, token stored');
         return { success: true, data };
       } else {
         return { 
@@ -94,7 +98,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Enhanced registration with comprehensive validation
+  // Enhanced registration with proper token storage
   const register = async (userData) => {
     setLoading(true);
     try {
@@ -141,6 +145,9 @@ export const AuthProvider = ({ children }) => {
       const data = await response.json();
       
       if (response.ok) {
+        // FIXED: Store token in localStorage for axios to access
+        localStorage.setItem('adminToken', data.token);
+        
         setToken(data.token);
         setUser(data.admin);
         setIsRegistered(true);
@@ -161,6 +168,7 @@ export const AuthProvider = ({ children }) => {
           console.warn('Session storage failed:', storageError);
         }
         
+        console.log('✅ Admin registration successful, token stored');
         return { success: true, data };
       } else {
         return { 
@@ -181,6 +189,9 @@ export const AuthProvider = ({ children }) => {
 
   // Enhanced logout with complete cleanup
   const logout = useCallback(() => {
+    // FIXED: Clear localStorage token
+    localStorage.removeItem('adminToken');
+    
     setToken(null);
     setUser(null);
     setLastActivity(null);
@@ -198,9 +209,11 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.warn('Storage cleanup failed:', error);
     }
+    
+    console.log('✅ Admin logout complete, all tokens cleared');
   }, []);
 
-  // FIXED: Memoized checkRegistrationStatus to prevent infinite calls
+  // FIXED: Check registration status endpoint
   const checkRegistrationStatus = useCallback(async () => {
     // Prevent multiple simultaneous calls
     if (checkingRef.current) {
@@ -216,7 +229,8 @@ export const AuthProvider = ({ children }) => {
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
       const timestamp = Date.now();
-      const response = await fetch(`${API_BASE}/check-registration?t=${timestamp}`, {
+      // FIXED: Use the correct endpoint
+      const response = await fetch(`${API_BASE}/check-registration-status?t=${timestamp}`, {
         method: 'GET',
         headers: { 
           'X-Requested-With': 'XMLHttpRequest',
@@ -235,6 +249,7 @@ export const AuthProvider = ({ children }) => {
       
       const data = await response.json();
       setIsRegistered(data.isRegistered);
+      console.log('✅ Registration status checked:', data.isRegistered);
       
     } catch (error) {
       console.error('Error checking registration:', error);
@@ -252,7 +267,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, [API_BASE]);
 
-  // ENHANCED: Token refresh functionality with better error handling and deduplication
+  // Enhanced token refresh with proper localStorage sync
   const refreshToken = useCallback(async () => {
     // Return early if no token or already refreshing
     if (!token || refreshing) {
@@ -269,7 +284,7 @@ export const AuthProvider = ({ children }) => {
       setRefreshing(true);
       
       try {
-        console.log('Refreshing token...');
+        console.log('Refreshing admin token...');
         
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
@@ -294,7 +309,10 @@ export const AuthProvider = ({ children }) => {
             throw new Error('Invalid refresh response: missing token');
           }
           
-          console.log('Token refreshed successfully');
+          console.log('✅ Admin token refreshed successfully');
+          
+          // FIXED: Update localStorage with new token
+          localStorage.setItem('adminToken', data.token);
           
           // Update state
           setToken(data.token);
@@ -311,7 +329,6 @@ export const AuthProvider = ({ children }) => {
             sessionData.expiryTime = Date.now() + (24 * 60 * 60 * 1000);
             
             sessionStorage.setItem('admin_session', JSON.stringify(sessionData));
-            console.log('Session storage updated');
           } catch (storageError) {
             console.warn('Session storage update failed:', storageError);
           }
@@ -326,7 +343,7 @@ export const AuthProvider = ({ children }) => {
           
           // If token is invalid/expired, logout user
           if (response.status === 401 || response.status === 403) {
-            console.log('Token expired, logging out user');
+            console.log('Admin token expired, logging out user');
             logout();
           }
           
@@ -369,79 +386,71 @@ export const AuthProvider = ({ children }) => {
     };
   })(), []);
 
-  // ENHANCED: Session management with better refresh timing
-  useEffect(() => {
-    if (!token) return;
-
-    const checkSession = async () => {
-      const now = Date.now();
-      
-      // Check session expiry
-      if (sessionExpiry && now > sessionExpiry) {
-        console.log('Session expired, logging out');
-        logout();
-        return;
-      }
-      
-      // Check inactivity (30 minutes)
-      const inactiveTime = now - lastActivity;
-      const maxInactiveTime = 30 * 60 * 1000;
-
-      if (inactiveTime > maxInactiveTime) {
-        console.log('Session inactive, logging out');
-        logout();
-        return;
-      }
-      
-      // Auto-refresh token if needed (refresh 2 hours before expiry)
-      if (sessionExpiry && (sessionExpiry - now) < (2 * 60 * 60 * 1000)) {
-        console.log('Token approaching expiry, attempting refresh');
-        const refreshSuccess = await refreshToken();
-        
-        if (!refreshSuccess) {
-          console.log('Token refresh failed, logging out');
-          logout();
-        }
-      }
-    };
-
-    const interval = setInterval(checkSession, 60000); // Check every minute
-    return () => clearInterval(interval);
-  }, [token, lastActivity, sessionExpiry, logout, refreshToken]);
-
-  // FIXED: Initialize only once on mount
+  // FIXED: Initialize with proper token restoration
   useEffect(() => {
     if (initializedRef.current) return; // Prevent re-initialization
     initializedRef.current = true;
     
     const initializeAuth = async () => {
-      console.log('Initializing auth context...');
+      console.log('Initializing admin auth context...');
       
-      // Restore session first
+      // FIXED: First check localStorage for admin token
+      const storedToken = localStorage.getItem('adminToken');
+      
+      if (storedToken && storedToken !== 'undefined' && storedToken !== 'null') {
+        console.log('Found stored admin token, attempting to restore session...');
+        
+        // Try to validate the token by making a test request
+        try {
+          const testResponse = await fetch(`${API_BASE}/refresh-token`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${storedToken}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (testResponse.ok) {
+            const tokenData = await testResponse.json();
+            
+            // Update with fresh token
+            localStorage.setItem('adminToken', tokenData.token);
+            setToken(tokenData.token);
+            setUser(tokenData.admin);
+            setLastActivity(Date.now());
+            setSessionExpiry(Date.now() + (24 * 60 * 60 * 1000));
+            
+            console.log('✅ Admin session restored with fresh token');
+          } else {
+            // Token is invalid, clear it
+            console.log('Stored admin token is invalid, clearing...');
+            localStorage.removeItem('adminToken');
+          }
+        } catch (error) {
+          console.error('Error validating stored admin token:', error);
+          localStorage.removeItem('adminToken');
+        }
+      }
+      
+      // Restore from session storage as fallback
       try {
         const sessionData = sessionStorage.getItem('admin_session');
-        if (sessionData) {
+        if (sessionData && !token) {
           const parsed = JSON.parse(sessionData);
           const now = Date.now();
           
           // Check if session is still valid
-          if (parsed.expiryTime && now < parsed.expiryTime) {
+          if (parsed.expiryTime && now < parsed.expiryTime && parsed.token) {
+            localStorage.setItem('adminToken', parsed.token);
             setToken(parsed.token);
             setUser(parsed.user);
             setLastActivity(now);
             setSessionExpiry(parsed.expiryTime);
-            console.log('Session restored successfully');
-            
-            // If token is close to expiry, refresh it
-            const timeToExpiry = parsed.expiryTime - now;
-            if (timeToExpiry < (2 * 60 * 60 * 1000)) { // Less than 2 hours
-              console.log('Restored token is close to expiry, refreshing...');
-              setTimeout(() => refreshToken(), 1000);
-            }
+            console.log('✅ Admin session restored from sessionStorage');
           } else {
             // Session expired, clean up
             sessionStorage.removeItem('admin_session');
-            console.log('Session expired, cleaned up');
+            console.log('Admin session expired, cleaned up');
           }
         }
       } catch (error) {
@@ -456,16 +465,56 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []); // Empty dependency array - only run once
 
+  // Session management with better refresh timing
+  useEffect(() => {
+    if (!token) return;
+
+    const checkSession = async () => {
+      const now = Date.now();
+      
+      // Check session expiry
+      if (sessionExpiry && now > sessionExpiry) {
+        console.log('Admin session expired, logging out');
+        logout();
+        return;
+      }
+      
+      // Check inactivity (30 minutes)
+      const inactiveTime = now - lastActivity;
+      const maxInactiveTime = 30 * 60 * 1000;
+
+      if (inactiveTime > maxInactiveTime) {
+        console.log('Admin session inactive, logging out');
+        logout();
+        return;
+      }
+      
+      // Auto-refresh token if needed (refresh 2 hours before expiry)
+      if (sessionExpiry && (sessionExpiry - now) < (2 * 60 * 60 * 1000)) {
+        console.log('Admin token approaching expiry, attempting refresh');
+        const refreshSuccess = await refreshToken();
+        
+        if (!refreshSuccess) {
+          console.log('Admin token refresh failed, logging out');
+          logout();
+        }
+      }
+    };
+
+    const interval = setInterval(checkSession, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [token, lastActivity, sessionExpiry, logout, refreshToken]);
+
   // Network status monitoring with token refresh
   useEffect(() => {
     const handleOnline = async () => {
       if (token && navigator.onLine) {
-        console.log('Network back online, refreshing token...');
+        console.log('Network back online, refreshing admin token...');
         // Small delay to ensure connection is stable
         setTimeout(async () => {
           const success = await refreshToken();
           if (success) {
-            console.log('Token refreshed after network reconnection');
+            console.log('Admin token refreshed after network reconnection');
           }
         }, 2000);
       }
@@ -484,16 +533,16 @@ export const AuthProvider = ({ children }) => {
     };
   }, [token, refreshToken]);
 
-  // NEW: Manual refresh token method that can be called from components
+  // Manual refresh token method that can be called from components
   const manualRefreshToken = useCallback(async () => {
     if (!token) {
-      return { success: false, error: 'No token available' };
+      return { success: false, error: 'No admin token available' };
     }
 
     const success = await refreshToken();
     return { 
       success, 
-      error: success ? null : 'Failed to refresh token'
+      error: success ? null : 'Failed to refresh admin token'
     };
   }, [token, refreshToken]);
 
@@ -506,7 +555,7 @@ export const AuthProvider = ({ children }) => {
     lastActivity,
     sessionExpiry,
     checkingRegistration,
-    refreshing, // NEW: Expose refresh state
+    refreshing,
     
     // Methods
     login,
@@ -514,7 +563,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     checkRegistrationStatus,
     refreshToken,
-    manualRefreshToken, // NEW: Expose manual refresh method
+    manualRefreshToken,
     updateActivity,
     
     // Config
@@ -523,7 +572,7 @@ export const AuthProvider = ({ children }) => {
     // Utils
     isAuthenticated: !!token && !!user,
     isSessionValid: sessionExpiry ? Date.now() < sessionExpiry : false,
-    timeToExpiry: sessionExpiry ? Math.max(0, sessionExpiry - Date.now()) : 0 // NEW: Time until token expires
+    timeToExpiry: sessionExpiry ? Math.max(0, sessionExpiry - Date.now()) : 0
   };
 
   return (

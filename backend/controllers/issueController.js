@@ -3,11 +3,11 @@ import Issue from '../models/issue.js';
 import {User} from '../models/Users.js';
 import { Manufacturer } from '../models/manufacturer.js';
 
-// Create new issue
+// Create new issue - ONLY FOR MANUFACTURERS
 export const createIssue = async (req, res) => {
   try {
-    const { name, description, category, } = req.body;
-    const userId = req.user.id; // From auth middleware
+    const { name, description, category } = req.body;
+    const userId = req.user.id; // From manufacturer auth middleware
 
     // Validate required fields
     if (!name || name.trim().length === 0) {
@@ -17,7 +17,7 @@ export const createIssue = async (req, res) => {
       });
     }
 
-        // Find manufacturer record
+    // Find manufacturer record
     const manufacturer = await Manufacturer.findOne({ userId });
     
     if (!manufacturer) {
@@ -34,6 +34,7 @@ export const createIssue = async (req, res) => {
       userId,
       manufacturerId: manufacturer._id,
       category: category || 'general',
+      status: 'open' // Default status
     });
 
     const savedIssue = await newIssue.save();
@@ -62,9 +63,25 @@ export const createIssue = async (req, res) => {
   }
 };
 
-// Get all issues (with filters) - Manufacturer specific
+// Get all issues - ONLY FOR ADMIN
 export const getAllIssues = async (req, res) => {
   try {
+    console.log('🔍 Getting all issues for admin...');
+    
+    // Check if request is from admin
+    if (!req.admin && !req.adminId) {
+      console.log('❌ Access denied: Not an admin');
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
+    console.log('✅ Admin access confirmed:', {
+      adminId: req.adminId,
+      email: req.admin?.email
+    });
+
     const {
       page = 1,
       limit = 10,
@@ -75,28 +92,9 @@ export const getAllIssues = async (req, res) => {
       sortOrder = 'desc'
     } = req.query;
 
-    // Only manufacturers can access this endpoint
-    if (!req.user.isManufacturer) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Only manufacturers can view issues.'
-      });
-    }
-
-    // Find manufacturer record
-    const manufacturer = await Manufacturer.findOne({ userId: req.user.id });
-    
-    if (!manufacturer) {
-      return res.status(404).json({
-        success: false,
-        message: 'Manufacturer profile not found.'
-      });
-    }
-
-    // Build filter object - only show this manufacturer's issues
+    // Build filter object - Admin can see ALL issues
     const filter = { 
-      isDeleted: false,
-      manufacturerId: manufacturer._id
+      isDeleted: false
     };
     
     if (status) filter.status = status;
@@ -131,14 +129,15 @@ export const getAllIssues = async (req, res) => {
     const totalIssues = await Issue.countDocuments(filter);
     const totalPages = Math.ceil(totalIssues / limit);
 
+    console.log('✅ Issues retrieved successfully:', {
+      count: issues.length,
+      totalCount: totalIssues
+    });
+
     res.status(200).json({
       success: true,
       data: {
         issues,
-        manufacturer: {
-          businessName: manufacturer.businessName,
-          contact: manufacturer.contact
-        },
         pagination: {
           currentPage: parseInt(page),
           totalPages,
@@ -150,7 +149,7 @@ export const getAllIssues = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching issues:', error);
+    console.error('❌ Error fetching issues:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -159,9 +158,19 @@ export const getAllIssues = async (req, res) => {
   }
 };
 
-// Get single issue by ID - Manufacturer specific
+// Get single issue by ID - ONLY FOR ADMIN
 export const getIssueById = async (req, res) => {
   try {
+    console.log('🔍 Getting issue by ID for admin:', req.params.id);
+    
+    // Check if request is from admin
+    if (!req.admin && !req.adminId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
     const { id } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -171,33 +180,13 @@ export const getIssueById = async (req, res) => {
       });
     }
 
-    // Only manufacturers can access this endpoint
-    if (!req.user.isManufacturer) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Only manufacturers can view issues.'
-      });
-    }
-
-    // Find manufacturer record
-    const manufacturer = await Manufacturer.findOne({ userId: req.user.id });
-    
-    if (!manufacturer) {
-      return res.status(404).json({
-        success: false,
-        message: 'Manufacturer profile not found.'
-      });
-    }
-
     const issue = await Issue.findOne({ 
       _id: id, 
-      isDeleted: false,
-      manufacturerId: manufacturer._id  // Only show this manufacturer's issues
+      isDeleted: false
     })
     .populate('userId', 'name email')
     .populate('manufacturerId', 'businessName contact.email contact.contactPerson')
-    .populate('assignedTo', 'name email')
-    .populate('comments.userId', 'name email');
+    .populate('assignedTo', 'name email');
 
     if (!issue) {
       return res.status(404).json({
@@ -205,6 +194,8 @@ export const getIssueById = async (req, res) => {
         message: 'Issue not found'
       });
     }
+
+    console.log('✅ Issue found:', issue._id);
 
     res.status(200).json({
       success: true,
@@ -214,7 +205,7 @@ export const getIssueById = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching issue:', error);
+    console.error('❌ Error fetching issue:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -223,11 +214,21 @@ export const getIssueById = async (req, res) => {
   }
 };
 
-// Update issue - Manufacturer specific
+// Update issue - ONLY FOR ADMIN
 export const updateIssue = async (req, res) => {
   try {
+    console.log('✏️ Updating issue for admin:', req.params.id);
+    
+    // Check if request is from admin
+    if (!req.admin && !req.adminId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
     const { id } = req.params;
-    const { name, description, status, category, resolution } = req.body;
+    const { name, description, status, category, assignedTo, priority, resolution } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
@@ -236,28 +237,9 @@ export const updateIssue = async (req, res) => {
       });
     }
 
-    // Only manufacturers can access this endpoint
-    if (!req.user.isManufacturer) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Only manufacturers can update issues.'
-      });
-    }
-
-    // Find manufacturer record
-    const manufacturer = await Manufacturer.findOne({ userId: req.user.id });
-    
-    if (!manufacturer) {
-      return res.status(404).json({
-        success: false,
-        message: 'Manufacturer profile not found.'
-      });
-    }
-
     const issue = await Issue.findOne({ 
       _id: id, 
-      isDeleted: false,
-      manufacturerId: manufacturer._id  // Only allow updating their own issues
+      isDeleted: false
     });
 
     if (!issue) {
@@ -267,17 +249,28 @@ export const updateIssue = async (req, res) => {
       });
     }
 
-    // Build update object - manufacturers can update basic info only
+    // Build update object - Admin can update everything
     const updateData = {};
     
     if (name) updateData.name = name.trim();
     if (description !== undefined) updateData.description = description.trim();
     if (category) updateData.category = category;
+    if (resolution !== undefined) updateData.resolution = resolution.trim();
     
-    // Only allow status update to specific values by manufacturer
-    if (status && ['open', 'closed'].includes(status)) {
-      updateData.status = status;
+    // Admin can update to any status
+    if (status) {
+      const validStatuses = ['open', 'in-progress', 'resolved', 'closed'];
+      if (validStatuses.includes(status)) {
+        updateData.status = status;
+      }
     }
+
+    // Admin can assign issues
+    if (assignedTo !== undefined) {
+      updateData.assignedTo = assignedTo || null;
+    }
+
+    updateData.updatedAt = new Date();
 
     // Update issue
     const updatedIssue = await Issue.findByIdAndUpdate(
@@ -289,6 +282,8 @@ export const updateIssue = async (req, res) => {
     .populate('manufacturerId', 'businessName contact.email contact.contactPerson')
     .populate('assignedTo', 'name email');
 
+    console.log('✅ Issue updated:', updatedIssue._id);
+
     res.status(200).json({
       success: true,
       message: 'Issue updated successfully',
@@ -298,7 +293,7 @@ export const updateIssue = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error updating issue:', error);
+    console.error('❌ Error updating issue:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -307,9 +302,15 @@ export const updateIssue = async (req, res) => {
   }
 };
 
-// Delete issue (soft delete) - Manufacturer specific
 export const deleteIssue = async (req, res) => {
   try {
+    if (!req.admin && !req.adminId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
     const { id } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -319,29 +320,7 @@ export const deleteIssue = async (req, res) => {
       });
     }
 
-    // Only manufacturers can access this endpoint
-    if (!req.user.isManufacturer) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Only manufacturers can delete issues.'
-      });
-    }
-
-    // Find manufacturer record
-    const manufacturer = await Manufacturer.findOne({ userId: req.user.id });
-    
-    if (!manufacturer) {
-      return res.status(404).json({
-        success: false,
-        message: 'Manufacturer profile not found.'
-      });
-    }
-
-    const issue = await Issue.findOne({ 
-      _id: id, 
-      isDeleted: false,
-      manufacturerId: manufacturer._id  // Only allow deleting their own issues
-    });
+    const issue = await Issue.findById(id);
 
     if (!issue) {
       return res.status(404).json({
@@ -350,16 +329,21 @@ export const deleteIssue = async (req, res) => {
       });
     }
 
-    // Soft delete
-    await Issue.findByIdAndUpdate(id, { isDeleted: true });
+    const deletedIssue = await Issue.findByIdAndDelete(id);
+
+    if (!deletedIssue) {
+      return res.status(404).json({
+        success: false,
+        message: 'Issue not found or already deleted'
+      });
+    }
 
     res.status(200).json({
       success: true,
-      message: 'Issue deleted successfully'
+      message: 'Issue permanently deleted from database'
     });
 
   } catch (error) {
-    console.error('Error deleting issue:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -368,9 +352,28 @@ export const deleteIssue = async (req, res) => {
   }
 };
 
-// Add comment to issue - Manufacturer specific
+// Add comment to issue - ONLY FOR ADMIN
+// Note: This function expects a comments field in the schema. 
+// If you want to add comments, you'll need to update your Issue schema first.
 export const addComment = async (req, res) => {
   try {
+    console.log('💬 Adding comment for admin:', req.params.id);
+    
+    return res.status(501).json({
+      success: false,
+      message: 'Comments feature not implemented. Please add a comments field to your Issue schema first.'
+    });
+    
+    /* Uncomment this code after adding comments field to your schema:
+    
+    // Check if request is from admin
+    if (!req.admin && !req.adminId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
     const { id } = req.params;
     const { message } = req.body;
 
@@ -388,28 +391,9 @@ export const addComment = async (req, res) => {
       });
     }
 
-    // Only manufacturers can access this endpoint
-    if (!req.user.isManufacturer) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Only manufacturers can add comments.'
-      });
-    }
-
-    // Find manufacturer record
-    const manufacturer = await Manufacturer.findOne({ userId: req.user.id });
-    
-    if (!manufacturer) {
-      return res.status(404).json({
-        success: false,
-        message: 'Manufacturer profile not found.'
-      });
-    }
-
     const issue = await Issue.findOne({ 
       _id: id, 
-      isDeleted: false,
-      manufacturerId: manufacturer._id  // Only allow commenting on their own issues
+      isDeleted: false
     });
 
     if (!issue) {
@@ -419,18 +403,22 @@ export const addComment = async (req, res) => {
       });
     }
 
-    // Add comment
+    // Add comment with admin ID
     const comment = {
-      userId: req.user.id,
+      userId: req.adminId,
       message: message.trim(),
-      timestamp: new Date()
+      timestamp: new Date(),
+      isAdminComment: true // Flag to identify admin comments
     };
 
     issue.comments.push(comment);
+    issue.updatedAt = new Date();
     await issue.save();
 
     // Populate the new comment
     await issue.populate('comments.userId', 'name email');
+
+    console.log('✅ Comment added:', issue._id);
 
     res.status(201).json({
       success: true,
@@ -439,9 +427,10 @@ export const addComment = async (req, res) => {
         comment: issue.comments[issue.comments.length - 1]
       }
     });
+    */
 
   } catch (error) {
-    console.error('Error adding comment:', error);
+    console.error('❌ Error adding comment:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -450,87 +439,28 @@ export const addComment = async (req, res) => {
   }
 };
 
+// Get issue statistics - ONLY FOR ADMIN
 export const getIssueStats = async (req, res) => {
   try {
-    // Check if user exists and has required permissions
-    if (!req.user || (!req.user.id && !req.user._id)) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required. User not found in request.'
-      });
-    }
-
-    // Get user ID (handle both req.user.id and req.user._id)
-    const userId = req.user.id || req.user._id;
-
-    // Check if user is manufacturer (check both flag and profile)
-    if (!req.user.isManufacturer && !req.user.manufacturerProfile) {
+    console.log('📊 Getting issue statistics for admin...');
+    
+    // Check if request is from admin
+    if (!req.admin && !req.adminId) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. Only manufacturers can view statistics.'
+        message: 'Access denied. Admin privileges required.'
       });
     }
 
-    console.log('Authenticated user:', {
-      id: userId,
-      email: req.user.email,
-      isManufacturer: req.user.isManufacturer,
-      hasManufacturerProfile: !!req.user.manufacturerProfile
-    });
+    console.log('✅ Admin access confirmed for stats');
 
-    // Find manufacturer record with more specific query
-    // First try to find by direct manufacturerProfile reference
-    let manufacturer;
-    
-    if (req.user.manufacturerProfile) {
-      manufacturer = await Manufacturer.findById(req.user.manufacturerProfile)
-        .populate('userId', 'email name');
-    } else {
-      // Fallback: find by userId
-      manufacturer = await Manufacturer.findOne({ 
-        userId: userId 
-      }).populate('userId', 'email name');
-    }
-    
-    console.log('Found manufacturer:', manufacturer);
-
-    if (!manufacturer) {
-      // Log all manufacturers to debug the association issue
-      const allManufacturers = await Manufacturer.find({})
-        .populate('userId', 'email name')
-        .select('userId businessName contact');
-      
-      console.log('All manufacturers in database:', allManufacturers);
-      console.log('Looking for userId:', userId);
-
-      return res.status(404).json({
-        success: false,
-        message: 'Manufacturer profile not found for this user.',
-        debug: {
-          userId: userId,
-          userEmail: req.user.email,
-          hasManufacturerProfile: !!req.user.manufacturerProfile,
-          manufacturerProfileId: req.user.manufacturerProfile,
-          availableManufacturers: allManufacturers.map(m => ({
-            id: m._id,
-            userId: m.userId?._id,
-            userEmail: m.userId?.email,
-            businessName: m.businessName
-          }))
-        }
-      });
-    }
-
-    // Build filter for manufacturer's issues
+    // Build base filter - Admin sees all issues
     const baseFilter = { 
-      isDeleted: false, 
-      manufacturerId: manufacturer._id 
+      isDeleted: false
     };
 
-    console.log('Filtering issues with:', baseFilter);
-
-    // Get statistics with error handling for each aggregation
-    const [totalIssues, statusStats,  categoryStats, recentIssues] = await Promise.allSettled([
+    // Get statistics
+    const [totalIssues, statusStats, categoryStats, recentIssues] = await Promise.allSettled([
       // Total issues
       Issue.countDocuments(baseFilter),
       
@@ -539,7 +469,7 @@ export const getIssueStats = async (req, res) => {
         { $match: baseFilter },
         { $group: { _id: '$status', count: { $sum: 1 } } }
       ]),
-            
+      
       // By category
       Issue.aggregate([
         { $match: baseFilter },
@@ -553,7 +483,7 @@ export const getIssueStats = async (req, res) => {
       })
     ]);
 
-    // Handle any rejected promises
+    // Handle results
     const handleResult = (result, defaultValue) => {
       if (result.status === 'fulfilled') {
         return result.value;
@@ -582,7 +512,8 @@ export const getIssueStats = async (req, res) => {
     ['open', 'in-progress', 'resolved', 'closed'].forEach(status => {
       formattedStats.byStatus[status] = 0;
     });
-    ['technical', 'billing', 'order', 'product', 'general','other'].forEach(category => {
+
+    ['technical', 'billing', 'order', 'product', 'general', 'other'].forEach(category => {
       formattedStats.byCategory[category] = 0;
     });
 
@@ -599,27 +530,21 @@ export const getIssueStats = async (req, res) => {
       }
     });
 
+    console.log('✅ Statistics retrieved:', formattedStats);
+
     res.status(200).json({
       success: true,
       data: {
-        statistics: formattedStats,
-        manufacturer: {
-          id: manufacturer._id,
-          businessName: manufacturer.businessName,
-          contact: manufacturer.contact,
-          userId: manufacturer.userId._id,
-          userEmail: manufacturer.userId.email
-        }
+        statistics: formattedStats
       }
     });
 
   } catch (error) {
-    console.error('Error fetching statistics:', error);
+    console.error('❌ Error fetching statistics:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: error.message
     });
   }
 };

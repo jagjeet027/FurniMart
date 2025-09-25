@@ -37,6 +37,7 @@ export const checkRegistrationStatus = async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
+    console.error('Error checking admin registration status:', error);
     res.status(500).json({ 
       message: "Server error", 
       error: error.message,
@@ -81,6 +82,8 @@ export const registerAdmin = async (req, res) => {
     
     const token = generateToken(admin._id);
     
+    console.log('✅ Admin registered successfully:', admin.email);
+    
     res.status(201).json({
       message: "Admin registered successfully",
       token,
@@ -92,7 +95,11 @@ export const registerAdmin = async (req, res) => {
     });
     
   } catch (error) {
-    res.status(500).json({ message: "Registration failed", error: error.message });
+    console.error('Admin registration error:', error);
+    res.status(500).json({ 
+      message: "Registration failed", 
+      error: error.message 
+    });
   }
 };
 
@@ -101,26 +108,40 @@ export const loginAdmin = async (req, res) => {
   try {
     const { adminId, password, secretCode } = req.body;
     
+    console.log('=== ADMIN LOGIN ATTEMPT ===');
+    console.log('Admin ID:', adminId);
+    
     // Find admin
     const admin = await Admin.findOne({ adminId: "ADmin820" });
     if (!admin) {
-      return res.status(404).json({ message: "Admin not found" });
+      console.log('❌ Admin not found');
+      return res.status(404).json({ 
+        message: "Admin not found" 
+      });
     }
     
     // Check password
     const isPasswordValid = await admin.comparePassword(password);
     if (!isPasswordValid) {
-      return res.status(401).json({ message: "Invalid credentials" });
+      console.log('❌ Invalid password');
+      return res.status(401).json({ 
+        message: "Invalid credentials" 
+      });
     }
     
     // Check secret code
     const isSecretCodeValid = await admin.compareSecretCode(secretCode);
     if (!isSecretCodeValid) {
-      return res.status(401).json({ message: "Invalid secret code" });
+      console.log('❌ Invalid secret code');
+      return res.status(401).json({ 
+        message: "Invalid secret code" 
+      });
     }
     
     // Generate token
     const token = generateToken(admin._id);
+    
+    console.log('✅ Admin login successful:', admin.email);
     
     res.json({
       message: "Login successful",
@@ -133,29 +154,43 @@ export const loginAdmin = async (req, res) => {
     });
     
   } catch (error) {
-    res.status(500).json({ message: "Login failed", error: error.message });
+    console.error('Admin login error:', error);
+    res.status(500).json({ 
+      message: "Login failed", 
+      error: error.message 
+    });
   }
 };
 
-// Add this to your adminController.js
-
+// Refresh token functionality
 export const refreshToken = async (req, res) => {
   try {
     // Get admin ID from the middleware (should be set by authMiddleware)
     const adminId = req.adminId;
     
     if (!adminId) {
-      return res.status(401).json({ message: "Unauthorized - No admin ID found" });
+      console.log('❌ No admin ID found in refresh request');
+      return res.status(401).json({ 
+        message: "Unauthorized - No admin ID found" 
+      });
     }
+    
+    console.log('=== ADMIN TOKEN REFRESH ===');
+    console.log('Admin ID:', adminId);
     
     // Find the admin
     const admin = await Admin.findById(adminId);
     if (!admin) {
-      return res.status(404).json({ message: "Admin not found" });
+      console.log('❌ Admin not found during token refresh');
+      return res.status(404).json({ 
+        message: "Admin not found" 
+      });
     }
     
     // Generate new token
     const newToken = generateToken(admin._id);
+    
+    console.log('✅ Admin token refreshed successfully');
     
     res.json({
       message: "Token refreshed successfully",
@@ -169,7 +204,7 @@ export const refreshToken = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Token refresh error:', error);
+    console.error('Admin token refresh error:', error);
     res.status(500).json({ 
       message: "Token refresh failed", 
       error: error.message 

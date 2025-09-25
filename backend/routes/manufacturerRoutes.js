@@ -2,16 +2,19 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import { authenticateToken } from '../middleware/authMiddleware.js';
+import adminAuth from '../middleware/adminAuth.js';
 import { Manufacturer } from '../models/manufacturer.js';
 import { User } from '../models/Users.js'; 
+import { sendStatusEmail } from '../services/emailService.js';
 import fs from 'fs';
+import { createManufacturerNotification } from '../utils/notificationHelper.js';
 
 const router = express.Router();
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/manufacturers/') // Make sure this directory exists
+    cb(null, 'uploads/manufacturers/')
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -25,7 +28,6 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024 // 10MB limit
   },
   fileFilter: (req, file, cb) => {
-    // Allow only certain file types
     const allowedTypes = /jpeg|jpg|png|pdf|doc|docx/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
@@ -38,18 +40,14 @@ const upload = multer({
   }
 });
 
-router.get('/all',  async (req, res) => {
+// GET /api/manufacturers/all - ADMIN ONLY
+router.get('/all', adminAuth, async (req, res) => {
   try {
-    console.log('=== GET ALL MANUFACTURERS ===');
-    console.log('User:', req.user ? {
-      id: req.user._id || req.user.id,
-      email: req.user.email,
-      isAdmin: req.user.isAdmin
-    } : 'No user');
-    console.log('UserId from req:', req.userId);
+    console.log('=== GET ALL MANUFACTURERS (ADMIN) ===');
+    console.log('Admin:', req.admin.email);
 
     const manufacturers = await Manufacturer.find({})
-      .populate('userId', 'email username')
+      .populate('userId', 'email name')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -103,7 +101,6 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/manufacturers/register
 router.post('/register', 
   authenticateToken,
   upload.fields([
@@ -114,13 +111,7 @@ router.post('/register',
   async (req, res) => {
     try {
       console.log('=== MANUFACTURER REGISTRATION ===');
-      console.log('User from auth:', req.user ? {
-        id: req.user._id || req.user.id,
-        email: req.user.email
-      } : 'No user');
       console.log('User ID:', req.userId);
-      console.log('Request body keys:', Object.keys(req.body));
-      console.log('Uploaded files:', req.files ? Object.keys(req.files) : 'No files');
 
       const {
         businessName,
@@ -142,8 +133,7 @@ router.post('/register',
         console.log('❌ Missing required fields');
         return res.status(400).json({
           success: false,
-          message: 'All fields are required',
-          receivedFields: Object.keys(req.body)
+          message: 'All fields are required'
         });
       }
 
@@ -152,8 +142,7 @@ router.post('/register',
         console.log('❌ Missing required files');
         return res.status(400).json({
           success: false,
-          message: 'Business license and tax certificate are required',
-          receivedFiles: req.files ? Object.keys(req.files) : []
+          message: 'Business license and tax certificate are required'
         });
       }
 
@@ -187,12 +176,11 @@ router.post('/register',
         documents.qualityCertifications = req.files.qualityCertifications.map(file => ({
           filename: file.originalname,
           path: file.path,
-          certificationType: 'General', // You might want to make this dynamic
+          certificationType: 'General',
           uploadDate: new Date()
         }));
       }
 
-      // Create manufacturer record
       const manufacturer = new Manufacturer({
         userId: req.userId,
         businessName,
@@ -216,6 +204,9 @@ router.post('/register',
 
       await manufacturer.save();
 
+      // Create notification for admin
+      await createManufacturerNotification('new_registration', manufacturer);
+
       console.log('✅ Manufacturer registered successfully');
 
       res.status(201).json({
@@ -230,7 +221,6 @@ router.post('/register',
     } catch (error) {
       console.error('❌ Manufacturer registration error:', error);
       
-      // Handle validation errors
       if (error.name === 'ValidationError') {
         const errors = Object.values(error.errors).map(err => err.message);
         return res.status(400).json({
@@ -249,7 +239,7 @@ router.post('/register',
   }
 );
 
-// GET /api/manufacturers/:id - Get manufacturer by ID
+// GET /api/manufacturers/:id - Get manufacturer by ID (Admin or Owner)
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -271,7 +261,6 @@ router.get('/:id', authenticateToken, async (req, res) => {
     }
 
     // Check if user has permission to view this manufacturer
-    // Allow if: user is the manufacturer owner, or user is admin
     if (manufacturer.userId._id.toString() !== req.userId && !req.user.isAdmin) {
       return res.status(403).json({
         success: false,
@@ -295,7 +284,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Enhanced document download route with better error handling and security
+// Document download route
 router.get('/documents/:filename', authenticateToken, async (req, res) => {
   try {
     const { filename } = req.params;
@@ -303,7 +292,6 @@ router.get('/documents/:filename', authenticateToken, async (req, res) => {
     console.log('Filename:', filename);
     console.log('User:', req.userId);
     
-    // First, find the manufacturer record that contains this document
     const manufacturer = await Manufacturer.findOne({
       $or: [
         { 'documents.businessLicense.filename': filename },
@@ -320,8 +308,7 @@ router.get('/documents/:filename', authenticateToken, async (req, res) => {
       });
     }
 
-    // Check if user has permission to access this document
-    // Allow access if: user is the manufacturer owner, or user is admin
+    // Check permission
     if (manufacturer.userId.toString() !== req.userId && !req.user.isAdmin) {
       console.log('❌ Access denied');
       return res.status(403).json({
@@ -330,19 +317,14 @@ router.get('/documents/:filename', authenticateToken, async (req, res) => {
       });
     }
 
-    // Find the actual file path from the document record
+    // Find the actual file path
     let actualFilePath = null;
     
-    // Check business license
     if (manufacturer.documents.businessLicense?.filename === filename) {
       actualFilePath = manufacturer.documents.businessLicense.path;
-    }
-    // Check tax certificate
-    else if (manufacturer.documents.taxCertificate?.filename === filename) {
+    } else if (manufacturer.documents.taxCertificate?.filename === filename) {
       actualFilePath = manufacturer.documents.taxCertificate.path;
-    }
-    // Check quality certifications
-    else {
+    } else {
       const qualityCert = manufacturer.documents.qualityCertifications?.find(
         cert => cert.filename === filename
       );
@@ -351,95 +333,54 @@ router.get('/documents/:filename', authenticateToken, async (req, res) => {
       }
     }
 
-    if (!actualFilePath) {
-      console.log('❌ Document path not found');
+    if (!actualFilePath || !fs.existsSync(actualFilePath)) {
+      console.log('❌ File not found');
       return res.status(404).json({
         success: false,
-        message: 'Document path not found'
+        message: 'File not found'
       });
     }
 
-    // Resolve the full file path
+    // Security check
     const fullPath = path.resolve(actualFilePath);
-    
-    // Security check: ensure the file is within the uploads directory
     const uploadsDir = path.resolve('uploads/manufacturers/');
     if (!fullPath.startsWith(uploadsDir)) {
-      console.log('❌ Invalid file path');
       return res.status(403).json({
         success: false,
         message: 'Access denied: Invalid file path'
       });
     }
 
-    // Check if file exists
-    if (!fs.existsSync(fullPath)) {
-      console.error(`❌ File not found at path: ${fullPath}`);
-      return res.status(404).json({
-        success: false,
-        message: 'Physical file not found on server'
-      });
-    }
-
-    // Get file stats for additional info
     const stats = fs.statSync(fullPath);
     const fileExtension = path.extname(filename).toLowerCase();
     
-    // Set appropriate content type based on file extension
     let contentType = 'application/octet-stream';
     switch (fileExtension) {
-      case '.pdf':
-        contentType = 'application/pdf';
-        break;
+      case '.pdf': contentType = 'application/pdf'; break;
       case '.jpg':
-      case '.jpeg':
-        contentType = 'image/jpeg';
-        break;
-      case '.png':
-        contentType = 'image/png';
-        break;
-      case '.doc':
-        contentType = 'application/msword';
-        break;
-      case '.docx':
-        contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-        break;
+      case '.jpeg': contentType = 'image/jpeg'; break;
+      case '.png': contentType = 'image/png'; break;
+      case '.doc': contentType = 'application/msword'; break;
+      case '.docx': contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'; break;
     }
 
-    console.log('✅ Serving file:', filename);
-
-    // Set headers
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Length', stats.size);
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     
-    // Create read stream and pipe to response
     const fileStream = fs.createReadStream(fullPath);
-    
-    fileStream.on('error', (error) => {
-      console.error('❌ File stream error:', error);
-      if (!res.headersSent) {
-        res.status(500).json({
-          success: false,
-          message: 'Error reading file'
-        });
-      }
-    });
-
     fileStream.pipe(res);
 
   } catch (error) {
     console.error('❌ Error serving document:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error while serving document',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Server error while serving document'
     });
   }
 });
 
-// PATCH /api/manufacturers/:id/status - Update manufacturer status (admin only)
-router.patch('/:id/status', authenticateToken, async (req, res) => {
+router.patch('/:id/status', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -447,14 +388,7 @@ router.patch('/:id/status', authenticateToken, async (req, res) => {
     console.log('=== UPDATE MANUFACTURER STATUS ===');
     console.log('Manufacturer ID:', id);
     console.log('New Status:', status);
-
-    // Check if user is admin
-    if (!req.user.isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Admin privileges required.'
-      });
-    }
+    console.log('Admin:', req.admin.email);
 
     // Validate status
     if (!['pending', 'approved', 'rejected'].includes(status)) {
@@ -464,9 +398,9 @@ router.patch('/:id/status', authenticateToken, async (req, res) => {
       });
     }
 
-    // Find manufacturer first to get userId
-    const manufacturerBeforeUpdate = await Manufacturer.findById(id);
-    if (!manufacturerBeforeUpdate) {
+    // Find manufacturer to get userId and contact info
+    const manufacturer = await Manufacturer.findById(id).populate('userId', 'email name');
+    if (!manufacturer) {
       console.log('❌ Manufacturer not found');
       return res.status(404).json({
         success: false,
@@ -474,19 +408,38 @@ router.patch('/:id/status', authenticateToken, async (req, res) => {
       });
     }
 
-    // Update manufacturer status
-    const manufacturer = await Manufacturer.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true }
-    ).populate('userId', 'email name'); // Only populate User fields that exist
+    // Store previous status for notification
+    const previousStatus = manufacturer.status;
 
-    // If status is approved, update user's isManufacturer to true
-    // If status is rejected, set isManufacturer to false
+    // Update manufacturer status
+    manufacturer.status = status;
+    await manufacturer.save();
+
+    // Update user's isManufacturer status
     if (status === 'approved') {
-      await User.findByIdAndUpdate(manufacturerBeforeUpdate.userId, { isManufacturer: true });
+      await User.findByIdAndUpdate(manufacturer.userId._id, { isManufacturer: true });
+      console.log('✅ User updated to manufacturer');
     } else if (status === 'rejected') {
-      await User.findByIdAndUpdate(manufacturerBeforeUpdate.userId, { isManufacturer: false });
+      await User.findByIdAndUpdate(manufacturer.userId._id, { isManufacturer: false });
+      console.log('✅ User manufacturer status revoked');
+    }
+
+    // Send email notification using your email service
+    try {
+      const emailResult = await sendStatusEmail(
+        manufacturer.contact.email, 
+        status, 
+        manufacturer._id
+      );
+      console.log('✅ Status email sent successfully:', emailResult.messageId);
+    } catch (emailError) {
+      console.error('❌ Failed to send status email:', emailError);
+      // Don't fail the entire operation if email fails
+    }
+
+    // Create notification for status change
+    if (previousStatus !== status) {
+      await createManufacturerNotification(status, manufacturer, req.admin._id);
     }
 
     console.log('✅ Status updated successfully');
@@ -494,7 +447,13 @@ router.patch('/:id/status', authenticateToken, async (req, res) => {
     res.json({
       success: true,
       message: `Manufacturer status updated to ${status}`,
-      data: manufacturer
+      data: {
+        id: manufacturer._id,
+        businessName: manufacturer.businessName,
+        status: manufacturer.status,
+        userId: manufacturer.userId._id,
+        userEmail: manufacturer.contact.email
+      }
     });
 
   } catch (error) {
@@ -507,22 +466,14 @@ router.patch('/:id/status', authenticateToken, async (req, res) => {
   }
 });
 
-// DELETE /api/manufacturers/:id - Delete manufacturer (admin only)
-router.delete('/:id', authenticateToken, async (req, res) => {
+// DELETE /api/manufacturers/:id - Delete manufacturer (ADMIN ONLY)
+router.delete('/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
     console.log('=== DELETE MANUFACTURER ===');
     console.log('Manufacturer ID:', id);
-    console.log('User:', req.userId);
-
-    // Check if user is admin
-    if (!req.user.isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Admin privileges required.'
-      });
-    }
+    console.log('Admin:', req.admin.email);
 
     // Find manufacturer to get file paths and userId
     const manufacturer = await Manufacturer.findById(id);
