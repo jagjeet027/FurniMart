@@ -4,7 +4,7 @@ import axios from 'axios';
 import { X, Menu, AlertCircle } from 'lucide-react';
 import {
   HomeIcon, BookOpen, BarChart2, Crown,
-  User, Sofa as SofaIcon
+  User, Sofa as SofaIcon, Lightbulb
 } from 'lucide-react';
 import { MessageCircle, Minimize2, Maximize2 } from 'lucide-react';
 import ManufacturerChat from '../manufacturer/ManufacturerChat';
@@ -142,53 +142,62 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   }, [isAuthenticated, user]);
 
   const menuItems = [
-    { path: '/', icon: HomeIcon, label: 'Dashboard', badge: null },
-    { 
-      path: '/products', 
-      icon: SofaIcon, 
-      label: 'Inventory', 
-      badge: '15',
-      requiresManufacturer: true 
-    },
-    { 
-      path: '/order', 
-      icon: BookOpen, 
-      label: 'Orders', 
-      badge: 'New',
-      requiresManufacturer: true 
-    },
-    { 
-      path: '/analytics', 
-      icon: BarChart2, 
-      label: 'Analytics', 
-      badge: null,
-      requiresManufacturer: true 
-    },
-    { 
-      path: '/ideas', 
-      icon: AlertCircle, 
-      label: 'Idea Submissions', 
-      badge: null,
-      requiresManufacturer: true 
-    },
-    {
-      path: '/premium',
-      icon: Crown,
-      label: 'Premium Features',
-      badge: 'PRO',
-      isPremium: true,
-      requiresManufacturer: true
-    },
-    { path: '/profile', icon: User, label: 'Profile', badge: null },
-    { 
-      path: '/chat', 
-      icon: MessageCircle, 
-      label: 'Chat Panel', 
-      badge: '3',
-      isChat: true,
-      onClick: () => setIsChatOpen(true) // Special handler for chat
-    },
-  ];
+  { path: '/', icon: HomeIcon, label: 'Dashboard', badge: null },
+  { 
+    path: '/products', 
+    icon: SofaIcon, 
+    label: 'Inventory', 
+    badge: '15',
+    requiresManufacturer: true 
+  },
+  { 
+    path: '/order', 
+    icon: BookOpen, 
+    label: 'Orders', 
+    badge: 'New',
+    requiresManufacturer: true 
+  },
+  { 
+    path: '/analytics', 
+    icon: BarChart2, 
+    label: 'Analytics', 
+    badge: null,
+    requiresManufacturer: true 
+  },
+  // ADD THIS NEW MENU ITEM
+  { 
+    path: '/new-idea', 
+    icon: Lightbulb, 
+    label: 'Innovation Hub', 
+    badge: 'NEW',
+    requiresAuth: true // Available for both users and manufacturers
+  },
+  { 
+    path: '/ideas', 
+    icon: AlertCircle, 
+    label: 'Idea Submissions', 
+    badge: null,
+    requiresManufacturer: true 
+  },
+  {
+    path: '/premium',
+    icon: Crown,
+    label: 'Premium Features',
+    badge: 'PRO',
+    isPremium: true,
+    requiresManufacturer: true
+  },
+  { path: '/profile', icon: User, label: 'Profile', badge: null },
+  { 
+    path: '/chat', 
+    icon: MessageCircle, 
+    label: 'Chat Panel', 
+    badge: '3',
+    isChat: true,
+    onClick: () => setIsChatOpen(true)
+  },
+];
+
 
   const handleNavigation = (path, item) => {
     console.log('Navigation clicked:', { path, item }); // Debug log

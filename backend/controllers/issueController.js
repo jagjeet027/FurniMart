@@ -94,6 +94,8 @@ export const getAllIssues = async (req, res) => {
 
     // Build filter object - Admin can see ALL issues
     const filter = { 
+
+
       isDeleted: false
     };
     
@@ -186,7 +188,8 @@ export const getIssueById = async (req, res) => {
     })
     .populate('userId', 'name email')
     .populate('manufacturerId', 'businessName contact.email contact.contactPerson')
-    .populate('assignedTo', 'name email');
+    .populate('assignedTo', 'name email')
+    .populate('comments.userId', 'name email');
 
     if (!issue) {
       return res.status(404).json({
@@ -228,7 +231,7 @@ export const updateIssue = async (req, res) => {
     }
 
     const { id } = req.params;
-    const { name, description, status, category, assignedTo, priority, resolution } = req.body;
+    const { name, description, status, category, assignedTo, priority } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
@@ -255,7 +258,7 @@ export const updateIssue = async (req, res) => {
     if (name) updateData.name = name.trim();
     if (description !== undefined) updateData.description = description.trim();
     if (category) updateData.category = category;
-    if (resolution !== undefined) updateData.resolution = resolution.trim();
+    if (priority) updateData.priority = priority;
     
     // Admin can update to any status
     if (status) {
@@ -353,18 +356,9 @@ export const deleteIssue = async (req, res) => {
 };
 
 // Add comment to issue - ONLY FOR ADMIN
-// Note: This function expects a comments field in the schema. 
-// If you want to add comments, you'll need to update your Issue schema first.
 export const addComment = async (req, res) => {
   try {
     console.log('💬 Adding comment for admin:', req.params.id);
-    
-    return res.status(501).json({
-      success: false,
-      message: 'Comments feature not implemented. Please add a comments field to your Issue schema first.'
-    });
-    
-    /* Uncomment this code after adding comments field to your schema:
     
     // Check if request is from admin
     if (!req.admin && !req.adminId) {
@@ -427,7 +421,6 @@ export const addComment = async (req, res) => {
         comment: issue.comments[issue.comments.length - 1]
       }
     });
-    */
 
   } catch (error) {
     console.error('❌ Error adding comment:', error);

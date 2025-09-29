@@ -29,6 +29,7 @@ import chatRoutes from './routes/chatRoutes.js';
 import career from './routes/careerRoutes/careerRoutes.js';
 import registerIndividual  from './routes/careerRoutes/registration.js';
 import organizationRoutes from './routes/careerRoutes/organizationRoutes.js';
+import postRoutes from './routes/postRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -223,6 +224,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/careers', career);
 app.use('/api/registration', registerIndividual );
 app.use('/api/organizations', organizationRoutes);
+app.use('/api', postRoutes);
 
 // Simple chatbot endpoint for predefined issues
 app.post('/api/chatbot', (req, res) => {

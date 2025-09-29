@@ -29,6 +29,8 @@ import CartPage from './orderpages/CartPage.jsx';
 import CategoryProductsPage from './components/userDashBoard/CategoryProductsPage.jsx';
 import CategoriesOverviewPage from './components/userDashBoard/CategoriesOverviewPage.jsx';
 import APIDebugComponent from './services/APIDebugComponent.jsx';
+// import FurnimartInnovationHub from './components/userDashBoard/FurnimartInnovationHub.jsx';
+import IdeaSharingPlatform from './components/userDashBoard/IdeaSharingPlatform.jsx';
 
 const App = () => {
   const location = useLocation();
@@ -46,6 +48,8 @@ const App = () => {
     '/manufacturer/faqsection',
     '/products/management',
     '/categories/management',
+
+    '/new-idea'
   ];
 
   // Improved check for paths that should hide header/footer
@@ -95,7 +99,7 @@ const App = () => {
           
           {/* PROFILE ROUTES */}
           <Route path="/profile" element={<PrivateRoute><Profile/></PrivateRoute>} />
-
+          <Route path ="/new-idea" element={<PrivateRoute><IdeaSharingPlatform/></PrivateRoute>} />
           {/* PRODUCT MANAGEMENT ROUTES - Before dynamic product routes */}
           <Route path="/products/management" element={<PrivateRoute><ProductManagement /></PrivateRoute>} />
           

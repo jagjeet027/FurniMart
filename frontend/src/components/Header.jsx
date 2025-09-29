@@ -18,11 +18,15 @@ import {
   Factory,
   Grid,
   ChevronRight,
-  Edit
+  Edit,
+  Search,
+  Loader2,
+  Lightbulb
 } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useCart } from '../contexts/CartContext'; // Add this import
+import { useCart } from '../contexts/CartContext';
+import api from '../axios/axiosInstance';
 
 // Updated menu sections with conditional rendering
 const menuSections = [
@@ -259,34 +263,154 @@ const NotificationsDropdown = () => {
   );
 };
 
-// Wishlist button component with tooltip
-const WishlistButton = ({ wishlistCount, isAnimating }) => {
-  const [showTooltip, setShowTooltip] = useState(false);
-  
-  return (
-    <div className="relative" 
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
-    >
-      <Link 
-        to="/wishlist" 
-        className="p-2 relative hover:bg-orange-100 rounded-full transition-colors duration-200 flex items-center justify-center"
-        aria-label="My Wishlist"
-      >
-        <Heart className={`h-6 w-6 text-rose-600 ${isAnimating ? 'animate-pulse scale-110' : ''}`} />
-        {wishlistCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-            {wishlistCount}
-          </span>
-        )}
-      </Link>
+// Search Component
+const SearchComponent = ({ isAuthenticated }) => {
+  const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await api.get('/categories');
+        const categoriesData = Array.isArray(response.data) ? response.data : (response.data.categories || []);
+        setCategories(categoriesData);
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    
+    if (!searchQuery.trim()) return;
+    
+    try {
+      setIsSearching(true);
       
-      {showTooltip && (
-        <div className="absolute -bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-50">
-          My Wishlist
-          <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
+      // Check if the search query matches any category name
+      const matchedCategory = categories.find(
+        cat => cat.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      
+      if (matchedCategory) {
+        navigate(`/categories/${matchedCategory._id || matchedCategory.id}/products`);
+        setSearchQuery('');
+        setIsExpanded(false);
+        return;
+      }
+      
+      // Search for products
+      const response = await api.get(`/products?search=${encodeURIComponent(searchQuery)}`);
+      const products = Array.isArray(response.data) ? response.data : (response.data.products || []);
+      
+      if (products.length > 0) {
+        navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+      } else {
+        navigate(`/search?q=${encodeURIComponent(searchQuery)}&no-results=true`);
+      }
+      
+      setSearchQuery('');
+      setIsExpanded(false);
+      
+    } catch (err) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery)}&no-results=true`);
+      setSearchQuery('');
+      setIsExpanded(false);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Mobile search overlay
+  if (isExpanded) {
+    return (
+      <div className="fixed inset-0 bg-white z-50 md:relative md:bg-transparent md:inset-auto">
+        <div className="p-4 md:p-0">
+          <div className="flex items-center space-x-3 mb-4 md:mb-0">
+            <button
+              onClick={() => setIsExpanded(false)}
+              className="md:hidden p-2 hover:bg-gray-100 rounded-full"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <form onSubmit={handleSearch} className="flex-1">
+              <div className="relative">
+                <input 
+                  type="text" 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search furniture, designs, collections" 
+                  className="w-full p-3 pr-12 rounded-full bg-gray-100 md:bg-white md:shadow-md placeholder-gray-400 text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 border border-gray-200"
+                  autoFocus
+                />
+                <button 
+                  type="submit"
+                  disabled={isSearching || !searchQuery.trim()} 
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-orange-500 to-orange-600 p-2 rounded-full text-white disabled:opacity-50"
+                >
+                  {isSearching ? (
+                    <Loader2 size={20} className="animate-spin" />
+                  ) : (
+                    <Search size={20} />
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+          
+          {/* Popular searches on mobile */}
+          <div className="md:hidden">
+            <h3 className="text-sm font-medium text-gray-500 mb-3">Popular Searches</h3>
+            <div className="flex flex-wrap gap-2">
+              <button className="px-3 py-2 bg-gray-100 rounded-full text-sm text-gray-600 hover:bg-orange-50">
+                Modern Sofa
+              </button>
+              <button className="px-3 py-2 bg-gray-100 rounded-full text-sm text-gray-600 hover:bg-orange-50">
+                Dining Set
+              </button>
+              <button className="px-3 py-2 bg-gray-100 rounded-full text-sm text-gray-600 hover:bg-orange-50">
+                King Bed
+              </button>
+              <button className="px-3 py-2 bg-gray-100 rounded-full text-sm text-gray-600 hover:bg-orange-50">
+                Office Chair
+              </button>
+            </div>
+          </div>
         </div>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 max-w-md md:max-w-lg mx-4">
+      <form onSubmit={handleSearch}>
+        <div className="relative">
+          <input 
+            type="text" 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setIsExpanded(true)}
+            placeholder="Search furniture..." 
+            className="w-full p-2 md:p-3 pr-12 rounded-full bg-gray-100 md:bg-white md:shadow-md placeholder-gray-400 text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 border border-gray-200"
+          />
+          <button 
+            type="submit"
+            disabled={isSearching || !searchQuery.trim()} 
+            className="absolute right-1 md:right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-orange-500 to-orange-600 p-1.5 md:p-2 rounded-full text-white disabled:opacity-50"
+          >
+            {isSearching ? (
+              <Loader2 size={16} className="md:w-5 md:h-5 animate-spin" />
+            ) : (
+              <Search size={16} className="md:w-5 md:h-5" />
+            )}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };
@@ -411,10 +535,10 @@ const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
 };
 
 // Mobile footer navigation component
-const MobileFooter = ({ isAuthenticated, wishlistCount, isWishlistAnimating, onProfileClick }) => {
+const MobileFooter = ({ isAuthenticated, onProfileClick }) => {
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden z-40">
-      <div className="grid grid-cols-5 h-16">
+      <div className="grid grid-cols-3 h-16">
         <Link to="/" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
           <Home className="h-6 w-6" />
           <span className="text-xs mt-1">Home</span>
@@ -424,128 +548,26 @@ const MobileFooter = ({ isAuthenticated, wishlistCount, isWishlistAnimating, onP
           <span className="text-xs mt-1">Categories</span>
         </Link>
         {isAuthenticated ? (
-          <>
-            <Link to="/wishlist" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600 relative">
-              <Heart className={`h-6 w-6 text-rose-600 ${isWishlistAnimating ? 'animate-pulse scale-110' : ''}`} />
-              {wishlistCount > 0 && (
-                <span className="absolute top-0 right-1/4 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                  {wishlistCount}
-                </span>
-              )}
-              <span className="text-xs mt-1">Wishlist</span>
-            </Link>
-            <Link to="/chat-history" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
-              <MessageCircle className="h-6 w-6" />
-              <span className="text-xs mt-1">Chat</span>
-            </Link>
-            <button onClick={onProfileClick} className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
-              <User className="h-6 w-6" />
-              <span className="text-xs mt-1">Profile</span>
-            </button>
-          </>
+          <button onClick={onProfileClick} className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
+            <User className="h-6 w-6" />
+            <span className="text-xs mt-1">Profile</span>
+          </button>
         ) : (
-          <>
-            <Link to="/login" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
-              <ShoppingCart className="h-6 w-6" />
-              <span className="text-xs mt-1">Login</span>
-            </Link>
-            <Link to="/signup" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
-              <User className="h-6 w-6" />
-              <span className="text-xs mt-1">Sign Up</span>
-            </Link>
-            <div className="flex flex-col items-center justify-center text-gray-600">
-              <HelpCircle className="h-6 w-6" />
-              <span className="text-xs mt-1">Help</span>
-            </div>
-          </>
+          <Link to="/login" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
+            <User className="h-6 w-6" />
+            <span className="text-xs mt-1">Login</span>
+          </Link>
         )}
       </div>
     </div>
   );
 };
 
-// Create a context for wishlist management
-const WishlistContext = React.createContext();
-
-// Export the provider for use in your app
-export const WishlistProvider = ({ children }) => {
-  const [wishlistItems, setWishlistItems] = useState([]);
-  const [wishlistAnimation, setWishlistAnimation] = useState(false);
-
-  useEffect(() => {
-    // Load wishlist from localStorage on mount
-    try {
-      const storedWishlist = localStorage.getItem('wishlist');
-      if (storedWishlist) {
-        setWishlistItems(JSON.parse(storedWishlist));
-      }
-    } catch (error) {
-      console.error('Error loading wishlist:', error);
-    }
-  }, []);
-
-  const addToWishlist = (product) => {
-    setWishlistItems(prev => {
-      const updated = [...prev, product];
-      localStorage.setItem('wishlist', JSON.stringify(updated));
-      return updated;
-    });
-    
-    // Trigger animation
-    setWishlistAnimation(true);
-    setTimeout(() => setWishlistAnimation(false), 1000);
-  };
-
-  const removeFromWishlist = (productId) => {
-    setWishlistItems(prev => {
-      const updated = prev.filter(item => item.id !== productId);
-      localStorage.setItem('wishlist', JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  const toggleWishlist = (product) => {
-    const isInWishlist = wishlistItems.some(item => item.id === product.id);
-    
-    if (isInWishlist) {
-      removeFromWishlist(product.id);
-    } else {
-      addToWishlist(product);
-    }
-  };
-
-  return (
-    <WishlistContext.Provider 
-      value={{ 
-        wishlistItems, 
-        wishlistCount: wishlistItems.length,
-        wishlistAnimation,
-        addToWishlist, 
-        removeFromWishlist,
-        toggleWishlist,
-        isInWishlist: (productId) => wishlistItems.some(item => item.id === productId)
-      }}
-    >
-      {children}
-    </WishlistContext.Provider>
-  );
-};
-
-// Custom hook to use the wishlist context
-export const useWishlist = () => {
-  const context = React.useContext(WishlistContext);
-  if (context === undefined) {
-    throw new Error('useWishlist must be used within a WishlistProvider');
-  }
-  return context;
-};
-
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
-  const { cartCount } = useCart(); // Use cartCount from context
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { cartCount } = useCart();
   const [mobileProfileOpen, setMobileProfileOpen] = useState(false);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [wishlistAnimation, setWishlistAnimation] = useState(false);
@@ -574,29 +596,22 @@ const Header = () => {
 
     getWishlistCount();
 
-    // FIX: Use both storage events and a global custom event for wishlist updates
     window.addEventListener('storage', getWishlistCount);
     
-    // Create a more robust custom event listener for wishlist updates
     const handleWishlistUpdate = (e) => {
       getWishlistCount();
-      // If item was added, trigger animation
       if (e.detail?.action === 'add') {
         setWishlistAnimation(true);
         setTimeout(() => setWishlistAnimation(false), 1000);
       }
     };
     
-    // Listen for our custom event
     window.addEventListener('wishlistUpdated', handleWishlistUpdate);
 
-    // Create a MutationObserver to watch for changes in localStorage
     const originalSetItem = localStorage.setItem;
     localStorage.setItem = function(key, value) {
-      // Call original implementation
       originalSetItem.apply(this, arguments);
       
-      // If wishlist is being updated, dispatch our custom event
       if (key === 'wishlist') {
         const event = new CustomEvent('wishlistUpdated', { 
           detail: { action: 'update', value: JSON.parse(value) } 
@@ -608,21 +623,8 @@ const Header = () => {
     return () => {
       window.removeEventListener('storage', getWishlistCount);
       window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
-      // Restore original localStorage function
       localStorage.setItem = originalSetItem;
     };
-  }, []);
-
-  // Add notification handler
-  useEffect(() => {
-    const handleNotification = (e) => {
-      // Show toast/notification based on e.detail.message and e.detail.type
-      console.log(e.detail.message); // Replace with actual notification system
-      // You can implement a toast library here like react-toastify
-    };
-    
-    window.addEventListener('showNotification', handleNotification);
-    return () => window.removeEventListener('showNotification', handleNotification);
   }, []);
 
   // Early return for manufacturer routes
@@ -638,91 +640,12 @@ const Header = () => {
           <div className="md:hidden flex items-center justify-between">
             <Link
               to="/"
-              className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 text-transparent bg-clip-text"
+              className="text-xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 text-transparent bg-clip-text"
             >
               FurniMart
             </Link>
-            <div className="flex items-center space-x-2">
-              {isAuthenticated && (
-                <>
-                  <Link to="/wishlist" className="relative p-2 hover:bg-orange-100 rounded-full">
-                    <Heart 
-                      className={`h-6 w-6 text-rose-600 ${wishlistAnimation ? 'animate-pulse scale-110' : ''}`} 
-                    />
-                    {wishlistCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {wishlistCount}
-                      </span>
-                    )}
-                  </Link>
-                  <Link to="/cart" className="relative p-2 hover:bg-orange-100 rounded-full">
-                    <ShoppingCart className="h-6 w-6 text-orange-600" />
-                    {cartCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {cartCount}
-                      </span>
-                    )}
-                  </Link>
-                </>
-              )}
-              <button 
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="hover:bg-orange-100 p-2 rounded-full transition-colors duration-200"
-              >
-                {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-              </button>
-            </div>
+            <SearchComponent isAuthenticated={isAuthenticated} />
           </div>
-
-          {/* Mobile Menu Dropdown */}
-          {mobileMenuOpen && (
-            <div className="md:hidden absolute left-0 right-0 top-full bg-white shadow-lg z-50 border-t">
-              <div className="p-4 space-y-3">
-                {isAuthenticated && !user?.isManufacturer && (
-                  <Link
-                    to="/manufacturer/register"
-                    className="block w-full text-center px-4 py-3 text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Become a Manufacturer
-                  </Link>
-                )}
-                
-                {isAuthenticated && user?.isManufacturer && (
-                  <Link
-                    to="/manufacturer/dashboard"
-                    className="block w-full text-center px-4 py-3 text-white bg-emerald-600 rounded-lg shadow-md hover:bg-emerald-700 hover:scale-105 transition-all duration-300"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Dashboard
-                  </Link>
-                )}
-                
-                {!isAuthenticated ? (
-                  <>
-                    <Link
-                      to="/login"
-                      className="block w-full text-center px-4 py-3 text-white bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      Login
-                    </Link>
-                    <Link
-                      to="/signup"
-                      className="block w-full text-center px-4 py-3 text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      Sign Up
-                    </Link>
-                  </>
-                ) : (
-                  <div onClick={() => setMobileMenuOpen(false)}>
-                    <ProfileMenu user={user} handleLogout={handleLogout} />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Desktop Header */}
           <div className="hidden md:flex items-center justify-between">
@@ -733,7 +656,18 @@ const Header = () => {
               FurniMart
             </Link>
             
-            <div className="flex items-center space-x-6"> 
+            <SearchComponent isAuthenticated={isAuthenticated} />
+            
+            <div className="flex items-center space-x-4"> 
+              {/* Submit New Idea Button */}
+              <Link
+                to="/new-idea"
+                className="px-4 py-2 text-white bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300 flex items-center space-x-2"
+              >
+                <Lightbulb className="h-4 w-4" />
+                <span className="text-sm">Submit New Idea</span>
+              </Link>
+
               {isAuthenticated && user?.isManufacturer && (
                 <Link
                   to="/manufacturer/dashboard"
@@ -754,10 +688,14 @@ const Header = () => {
               
               {isAuthenticated && (
                 <>
-                  <WishlistButton 
-                    wishlistCount={wishlistCount}
-                    isAnimating={wishlistAnimation}
-                  />
+                  <Link to="/wishlist" className="relative p-2 hover:bg-orange-100 rounded-full transition-colors duration-200">
+                    <Heart className={`h-6 w-6 text-rose-600 ${wishlistAnimation ? 'animate-pulse scale-110' : ''}`} />
+                    {wishlistCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {wishlistCount}
+                      </span>
+                    )}
+                  </Link>
                   <Link to="/cart" className="relative p-2 hover:bg-orange-100 rounded-full">
                     <ShoppingCart className="h-6 w-6 text-orange-600" />
                     {cartCount > 0 && (
@@ -803,8 +741,6 @@ const Header = () => {
       {/* Mobile Footer Navigation */}
       <MobileFooter 
         isAuthenticated={isAuthenticated} 
-        wishlistCount={wishlistCount} 
-        isWishlistAnimating={wishlistAnimation}
         onProfileClick={() => setMobileProfileOpen(true)}
       />
       
@@ -812,4 +748,4 @@ const Header = () => {
   );
 };
 
-export default Header;  
+export default Header;

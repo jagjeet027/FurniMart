@@ -9,7 +9,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 
 const IssuesPage = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -45,6 +45,7 @@ const IssuesPage = () => {
     name: '',
     description: '',
     category: 'general',
+    status: 'open'
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -55,8 +56,8 @@ const IssuesPage = () => {
          error.response?.data?.message === 'Invalid token' || 
          error.response?.data?.message === 'No token provided')) {
       
-      // Clear local storage
-      localStorage.removeItem('accessToken');
+      // Clear local storage - FIXED: using adminToken
+      localStorage.removeItem('adminToken');
       localStorage.removeItem('refreshToken');
       
       // Call logout if available
@@ -78,9 +79,10 @@ const IssuesPage = () => {
   // Enhanced axios request with token handling
   const makeAuthenticatedRequest = async (requestConfig) => {
     try {
-      const token = localStorage.getItem('accessToken');
+      // FIXED: Get token from adminToken in localStorage or from context
+      const authToken = localStorage.getItem('adminToken') || token;
       
-      if (!token) {
+      if (!authToken) {
         navigate('/login', { 
           replace: true,
           state: { message: 'Please log in to continue.' }
@@ -92,7 +94,7 @@ const IssuesPage = () => {
         ...requestConfig,
         headers: {
           ...requestConfig.headers,
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${authToken}`
         }
       };
 
@@ -108,8 +110,9 @@ const IssuesPage = () => {
 
   // Fetch issues with token handling
   const fetchIssues = async () => {
-    if (!user?.isManufacturer) {
-      setError('Access denied. Only manufacturers can view issues.');
+    // FIXED: Check for admin user instead of manufacturer
+    if (!user || (!user.isManufacturer && !user.adminId)) {
+      setError('Access denied. Only manufacturers and admins can view issues.');
       setLoading(false);
       return;
     }
@@ -184,7 +187,7 @@ const IssuesPage = () => {
 
       if (response) {
         setShowCreateModal(false);
-        setFormData({ name: '', description: '', category: 'general'});
+        setFormData({ name: '', description: '', category: 'general', status: 'open' });
         fetchIssues();
         fetchStats();
       }
@@ -210,6 +213,7 @@ const IssuesPage = () => {
       if (response) {
         setShowEditModal(false);
         setSelectedIssue(null);
+        setFormData({ name: '', description: '', category: 'general', status: 'open' });
         fetchIssues();
         fetchStats();
       }
@@ -279,12 +283,12 @@ const IssuesPage = () => {
     return statusMap[status] || statusMap.open;
   };
 
-  if (!user?.isManufacturer) {
+  if (!user || (!user.isManufacturer && !user.adminId)) {
     return (
       <div className="p-6 text-center">
         <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
         <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
-        <p className="text-gray-600">Only manufacturers can access the issues management system.</p>
+        <p className="text-gray-600">Only manufacturers and admins can access the issues management system.</p>
       </div>
     );
   }
@@ -620,8 +624,104 @@ const IssuesPage = () => {
                   <option value="other">Other</option>
                 </select>
               </div>
-
               
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({...prev, description: e.target.value}))}
+                  rows={4}
+                  maxLength={1000}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                />
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Creating...' : 'Create Issue'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* FIXED: Edit Issue Modal - was completely missing */}
+      {showEditModal && selectedIssue && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Edit Issue</h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XCircle size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleUpdateIssue}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Issue Name *
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({...prev, name: e.target.value}))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  placeholder="Enter issue name"
+                  required
+                  maxLength={200}
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Status
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData(prev => ({...prev, status: e.target.value}))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                >
+                  <option value="open">Open</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="closed">Closed</option>
+                </select>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Category
+                </label>
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData(prev => ({...prev, category: e.target.value}))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                >
+                  <option value="technical">Technical</option>
+                  <option value="billing">Billing</option>
+                  <option value="order">Order</option>
+                  <option value="product">Product</option>
+                  <option value="general">General</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
               
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
