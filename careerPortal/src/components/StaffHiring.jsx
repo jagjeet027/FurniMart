@@ -46,7 +46,7 @@ import JobDetailsModal from "./JobDetailsModal";
     const [totalJobs, setTotalJobs] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
 
-    const API_BASE_URL = 'http://localhost:5000/api/careers';
+    const API_BASE_URL = 'http://localhost:5000/api/careers' || import.meta.env.VITE_API_URL || 'https://furnimart-careerspage-com.onrender.com/api/careers';
 
     // Add CSS styles programmatically
     useEffect(() => {
