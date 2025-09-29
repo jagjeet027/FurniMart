@@ -6,7 +6,7 @@
     getProductById,
     updateProduct,
     deleteProduct
-  } from "../Controllers/productController.js";
+  } from "../controllers/productController.js";
 
 
   const router = express.Router();
