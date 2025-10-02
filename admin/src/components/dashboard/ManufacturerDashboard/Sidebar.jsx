@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { 
   Home, Building2, TrendingUp, Lightbulb, Package, FileText, 
-  BarChart3, Settings, UserCheck, X, ArrowLeft, Clock, AlertCircle, 
-  CheckCircle2, XCircle, MessageSquare, Send, Edit3, Trash2, Menu,
-  ChevronDown, ChevronRight, Users, Briefcase, Building
+  BarChart3, Settings, UserCheck, X, Clock, LogOut,
+  ChevronRight, Users, Briefcase, Building, Menu
 } from 'lucide-react';
+
+// Import your AuthContext
+// import { useAuth } from '../contexts/AuthContext';
 
 // Custom CSS for scrollbar
 const customScrollbarStyles = `
@@ -43,19 +45,30 @@ const customScrollbarStyles = `
   }
 `;
 
-// Mock useAuth hook for demonstration
-const useAuth = () => ({
-  user: {
-    isManufacturer: true,
-    name: 'Jagjeet jaiswal',
-    email: 'jagjeetjaiwal027@gmail.com'
-  }
-});
-
-// Sidebar Component
+// Sidebar Component with Backend Integration
 const Sidebar = ({ isOpen, onClose, activeSection, onSectionChange }) => {
   const navigate = useNavigate();
+  // IMPORTANT: Uncomment this and remove the mock when integrating
+  // const { user, logout, isAuthenticated } = useAuth();
+  
+  // Mock for demonstration - REMOVE THIS when integrating
+  const mockAuth = {
+    user: {
+      email: 'admin@furnimart.com',
+      adminId: 'ADmin820',
+      id: '123'
+    },
+    logout: () => {
+      console.log('Logout called');
+      // Add your logout logic here
+    },
+    isAuthenticated: true
+  };
+  
+  const { user, logout, isAuthenticated } = mockAuth;
+  
   const [expandedItems, setExpandedItems] = useState({});
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -80,7 +93,6 @@ const Sidebar = ({ isOpen, onClose, activeSection, onSectionChange }) => {
 
   const handleMenuClick = (item) => {
     if (item.hasSubItems) {
-      // Toggle expansion for items with sub-items
       setExpandedItems(prev => ({
         ...prev,
         [item.id]: !prev[item.id]
@@ -89,26 +101,29 @@ const Sidebar = ({ isOpen, onClose, activeSection, onSectionChange }) => {
     }
 
     if (item.route) {
-      // Navigate to specific route
       navigate(item.route);
     } else {
-      // Handle normal section change
       onSectionChange(item.id);
     }
     
-    // Close sidebar on mobile
     if (window.innerWidth < 1024) onClose();
   };
 
   const handleSubItemClick = (parentId, subItem) => {
-    // Set the active section to the sub-item
     onSectionChange(subItem.id);
-    
-    // Close sidebar on mobile
     if (window.innerWidth < 1024) onClose();
   };
 
-  // Auto-expand career section if any of its sub-items are active
+  const handleLogout = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = () => {
+    logout();
+    setShowLogoutConfirm(false);
+    navigate('/admin/login'); // Adjust route as needed
+  };
+
   useEffect(() => {
     const careerSubItems = ['organization', 'individuals', 'jobBoard'];
     if (careerSubItems.includes(activeSection)) {
@@ -119,9 +134,14 @@ const Sidebar = ({ isOpen, onClose, activeSection, onSectionChange }) => {
     }
   }, [activeSection]);
 
+  // Get display name from email
+  const getDisplayName = () => {
+    if (!user?.email) return 'Admin User';
+    return user.email.split('@')[0];
+  };
+
   return (
     <>
-      {/* Inject custom styles */}
       <style dangerouslySetInnerHTML={{ __html: customScrollbarStyles }} />
       
       {isOpen && (
@@ -197,7 +217,6 @@ const Sidebar = ({ isOpen, onClose, activeSection, onSectionChange }) => {
                     )}
                   </button>
 
-                  {/* Sub-items */}
                   {item.hasSubItems && isExpanded && (
                     <div className="mt-1 ml-3 space-y-0.5 animate-in slide-in-from-left-2 duration-300">
                       {item.subItems.map((subItem, index) => {
@@ -242,18 +261,62 @@ const Sidebar = ({ isOpen, onClose, activeSection, onSectionChange }) => {
           </nav>
         </div>
         
-        <div className="p-4 border-t border-gradient-to-r from-cyan-400/10 via-purple-400/10 to-pink-400/10 bg-gradient-to-r from-slate-900/30 to-slate-800/30 backdrop-blur-sm">
-          <div className="flex items-center gap-2.5 p-2.5 bg-gradient-to-r from-slate-800/50 via-slate-700/30 to-slate-800/50 rounded-lg hover:from-slate-700/60 hover:to-slate-700/40 transition-all duration-300 cursor-pointer group border border-white/5 hover:border-cyan-400/20">
-            <div className="w-8 h-8 bg-gradient-to-br from-cyan-500/20 via-purple-500/15 to-pink-500/20 rounded-full flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-300 shadow-sm shadow-cyan-500/20">
-              <UserCheck className="h-4 w-4 text-cyan-300 group-hover:text-white transition-colors duration-300" />
+        {/* Admin Profile Section */}
+        <div className="p-4 border-t border-gradient-to-r from-cyan-400/10 via-purple-400/10 to-pink-400/10 bg-gradient-to-r from-slate-900/30 to-slate-800/30 backdrop-blur-sm space-y-2">
+          {/* Admin Info */}
+          <div className="flex items-center gap-2.5 p-2.5 bg-gradient-to-r from-slate-800/50 via-slate-700/30 to-slate-800/50 rounded-lg border border-white/5">
+            <div className="w-8 h-8 bg-gradient-to-br from-cyan-500/20 via-purple-500/15 to-pink-500/20 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm shadow-cyan-500/20">
+              <UserCheck className="h-4 w-4 text-cyan-300 transition-colors duration-300" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-white font-medium text-xs truncate tracking-wide">Admin User</p>
-              <p className="text-white/50 text-xs truncate">admin@company.com</p>
+              <p className="text-white font-medium text-xs truncate tracking-wide">
+                {getDisplayName()}
+              </p>
+              <p className="text-white/50 text-xs truncate">{user?.email || 'admin@company.com'}</p>
+            </div>
+          </div>
+
+          {/* Logout Button */}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-red-500/10 to-red-600/10 hover:from-red-500/20 hover:to-red-600/20 text-red-400 hover:text-red-300 rounded-lg text-sm font-medium transition-all duration-300 border border-red-500/20 hover:border-red-400/30 hover:shadow-lg hover:shadow-red-500/10"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-cyan-400/20 rounded-xl p-6 max-w-sm w-full shadow-2xl shadow-purple-500/20">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-red-500/20 to-red-600/20 rounded-full flex items-center justify-center">
+                <LogOut className="h-5 w-5 text-red-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">Confirm Logout</h3>
+            </div>
+            <p className="text-white/70 text-sm mb-6">
+              Are you sure you want to logout? You'll need to login again to access the admin portal.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-medium transition-all duration-300 border border-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmLogout}
+                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg text-sm font-medium transition-all duration-300 shadow-lg shadow-red-500/30"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>
-      </aside>
+      )}
     </>
   );
 };

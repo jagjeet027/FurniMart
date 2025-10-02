@@ -3,7 +3,8 @@ import {
   checkRegistrationStatus, 
   registerAdmin, 
   loginAdmin, 
-  refreshToken 
+  refreshToken,
+  getAdminProfile  // NEW
 } from '../controllers/adminController.js';
 import adminAuth from '../middleware/adminAuth.js';
 
@@ -16,8 +17,9 @@ router.post('/login', loginAdmin);
 
 // Protected routes
 router.post('/refresh-token', adminAuth, refreshToken);
+router.get('/profile', adminAuth, getAdminProfile); // NEW - Get admin profile
 
-// Health check endpoint for connectivity testing
+// Health check endpoint
 router.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 

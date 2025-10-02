@@ -11,7 +11,6 @@ const generateToken = (adminId) => {
 // Check if admin is already registered
 export const checkRegistrationStatus = async (req, res) => {
   try {
-    // Disable caching completely
     res.set({
       'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
       'Pragma': 'no-cache',
@@ -19,7 +18,6 @@ export const checkRegistrationStatus = async (req, res) => {
       'Surrogate-Control': 'no-store'
     });
     
-    // Remove ETag header if present
     res.removeHeader('ETag');
     
     const admin = await Admin.findOne({ adminId: "ADmin820" });
@@ -51,7 +49,6 @@ export const registerAdmin = async (req, res) => {
   try {
     const { email, password, secretCode } = req.body;
     
-    // Check if admin already registered
     const existingAdmin = await Admin.findOne({ adminId: "ADmin820" });
     if (existingAdmin && existingAdmin.isRegistered) {
       return res.status(400).json({ 
@@ -59,14 +56,12 @@ export const registerAdmin = async (req, res) => {
       });
     }
     
-    // Validate required fields
     if (!email || !password || !secretCode) {
       return res.status(400).json({ 
         message: "Email, password, and secret code are required" 
       });
     }
     
-    // Create new admin (will replace existing if any)
     const adminData = {
       email,
       adminId: "ADmin820",
@@ -75,7 +70,6 @@ export const registerAdmin = async (req, res) => {
       isRegistered: true
     };
     
-    // Remove existing admin if any and create new one
     await Admin.deleteMany({ adminId: "ADmin820" });
     const admin = new Admin(adminData);
     await admin.save();
@@ -111,7 +105,6 @@ export const loginAdmin = async (req, res) => {
     console.log('=== ADMIN LOGIN ATTEMPT ===');
     console.log('Admin ID:', adminId);
     
-    // Find admin
     const admin = await Admin.findOne({ adminId: "ADmin820" });
     if (!admin) {
       console.log('❌ Admin not found');
@@ -120,7 +113,6 @@ export const loginAdmin = async (req, res) => {
       });
     }
     
-    // Check password
     const isPasswordValid = await admin.comparePassword(password);
     if (!isPasswordValid) {
       console.log('❌ Invalid password');
@@ -129,7 +121,6 @@ export const loginAdmin = async (req, res) => {
       });
     }
     
-    // Check secret code
     const isSecretCodeValid = await admin.compareSecretCode(secretCode);
     if (!isSecretCodeValid) {
       console.log('❌ Invalid secret code');
@@ -138,7 +129,6 @@ export const loginAdmin = async (req, res) => {
       });
     }
     
-    // Generate token
     const token = generateToken(admin._id);
     
     console.log('✅ Admin login successful:', admin.email);
@@ -162,10 +152,48 @@ export const loginAdmin = async (req, res) => {
   }
 };
 
-// Refresh token functionality
+// Get admin profile (NEW)
+export const getAdminProfile = async (req, res) => {
+  try {
+    console.log('=== GET ADMIN PROFILE ===');
+    console.log('Admin ID from middleware:', req.adminId);
+    
+    const admin = await Admin.findById(req.adminId).select('-password -secretCode');
+    
+    if (!admin) {
+      console.log('❌ Admin not found');
+      return res.status(404).json({
+        success: false,
+        message: 'Admin not found'
+      });
+    }
+    
+    console.log('✅ Admin profile retrieved:', admin.email);
+    
+    res.json({
+      success: true,
+      data: {
+        id: admin._id,
+        email: admin.email,
+        adminId: admin.adminId,
+        isRegistered: admin.isRegistered,
+        createdAt: admin.createdAt
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Get admin profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Refresh token
 export const refreshToken = async (req, res) => {
   try {
-    // Get admin ID from the middleware (should be set by authMiddleware)
     const adminId = req.adminId;
     
     if (!adminId) {
@@ -178,7 +206,6 @@ export const refreshToken = async (req, res) => {
     console.log('=== ADMIN TOKEN REFRESH ===');
     console.log('Admin ID:', adminId);
     
-    // Find the admin
     const admin = await Admin.findById(adminId);
     if (!admin) {
       console.log('❌ Admin not found during token refresh');
@@ -187,7 +214,6 @@ export const refreshToken = async (req, res) => {
       });
     }
     
-    // Generate new token
     const newToken = generateToken(admin._id);
     
     console.log('✅ Admin token refreshed successfully');

@@ -1,9 +1,11 @@
+// routes/manufacturerRoutes.js
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 import adminAuth from '../middleware/adminAuth.js';
+import flexibleAuth from '../middleware/flexibleAuth.js'; // NEW IMPORT
 import {
   getMyManufacturer,
   registerManufacturer,
@@ -11,6 +13,7 @@ import {
   getManufacturerById,
   updateManufacturerStatus,
   deleteManufacturer,
+  downloadDocument
 } from '../Controllers/manufacturerController.js';
 
 const router = express.Router();
@@ -19,7 +22,6 @@ const router = express.Router();
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadDir = 'uploads/manufacturers/';
-    // Ensure directory exists
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -65,11 +67,14 @@ router.post('/register',
   registerManufacturer
 );
 
+// FIXED: Use flexibleAuth for document downloads (accepts both user and admin tokens)
+router.get('/documents/:filename', flexibleAuth, downloadDocument);
 
 // This MUST come after /all and other specific routes
 router.get('/:id', authenticateToken, getManufacturerById);
 
-// Other admin routes
+// Admin routes
 router.patch('/:id/status', adminAuth, updateManufacturerStatus);
 router.delete('/:id', adminAuth, deleteManufacturer);
+
 export default router;

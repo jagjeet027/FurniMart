@@ -449,3 +449,125 @@ export const deleteManufacturer = async (req, res) => {
     });
   }
 };
+
+export const downloadDocument = async (req, res) => {
+  try {
+    const { filename } = req.params;
+    console.log('=== DOWNLOAD DOCUMENT ===');
+    console.log('Filename:', filename);
+    console.log('User/Admin:', req.isAdmin ? 'Admin' : 'User');
+    console.log('ID:', req.isAdmin ? req.adminId : req.userId);
+    
+    const manufacturer = await Manufacturer.findOne({
+      $or: [
+        { 'documents.businessLicense.filename': filename },
+        { 'documents.taxCertificate.filename': filename },
+        { 'documents.qualityCertifications.filename': filename }
+      ]
+    }).lean();
+
+    if (!manufacturer) {
+      console.log('❌ Document not found in records');
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found in records'
+      });
+    }
+
+    // Check permission - UPDATED TO HANDLE ADMIN
+    const isOwner = manufacturer.userId.toString() === (req.userId?.toString() || '');
+    const isAdmin = req.isAdmin === true;
+    
+    if (!isOwner && !isAdmin) {
+      console.log('❌ Access denied - Not owner or admin');
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+    
+    console.log('✅ Access granted:', isAdmin ? 'Admin access' : 'Owner access');
+
+    // Find the actual file path
+    let actualFilePath = null;
+    
+    if (manufacturer.documents.businessLicense?.filename === filename) {
+      actualFilePath = manufacturer.documents.businessLicense.path;
+    } else if (manufacturer.documents.taxCertificate?.filename === filename) {
+      actualFilePath = manufacturer.documents.taxCertificate.path;
+    } else {
+      const qualityCert = manufacturer.documents.qualityCertifications?.find(
+        cert => cert.filename === filename
+      );
+      if (qualityCert) {
+        actualFilePath = qualityCert.path;
+      }
+    }
+
+    if (!actualFilePath || !fs.existsSync(actualFilePath)) {
+      console.log('❌ File not found on disk');
+      return res.status(404).json({
+        success: false,
+        message: 'File not found'
+      });
+    }
+
+    // Security check
+    const path = await import('path');
+    const fullPath = path.resolve(actualFilePath);
+    const uploadsDir = path.resolve('uploads/manufacturers/');
+    
+    if (!fullPath.startsWith(uploadsDir)) {
+      console.log('❌ Security violation: Invalid file path');
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Invalid file path'
+      });
+    }
+
+    const stats = fs.statSync(fullPath);
+    const fileExtension = path.extname(filename).toLowerCase();
+    
+    let contentType = 'application/octet-stream';
+    switch (fileExtension) {
+      case '.pdf': contentType = 'application/pdf'; break;
+      case '.jpg':
+      case '.jpeg': contentType = 'image/jpeg'; break;
+      case '.png': contentType = 'image/png'; break;
+      case '.doc': contentType = 'application/msword'; break;
+      case '.docx': contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'; break;
+    }
+
+    console.log('✅ Serving file:', filename);
+    
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', stats.size);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    
+    const fileStream = fs.createReadStream(fullPath);
+    fileStream.pipe(res);
+
+  } catch (error) {
+    console.error('❌ Error serving document:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while serving document',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Helper function to cleanup uploaded files
+const cleanupFiles = (files) => {
+  if (files) {
+    Object.values(files).flat().forEach(file => {
+      try {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      } catch (cleanupError) {
+        console.error('Error cleaning up file:', cleanupError);
+      }
+    });
+  }
+};
