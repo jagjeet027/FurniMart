@@ -1,523 +1,451 @@
+import { Manufacturer } from '../models/manufacturer.js';
+import { User } from '../models/Users.js';
+import { sendStatusEmail } from '../services/emailService.js';
+import { createManufacturerNotification } from '../utils/notificationHelper.js';
+import fs from 'fs';
 
-// import  { Manufacturer }  from "../models/manufacturer.js";
-// import AppError from "../utils/appError.js";
-// import catchAsync from "../utils/catchAsync.js";
-// import mongoose from "mongoose";
-// import { User } from '../models/Users.js'; 
-// import dotenv from 'dotenv';
-// dotenv.config()
+// @access  Private
+export const getMyManufacturer = async (req, res) => {
+  try {
+    console.log('=== GET MY MANUFACTURER INFO ===');
+    console.log('User ID:', req.userId);
 
-// const manufacturerController = {
-//   registerManufacturer: catchAsync(async (req, res, next) => {
-//     if (!req.user) {
-//       return next(new AppError("User not authenticated", 401));
-//     }
-  
-//     const { 
-//       businessName, registrationNumber, businessType, yearEstablished,
-//       streetAddress, city, state, postalCode, country,
-//       contactPerson, email, phone 
-//     } = req.body;
-  
-//     console.log("Registering manufacturer:", req.body);
-//     console.log("Request User:", req.user);
+    const manufacturer = await Manufacturer.findOne({ userId: req.userId }).lean();
     
-//     if (![businessName, registrationNumber, businessType, yearEstablished, streetAddress, city, state, postalCode, country, contactPerson, email, phone].every(Boolean)) {
-//       return next(new AppError("All fields are required", 400));
-//     }
-  
-//     const user = req.user;
-  
-//     if (user.isManufacturer) {
-//       return next(new AppError("User is already registered as a manufacturer", 400));
-//     }
-  
-//     // Check if manufacturer with same email exists
-//     const existingManufacturer = await Manufacturer.findOne({ "contact.email": email });
-//     if (existingManufacturer) {
-//       return next(new AppError("A manufacturer with this email already exists", 400));
-//     }
-  
-//     const session = await mongoose.startSession();
-//     session.startTransaction();
-  
-//     try {
-//       const documents = {
-//         businessLicense: req.files?.businessLicense?.[0] ? {
-//           filename: req.files.businessLicense[0].filename,
-//           path: req.files.businessLicense[0].path
-//         } : undefined,
-//         taxCertificate: req.files?.taxCertificate?.[0] ? {
-//           filename: req.files.taxCertificate[0].filename,
-//           path: req.files.taxCertificate[0].path
-//         } : undefined,
-//         qualityCertifications: req.files?.qualityCertifications ? req.files.qualityCertifications.map(file => ({
-//           filename: file.filename,
-//           path: file.path,
-//           certificationType: "Additional Certification"
-//         })) : []
-//       };
-  
-//       const manufacturer = await Manufacturer.create([{
-//         userId: user._id,
-//         businessName,
-//         registrationNumber,
-//         businessType,
-//         yearEstablished,
-//         address: { streetAddress, city, state, postalCode, country },
-//         contact: { contactPerson, email, phone },
-//         documents,
-//         status: "pending"
-//       }], { session });
-  
-//       await User.findByIdAndUpdate(user._id, {
-//         isManufacturer: true,
-//         manufacturerProfile: manufacturer[0]._id
-//       }, { session, new: true });
-  
-//       await session.commitTransaction();
-  
-//       res.status(201).json({
-//         success: true,
-//         message: "Manufacturer registered successfully",
-//         data: {
-//           manufacturer: manufacturer[0],
-//           user: { id: user._id, email: user.email, isManufacturer: true }
-//         }
-//       });
-//     } catch (error) {
-//       await session.abortTransaction();
-//       throw error;
-//     } finally {
-//       session.endSession();
-//     }
-//   }),
+    if (!manufacturer) {
+      console.log('❌ Manufacturer profile not found');
+      return res.status(404).json({
+        success: false,
+        message: 'Manufacturer profile not found'
+      });
+    }
 
-//   getManufacturerById: catchAsync(async (req, res, next) => {
-//     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-//       return next(new AppError("Invalid manufacturer ID", 400));
-//     }
+    console.log('✅ Found manufacturer:', manufacturer.businessName);
 
-//     const manufacturer = await Manufacturer.findById(req.params.id).select(
-//       "-__v"
-//     );
+    res.json({
+      success: true,
+      data: manufacturer
+    });
+  } catch (error) {
+    console.error('❌ Get manufacturer error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
 
-//     if (!manufacturer) {
-//       return next(new AppError("Manufacturer not found", 404));
-//     }
+export const registerManufacturer = async (req, res) => {
+  try {
+    const {
+      businessName,
+      businessType,
+      yearEstablished,
+      streetAddress,
+      city,
+      state,
+      postalCode,
+      country,
+      contactPerson,
+      email,
+      phone
+    } = req.body;
 
-//     res.status(200).json({
-//       status: "success",
-//       data: {
-//         manufacturer: {
-//           id: manufacturer._id,
-//           businessName: manufacturer.businessName,
-//           registrationNumber: manufacturer.registrationNumber,
-//           businessType: manufacturer.businessType,
-//           yearEstablished: manufacturer.yearEstablished,
-//           address: {
-//             streetAddress: manufacturer.address.streetAddress,
-//             city: manufacturer.address.city,
-//             state: manufacturer.address.state,
-//             postalCode: manufacturer.address.postalCode,
-//             country: manufacturer.address.country,
-//             fullAddress: manufacturer.fullAddress,
-//           },
-//           contact: {
-//             contactPerson: manufacturer.contact.contactPerson,
-//             email: manufacturer.contact.email,
-//             phone: manufacturer.contact.phone,
-//           },
-//           documents: {
-//             businessLicense: {
-//               filename: manufacturer.documents.businessLicense.filename,
-//               path: manufacturer.documents.businessLicense.path,
-//               uploadDate: manufacturer.documents.businessLicense.uploadDate,
-//             },
-//             taxCertificate: {
-//               filename: manufacturer.documents.taxCertificate.filename,
-//               path: manufacturer.documents.taxCertificate.path,
-//               uploadDate: manufacturer.documents.taxCertificate.uploadDate,
-//             },
-//             qualityCertifications:
-//               manufacturer.documents.qualityCertifications.map((cert) => ({
-//                 filename: cert.filename,
-//                 path: cert.path,
-//                 certificationType: cert.certificationType,
-//                 uploadDate: cert.uploadDate,
-//               })),
-//           },
-//           status: manufacturer.status,
-//           createdAt: manufacturer.createdAt,
-//           updatedAt: manufacturer.updatedAt,
-//         },
-//       },
-//     });
-//   }),
+    console.log('=== MANUFACTURER REGISTRATION ATTEMPT ===');
+    console.log('User ID:', req.userId);
+    console.log('User Email:', req.user?.email);
 
-// getAllManufacturers: catchAsync(async (req, res, next) => {
-//   const { page = 1, limit = 10, search, status, sort = '-createdAt' } = req.query;
-  
-//   // Build query
-//   const query = {};
-  
-//   if (search) {
-//     query.$or = [
-//       { businessName: { $regex: search, $options: 'i' } },
-//       { registrationNumber: { $regex: search, $options: 'i' } },
-//       { 'contact.email': { $regex: search, $options: 'i' } },
-//       { 'contact.contactPerson': { $regex: search, $options: 'i' } }
-//     ];
-//   }
+    // Validate required fields
+    if (!businessName || !businessType || !yearEstablished || !streetAddress || 
+        !city || !state || !postalCode || !country || !contactPerson || !email || !phone) {
+      console.log('❌ Missing required fields');
+      cleanupFiles(req.files);
+      
+      return res.status(400).json({
+        success: false,
+        message: 'All fields are required'
+      });
+    }
 
-//   if (status && status !== 'all') {
-//     query.status = status;
-//   }
+    // Check if required files are uploaded
+    if (!req.files?.businessLicense || !req.files?.taxCertificate) {
+      console.log('❌ Missing required files');
+      cleanupFiles(req.files);
+      
+      return res.status(400).json({
+        success: false,
+        message: 'Business license and tax certificate are required'
+      });
+    }
 
-//   // Execute query with pagination
-//   const skip = (parseInt(page) - 1) * parseInt(limit);
-  
-//   const [manufacturers, total] = await Promise.all([
-//     Manufacturer
-//       .find(query)
-//       .sort(sort)
-//       .skip(skip)
-//       .limit(parseInt(limit))
-//       .select('-__v'),
-//     Manufacturer.countDocuments(query)
-//   ]);
+    // Check if user is already a manufacturer (approved)
+    const user = await User.findById(req.userId);
+    if (user && user.isManufacturer) {
+      console.log('❌ User already approved as manufacturer');
+      cleanupFiles(req.files);
+      
+      return res.status(400).json({
+        success: false,
+        message: 'You are already registered as a manufacturer'
+      });
+    }
 
-//   res.status(200).json({
-//     status: 'success',
-//     results: manufacturers.length,
-//     total,
-//     data: {
-//       manufacturers: manufacturers.map(m => ({
-//         id: m._id,
-//         businessName: m.businessName,
-//         registrationNumber: m.registrationNumber,
-//         businessType: m.businessType,
-//         yearEstablished: m.yearEstablished,
-//         address: {
-//           streetAddress: m.address.streetAddress,
-//           city: m.address.city,
-//           state: m.address.state,
-//           postalCode: m.address.postalCode,
-//           country: m.address.country,
-//           fullAddress: m.fullAddress
-//         },
-//         contact: {
-//           contactPerson: m.contact.contactPerson,
-//           email: m.contact.email,
-//           phone: m.contact.phone
-//         },
-//         documents: {
-//           businessLicense: {
-//             filename: m.documents.businessLicense.filename,
-//             path: m.documents.businessLicense.path,
-//             uploadDate: m.documents.businessLicense.uploadDate
-//           },
-//           taxCertificate: {
-//             filename: m.documents.taxCertificate.filename,
-//             path: m.documents.taxCertificate.path,
-//             uploadDate: m.documents.taxCertificate.uploadDate
-//           },
-//           qualityCertifications: m.documents.qualityCertifications.map(cert => ({
-//             filename: cert.filename,
-//             path: cert.path,
-//             certificationType: cert.certificationType,
-//             uploadDate: cert.uploadDate
-//           }))
-//         },
-//         status: m.status,
-//         createdAt: m.createdAt,
-//         updatedAt: m.updatedAt
-//       }))
-//     }
-//   });
-// }),
+    // CRITICAL: Check if THIS user already has a pending/submitted registration
+    const existingManufacturer = await Manufacturer.findOne({ userId: req.userId });
+    if (existingManufacturer) {
+      console.log('❌ User already has a manufacturer registration:', existingManufacturer.status);
+      console.log('   Existing Manufacturer ID:', existingManufacturer._id);
+      console.log('   Existing Business Name:', existingManufacturer.businessName);
+      cleanupFiles(req.files);
+      
+      return res.status(400).json({
+        success: false,
+        message: `You have already submitted a manufacturer registration. Current status: ${existingManufacturer.status}`,
+        existingRegistration: {
+          id: existingManufacturer._id,
+          businessName: existingManufacturer.businessName,
+          status: existingManufacturer.status,
+          submittedOn: existingManufacturer.createdAt
+        }
+      });
+    }
 
-// getManufacturerById: catchAsync(async (req, res, next) => {
-//   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-//     return next(new AppError('Invalid manufacturer ID', 400));
-//   }
+    // Prepare documents data
+    const documents = {
+      businessLicense: {
+        filename: req.files.businessLicense[0].originalname,
+        path: req.files.businessLicense[0].path,
+        uploadDate: new Date()
+      },
+      taxCertificate: {
+        filename: req.files.taxCertificate[0].originalname,
+        path: req.files.taxCertificate[0].path,
+        uploadDate: new Date()
+      },
+      qualityCertifications: []
+    };
 
-//   const manufacturer = await Manufacturer.findById(req.params.id).select('-__v');
+    // Handle quality certifications if provided
+    if (req.files.qualityCertifications) {
+      documents.qualityCertifications = req.files.qualityCertifications.map(file => ({
+        filename: file.originalname,
+        path: file.path,
+        certificationType: 'General',
+        uploadDate: new Date()
+      }));
+    }
 
-//   if (!manufacturer) {
-//     return next(new AppError('Manufacturer not found', 404));
-//   }
+    // Create manufacturer record
+    const manufacturer = new Manufacturer({
+      userId: req.userId,
+      businessName,
+      businessType,
+      yearEstablished: parseInt(yearEstablished),
+      address: {
+        streetAddress,
+        city,
+        state,
+        postalCode,
+        country
+      },
+      contact: {
+        contactPerson,
+        email,
+        phone
+      },
+      documents,
+      status: 'pending'
+    });
 
-//   res.status(200).json({
-//     status: 'success',
-//     data: {
-//       manufacturer: {
-//         id: manufacturer._id,
-//         businessName: manufacturer.businessName,
-//         registrationNumber: manufacturer.registrationNumber,
-//         businessType: manufacturer.businessType,
-//         yearEstablished: manufacturer.yearEstablished,
-//         address: {
-//           streetAddress: manufacturer.address.streetAddress,
-//           city: manufacturer.address.city,
-//           state: manufacturer.address.state,
-//           postalCode: manufacturer.address.postalCode,
-//           country: manufacturer.address.country,
-//           fullAddress: manufacturer.fullAddress
-//         },
-//         contact: {
-//           contactPerson: manufacturer.contact.contactPerson,
-//           email: manufacturer.contact.email,
-//           phone: manufacturer.contact.phone
-//         },
-//         documents: {
-//           businessLicense: {
-//             filename: manufacturer.documents.businessLicense.filename,
-//             path: manufacturer.documents.businessLicense.path,
-//             uploadDate: manufacturer.documents.businessLicense.uploadDate
-//           },
-//           taxCertificate: {
-//             filename: manufacturer.documents.taxCertificate.filename,
-//             path: manufacturer.documents.taxCertificate.path,
-//             uploadDate: manufacturer.documents.taxCertificate.uploadDate
-//           },
-//           qualityCertifications: manufacturer.documents.qualityCertifications.map(cert => ({
-//             filename: cert.filename,
-//             path: cert.path,
-//             certificationType: cert.certificationType,
-//             uploadDate: cert.uploadDate
-//           }))
-//         },
-//         status: manufacturer.status,
-//         createdAt: manufacturer.createdAt,
-//         updatedAt: manufacturer.updatedAt
-//       }
-//     }
-//   });
-// }),
-// updateManufacturerById: catchAsync(async (req, res, next) => {
-//   console.log('Updating manufacturer:', req.params.id);
-  
-//   try {
-//     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-//       throw new AppError('Invalid manufacturer ID', 400);
-//     }
+    console.log('Attempting to save manufacturer...');
+    await manufacturer.save();
+    console.log('✅ Manufacturer saved successfully');
 
-//     // Handle file upload
-//     await uploadPromise(req, res);
+    // Create notification for admin
+    try {
+      await createManufacturerNotification('new_registration', manufacturer);
+    } catch (notifError) {
+      console.error('❌ Error creating notification:', notifError);
+    }
 
-//     const manufacturer = await Manufacturer.findById(req.params.id);
+    console.log('✅ Manufacturer registered successfully:', manufacturer._id);
+
+    res.status(201).json({
+      success: true,
+      message: 'Manufacturer registration submitted successfully. Please wait for admin approval.',
+      data: {
+        manufacturerId: manufacturer._id,
+        status: manufacturer.status,
+        businessName: manufacturer.businessName
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Manufacturer registration error:', error);
+    console.error('Error name:', error.name);
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
     
-//     if (!manufacturer) {
-//       throw new AppError('Manufacturer not found', 404);
-//     }
-
-//     // Validate year established if provided
-//     if (req.body.yearEstablished) {
-//       const currentYear = new Date().getFullYear();
-//       const yearEstablished = parseInt(req.body.yearEstablished);
-//       if (yearEstablished < 1800 || yearEstablished > currentYear) {
-//         throw new AppError('Invalid year established', 400);
-//       }
-//     }
-
-//     // Update basic information
-//     const updateData = {
-//       businessName: req.body.businessName || manufacturer.businessName,
-//       businessType: req.body.businessType || manufacturer.businessType,
-//       yearEstablished: req.body.yearEstablished || manufacturer.yearEstablished,
-//       address: {
-//         streetAddress: req.body.streetAddress || manufacturer.address.streetAddress,
-//         city: req.body.city || manufacturer.address.city,
-//         state: req.body.state || manufacturer.address.state,
-//         postalCode: req.body.postalCode || manufacturer.address.postalCode,
-//         country: req.body.country || manufacturer.address.country
-//       },
-//       contact: {
-//         contactPerson: req.body.contactPerson || manufacturer.contact.contactPerson,
-//         email: req.body.email || manufacturer.contact.email,
-//         phone: req.body.phone || manufacturer.contact.phone
-//       }
-//     };
-
-//     // Handle document updates
-//     if (req.files) {
-//       if (req.files.businessLicense) {
-//         await deleteFile(manufacturer.documents.businessLicense.path);
-//         updateData['documents.businessLicense'] = {
-//           filename: req.files.businessLicense[0].filename,
-//           path: req.files.businessLicense[0].path,
-//           uploadDate: Date.now()
-//         };
-//       }
-
-//       if (req.files.taxCertificate) {
-//         await deleteFile(manufacturer.documents.taxCertificate.path);
-//         updateData['documents.taxCertificate'] = {
-//           filename: req.files.taxCertificate[0].filename,
-//           path: req.files.taxCertificate[0].path,
-//           uploadDate: Date.now()
-//         };
-//       }
-
-//       if (req.files.qualityCertifications) {
-//         for (const cert of manufacturer.documents.qualityCertifications || []) {
-//           await deleteFile(cert.path);
-//         }
-//         updateData['documents.qualityCertifications'] = req.files.qualityCertifications.map(cert => ({
-//           filename: cert.filename,
-//           path: cert.path,
-//           certificationType: req.body.certificationTypes?.[cert.fieldname] || 'general',
-//           uploadDate: Date.now()
-//         }));
-//       }
-//     }
-
-//     const updatedManufacturer = await Manufacturer.findByIdAndUpdate(
-//       req.params.id,
-//       { $set: updateData },
-//       { new: true, runValidators: true }
-//     );
-
-//     res.status(200).json({
-//       success: true,
-//       message: 'Manufacturer updated successfully',
-//       data: {
-//         manufacturer: updatedManufacturer
-//       }
-//     });
-
-//   } catch (error) {
-//     // Clean up uploaded files on error
-//     if (req.files) {
-//       Object.values(req.files).flat().forEach(file => {
-//         deleteFile(file.path);
-//       });
-//     }
-//     console.error('Error updating manufacturer:', error);
-//     next(error);
-//   }
-// }),
-
-// updateManufacturerStatus: catchAsync(async (req, res, next) => {
-//   const { id } = req.params;
-//   const { status } = req.body;
-
-//   if (!['pending', 'approved', 'rejected'].includes(status)) {
-//     throw new AppError('Invalid status value', 400);
-//   }
-
-//   if (!mongoose.Types.ObjectId.isValid(id)) {
-//     throw new AppError('Invalid manufacturer ID', 400);
-//   }
-
-//   const manufacturer = await Manufacturer.findByIdAndUpdate(
-//     id,
-//     { status },
-//     { new: true, runValidators: true }
-//   );
-
-//   if (!manufacturer) {
-//     throw new AppError('Manufacturer not found', 404);
-//   }
-
-//   res.status(200).json({
-//     status: 'success',
-//     data: {
-//       manufacturer: {
-//         id: manufacturer._id,
-//         businessName: manufacturer.businessName,
-//         status: manufacturer.status,
-//         email: manufacturer.contact.email,
-//         registrationNumber: manufacturer.registrationNumber,
-//         businessType: manufacturer.businessType,
-//         createdAt: manufacturer.createdAt
-//       }
-//     }
-//   });
-// }),
-
-// deleteManufacturer: catchAsync(async (req, res, next) => {
-//   console.log('Deleting manufacturer:', req.params.id);
-  
-//   try {
-//     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-//       throw new AppError('Invalid manufacturer ID', 400);
-//     }
-
-//     const manufacturer = await Manufacturer.findById(req.params.id);
-
-//     if (!manufacturer) {
-//       throw new AppError('Manufacturer not found', 404);
-//     }
-
-//     // Delete associated files
-//     await deleteFile(manufacturer.documents.businessLicense.path);
-//     await deleteFile(manufacturer.documents.taxCertificate.path);
+    cleanupFiles(req.files);
     
-//     if (manufacturer.documents.qualityCertifications) {
-//       for (const cert of manufacturer.documents.qualityCertifications) {
-//         await deleteFile(cert.path);
-//       }
-//     }
+    // Handle MongoDB duplicate key error (E11000)
+    if (error.code === 11000) {
+      console.error('❌ DUPLICATE KEY ERROR - This should not happen!');
+      console.error('   Duplicate field:', error.keyPattern);
+      console.error('   Duplicate value:', error.keyValue);
+      
+      return res.status(400).json({
+        success: false,
+        message: 'A manufacturer registration with this information already exists. If you believe this is an error, please contact support.',
+        debug: process.env.NODE_ENV === 'development' ? {
+          field: error.keyPattern,
+          value: error.keyValue
+        } : undefined
+      });
+    }
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors
+      });
+    }
 
-//     // Delete manufacturer
-//     await Manufacturer.findByIdAndDelete(req.params.id);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during manufacturer registration',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+// @access  Admin
+export const getAllManufacturers = async (req, res) => {
+  try {
+    const manufacturers = await Manufacturer.find({})
+      .populate('userId', 'email name')
+      .sort({ createdAt: -1 })
+      .lean();
 
-//     res.status(200).json({
-//       success: true,
-//       message: 'Manufacturer deleted successfully',
-//       data: null
-//     });
-//   } catch (error) {
-//     console.error('Error deleting manufacturer:', error);
-//     next(error);
-//   }
-// }),
 
-// getManufacturerStats: catchAsync(async (req, res, next) => {
-//   console.log('Fetching manufacturer statistics...');
-  
-//   try {
-//     const [stats, totalManufacturers, monthlyRegistrations] = await Promise.all([
-//       Manufacturer.aggregate([
-//         {
-//           $group: {
-//             _id: '$status',
-//             count: { $sum: 1 },
-//             averageYearEstablished: { $avg: '$yearEstablished' }
-//           }
-//         }
-//       ]),
-//       Manufacturer.countDocuments(),
-//       Manufacturer.aggregate([
-//         {
-//           $group: {
-//             _id: {
-//               year: { $year: '$createdAt' },
-//               month: { $month: '$createdAt' }
-//             },
-//             count: { $sum: 1 }
-//           }
-//         },
-//         { $sort: { '_id.year': -1, '_id.month': -1 } },
-//         { $limit: 12 }
-//       ])
-//     ]);
+    res.json({
+      success: true,
+      data: manufacturers,
+      count: manufacturers.length
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+export const getManufacturerById = async (req, res) => {
+  try {
+    const { id } = req.params;    
+    const manufacturer = await Manufacturer.findById(id)
+      .populate('userId', 'email name')
+      .lean();
 
-//     res.status(200).json({
-//       success: true,
-//       data: {
-//         totalManufacturers,
-//         statusStats: stats,
-//         monthlyRegistrations
-//       }
-//     });
-//   } catch (error) {
-//     console.error('Error fetching manufacturer statistics:', error);
-//     next(error);
-//   }
-// })
-// };
+    if (!manufacturer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Manufacturer not found'
+      });
+    }
 
-// // export default manufacturerController;
+    // Check if user has permission to view this manufacturer
+    if (manufacturer.userId._id.toString() !== req.userId && !req.user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    console.log('✅ Found manufacturer:', manufacturer.businessName);
+
+    res.json({
+      success: true,
+      data: manufacturer
+    });
+  } catch (error) {
+    console.error('❌ Get manufacturer by ID error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// @desc    Update manufacturer status
+// @route   PATCH /api/manufacturers/:id/status
+// @access  Admin
+export const updateManufacturerStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    console.log('=== UPDATE MANUFACTURER STATUS ===');
+    console.log('Manufacturer ID:', id);
+    console.log('New Status:', status);
+    console.log('Admin:', req.admin.email);
+
+    // Validate status
+    if (!['pending', 'approved', 'rejected'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status. Must be pending, approved, or rejected'
+      });
+    }
+
+    // Find manufacturer to get userId and contact info
+    const manufacturer = await Manufacturer.findById(id).populate('userId', 'email name');
+    if (!manufacturer) {
+      console.log('❌ Manufacturer not found');
+      return res.status(404).json({
+        success: false,
+        message: 'Manufacturer not found'
+      });
+    }
+
+    // Store previous status for notification
+    const previousStatus = manufacturer.status;
+
+    // Update manufacturer status
+    manufacturer.status = status;
+    await manufacturer.save();
+
+    // Update user's isManufacturer status
+    if (status === 'approved') {
+      await User.findByIdAndUpdate(manufacturer.userId._id, { 
+        isManufacturer: true,
+        role: 'manufacturer'
+      });
+      console.log('✅ User updated to manufacturer');
+    } else if (status === 'rejected') {
+      await User.findByIdAndUpdate(manufacturer.userId._id, { 
+        isManufacturer: false,
+        role: 'user'
+      });
+      console.log('✅ User manufacturer status revoked');
+    }
+
+    // Send email notification
+    try {
+      await sendStatusEmail(manufacturer.contact.email, status, manufacturer._id);
+      console.log('✅ Status email sent successfully');
+    } catch (emailError) {
+      console.error('❌ Failed to send status email:', emailError);
+    }
+
+    // Create notification for status change
+    if (previousStatus !== status) {
+      try {
+        await createManufacturerNotification(status, manufacturer, req.admin._id);
+      } catch (notifError) {
+        console.error('❌ Error creating notification:', notifError);
+      }
+    }
+
+    console.log('✅ Status updated successfully');
+
+    res.json({
+      success: true,
+      message: `Manufacturer status updated to ${status}`,
+      data: {
+        id: manufacturer._id,
+        businessName: manufacturer.businessName,
+        status: manufacturer.status,
+        userId: manufacturer.userId._id,
+        userEmail: manufacturer.contact.email
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error updating manufacturer status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating status',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// @desc    Delete manufacturer
+// @route   DELETE /api/manufacturers/:id
+// @access  Admin
+export const deleteManufacturer = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log('=== DELETE MANUFACTURER ===');
+    console.log('Manufacturer ID:', id);
+    console.log('Admin:', req.admin.email);
+
+    // Find manufacturer to get file paths and userId
+    const manufacturer = await Manufacturer.findById(id);
+    if (!manufacturer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Manufacturer not found'
+      });
+    }
+
+    // Delete associated files
+    const filesToDelete = [];
+    
+    if (manufacturer.documents.businessLicense?.path) {
+      filesToDelete.push(manufacturer.documents.businessLicense.path);
+    }
+    
+    if (manufacturer.documents.taxCertificate?.path) {
+      filesToDelete.push(manufacturer.documents.taxCertificate.path);
+    }
+    
+    if (manufacturer.documents.qualityCertifications) {
+      manufacturer.documents.qualityCertifications.forEach(cert => {
+        if (cert.path) filesToDelete.push(cert.path);
+      });
+    }
+
+    // Delete files from filesystem
+    filesToDelete.forEach(filePath => {
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`✅ Deleted file: ${filePath}`);
+        }
+      } catch (error) {
+        console.error(`❌ Error deleting file ${filePath}:`, error);
+      }
+    });
+
+    // Delete manufacturer record
+    await Manufacturer.findByIdAndDelete(id);
+
+    // Update user's isManufacturer status to false
+    await User.findByIdAndUpdate(manufacturer.userId, { 
+      isManufacturer: false,
+      role: 'user'
+    });
+
+    console.log('✅ Manufacturer deleted successfully');
+
+    res.json({
+      success: true,
+      message: 'Manufacturer deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Error deleting manufacturer:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while deleting manufacturer',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};

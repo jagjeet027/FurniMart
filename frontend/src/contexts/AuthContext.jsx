@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import Cookies from 'js-cookie';
 import api from '../axios/axiosInstance';
+
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
@@ -9,7 +10,7 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Check authentication status on mount and handle token refresh
+  // Check authentication status on mount
   useEffect(() => {
     const initializeAuth = async () => {
       try {
@@ -22,7 +23,8 @@ export const AuthProvider = ({ children }) => {
         }
 
         if (!accessToken && refreshToken) {
-          const response = await api.post('/auth/refresh-token', {}, {
+          // Try to refresh the token
+          const response = await api.post('/users/refresh-token', {}, {
             withCredentials: true, 
           });
 
@@ -35,7 +37,6 @@ export const AuthProvider = ({ children }) => {
               setUser(JSON.parse(userData));
             }
           } else {
-            // If refresh fails, clean up
             handleLogout();
           }
         } else if (accessToken) {
@@ -47,6 +48,7 @@ export const AuthProvider = ({ children }) => {
           }
         }
       } catch (err) {
+        console.error('Auth initialization error:', err);
         setError(err.message);
         handleLogout();
       } finally {
@@ -57,13 +59,18 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
+  // Login function
   const login = async (email, password) => {
     try {
       const response = await api.post('/users/login', { email, password }, {
-        withCredentials: true, // Important for receiving cookies
+        withCredentials: true,
       });
   
       const data = response.data;
+      
+      if (!data.success) {
+        throw new Error(data.message || 'Login failed');
+      }
       
       // Store tokens and user data
       localStorage.setItem('accessToken', data.accessToken);
@@ -71,18 +78,24 @@ export const AuthProvider = ({ children }) => {
       
       setUser(data.user);
       setIsAuthenticated(true);
+      setError(null);
+      
       return data;
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
+      const errorMessage = err.response?.data?.message || err.message || 'Login failed';
+      setError(errorMessage);
       throw err;
     }
   };
   
+  // Logout function
   const handleLogout = async () => {
     try {
       await api.post('/users/logout', {}, {
         withCredentials: true,
       });
+    } catch (err) {
+      console.error('Logout error:', err);
     } finally {
       // Clean up regardless of server response
       localStorage.removeItem('accessToken');
@@ -90,9 +103,98 @@ export const AuthProvider = ({ children }) => {
       Cookies.remove('refreshToken');
       setUser(null);
       setIsAuthenticated(false);
+      setError(null);
     }
   };
 
+  // Refresh user data from server
+  const refreshUserData = async () => {
+    try {
+      const response = await api.get('/users/me', {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("accessToken")}`,
+        },
+      });
+
+      if (response.data.success) {
+        const updatedUser = response.data.user;
+        localStorage.setItem("userData", JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        
+        return { success: true, user: updatedUser };
+      } else {
+        throw new Error('Failed to fetch user data');
+      }
+    } catch (err) {
+      console.error("Error refreshing user data:", err);
+      const errorMessage = err.response?.data?.message || "Failed to refresh user data";
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  };
+
+  // Update user to manufacturer
+  const updateUserToManufacturer = async (manufacturerData) => {
+    try {
+      const response = await api.put('/users/me', manufacturerData, {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("accessToken")}`,
+        },
+      });
+
+      if (response.data.success) {
+        const updatedUser = response.data.user;
+        localStorage.setItem("userData", JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        
+        return { success: true, user: updatedUser };
+      } else {
+        throw new Error('Failed to update user');
+      }
+    } catch (err) {
+      console.error("Error updating user to manufacturer:", err);
+      const errorMessage = err.response?.data?.message || "Failed to update user to manufacturer";
+      setError(errorMessage);
+      return { 
+        success: false, 
+        error: errorMessage 
+      };
+    }
+  };
+
+  // Register as manufacturer
+  const registerAsManufacturer = async (manufacturerData) => {
+    try {
+      const response = await api.post('/manufacturers/register', manufacturerData, {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("accessToken")}`,
+        },
+        withCredentials: true,
+      });
+
+      if (response.data.success || response.status === 200 || response.status === 201) {
+        const updatedUser = response.data.user || response.data;
+        localStorage.setItem("userData", JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        
+        return { success: true, user: updatedUser };
+      } else {
+        throw new Error('Failed to register as manufacturer');
+      }
+    } catch (err) {
+      console.error("Error registering as manufacturer:", err);
+      const errorMessage = err.response?.data?.message || "Failed to register as manufacturer";
+      setError(errorMessage);
+      return { 
+        success: false, 
+        error: errorMessage 
+      };
+    }
+  };
+
+  // Update user role (legacy support)
   const updateUserRole = async (isManufacturer, formDataToSend) => {
     try {
       const response = await api.post('/manufacturers/register', formDataToSend, {
@@ -117,78 +219,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Fixed refreshUserData function
-  const refreshUserData = async () => {
-    try {
-      const response = await api.get('/users/me', {
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("accessToken")}`,
-        },
-      });
-
-      const updatedUser = response.data;
-      localStorage.setItem("userData", JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      
-      return { success: true, user: updatedUser };
-    } catch (err) {
-      console.error("Error refreshing user data:", err);
-      setError(err.response?.data?.message || "Failed to refresh user data");
-      return { success: false, error: err.response?.data?.message || "Failed to refresh user data" };
-    }
-  };
-
-  // New function to update user to manufacturer
-  const updateUserToManufacturer = async (manufacturerData) => {
-    try {
-      const response = await api.put('/users/me', manufacturerData, {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("accessToken")}`,
-        },
-      });
-
-      const updatedUser = response.data;
-      localStorage.setItem("userData", JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      
-      return { success: true, user: updatedUser };
-    } catch (err) {
-      console.error("Error updating user to manufacturer:", err);
-      setError(err.response?.data?.message || "Failed to update user to manufacturer");
-      return { 
-        success: false, 
-        error: err.response?.data?.message || "Failed to update user to manufacturer" 
-      };
-    }
-  };
-
-  // Alternative function for manufacturer registration
-  const registerAsManufacturer = async (manufacturerData) => {
-    try {
-      const response = await api.post('/manufacturers/register', manufacturerData, {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("accessToken")}`,
-        },
-        withCredentials: true,
-      });
-
-      const updatedUser = response.data.user || response.data;
-      localStorage.setItem("userData", JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      
-      return { success: true, user: updatedUser };
-    } catch (err) {
-      console.error("Error registering as manufacturer:", err);
-      setError(err.response?.data?.message || "Failed to register as manufacturer");
-      return { 
-        success: false, 
-        error: err.response?.data?.message || "Failed to register as manufacturer" 
-      };
-    }
-  };
-
   return (
     <AuthContext.Provider value={{
       isAuthenticated,
@@ -207,6 +237,12 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
 
 export default AuthContext;

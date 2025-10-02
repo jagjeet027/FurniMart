@@ -1,33 +1,38 @@
 import express from 'express';
 import { 
-  sendOTP, 
-  verifyOTP, 
   registerUser, 
   loginUser, 
   refreshToken,
   getUserProfile,
   updateUserToManufacturer,
   logoutUser,
-} from '../controllers/userController.js';
+  forgotPassword,
+  resetPassword
+} from '../Controllers/userController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 import adminAuth from '../middleware/adminAuth.js';
 import loginAuth from '../middleware/loginAuth.js';
+import { User } from '../models/Users.js';
 
 const router = express.Router();
 
 // ===== PUBLIC ROUTES =====
-router.post('/send-otp', sendOTP);
-router.post('/verify-otp', verifyOTP);
 router.post('/register', registerUser);
 router.post('/login', loginAuth, loginUser);
+
+// FIXED: Changed from /refresh-token to match API calls
 router.post('/refresh-token', refreshToken);
+
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password/:token', resetPassword);
 
 // ===== PROTECTED USER ROUTES =====
 router.post('/logout', authenticateToken, logoutUser);
 router.get('/me', authenticateToken, getUserProfile);
 router.put('/me', authenticateToken, updateUserToManufacturer);
 
-// ===== ADMIN ONLY ROUTES =====
+// ===== ADMIN ROUTES =====
+
 // Get all users (admin only)
 router.get('/all', adminAuth, async (req, res) => {
   try {
@@ -114,9 +119,11 @@ router.patch('/:id/status', adminAuth, async (req, res) => {
     // Update fields if provided
     if (typeof isManufacturer !== 'undefined') {
       user.isManufacturer = isManufacturer;
+      user.role = isManufacturer ? 'manufacturer' : 'user';
     }
     if (typeof isAdmin !== 'undefined') {
       user.isAdmin = isAdmin;
+      if (isAdmin) user.role = 'admin';
     }
     if (typeof isActive !== 'undefined') {
       user.isActive = isActive;
@@ -134,7 +141,8 @@ router.patch('/:id/status', adminAuth, async (req, res) => {
         email: user.email,
         isManufacturer: user.isManufacturer,
         isAdmin: user.isAdmin,
-        isActive: user.isActive
+        isActive: user.isActive,
+        role: user.role
       }
     });
 

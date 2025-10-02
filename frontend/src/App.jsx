@@ -7,7 +7,6 @@ import './index.css';
 import Footer from './components/Footer';
 import SignupPage from './components/SignUpPage';
 import { AuthProvider } from './contexts/AuthContext';
-import { CartProvider } from './contexts/CartContext';
 import Dashboard from './components/manufacturer/Dashboard';    
 import PrivateRoute from './components/PrivateRoute';
 import ProductCard from './components/ProductCardDetails.jsx';
@@ -25,18 +24,24 @@ import ProductManagement from './components/manufacturer/ProductManagement';
 import EditProduct from './components/manufacturer/EditProduct.jsx';
 import CheckoutPage from './orderpages/CheckoutPage.jsx';
 import WishlistPage from './orderpages/wishlistPage.jsx';
-import CartPage from './orderpages/CartPage.jsx';
 import CategoryProductsPage from './components/userDashBoard/CategoryProductsPage.jsx';
 import CategoriesOverviewPage from './components/userDashBoard/CategoriesOverviewPage.jsx';
 import APIDebugComponent from './services/APIDebugComponent.jsx';
-// import FurnimartInnovationHub from './components/userDashBoard/FurnimartInnovationHub.jsx';
 import IdeaSharingPlatform from './components/userDashBoard/IdeaSharingPlatform.jsx';
+import ForgotPasswordPage from './components/userDashBoard/ForgotPasswordPage.jsx';
+import ResetPasswordPage from './components/userDashBoard/ResetPasswordPage.jsx';
+
 
 const App = () => {
   const location = useLocation();
 
   // Paths that should not show header/footer
   const noHeaderFooterPaths = [
+    '/login',
+    '/signup',
+    '/forgot-password',
+    '/reset-password',
+    '/checkout',
     '/ideas',
     '/idea/:id',
     '/manufacturer/register',
@@ -78,10 +83,10 @@ const App = () => {
           {/* AUTHENTICATION ROUTES - First Priority */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
-          
+          <Route path="/forgot-password" element={<ForgotPasswordPage/>} />
+          <Route path="/reset-password/:token" element={<ResetPasswordPage/>} />
           {/* EXACT STATIC ROUTES - Second Priority */}
           <Route path="/checkout" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
-          <Route path="/cart" element={<CartPage />} />
           <Route path="/wishlist" element={<PrivateRoute><WishlistPage /></PrivateRoute>} />
           <Route path="/order-tracking" element={<PrivateRoute><OrderTrackingPage /></PrivateRoute>} />
           
@@ -141,9 +146,7 @@ const App = () => {
 const AppWrapper = () => (
   <Router>
     <AuthProvider>
-      <CartProvider>
         <App />
-      </CartProvider>
     </AuthProvider>
   </Router>
 );

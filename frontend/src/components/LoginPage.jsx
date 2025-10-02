@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Lock, Mail, EyeOff, Eye, ArrowRight, AlertTriangle } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Lock, Mail, Eye, EyeOff, Sofa, CheckCircle2 } from 'lucide-react';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { login, isAuthenticated, user, error: authError, isLoading: authLoading } = useAuth();
   
   const [showPassword, setShowPassword] = useState(false);
@@ -29,7 +28,6 @@ const LoginPage = () => {
   }, []);
 
   useEffect(() => {
-    // Redirect if already authenticated
     if (isAuthenticated && user) {
       const redirectPath = user.isManufacturer 
         ? '/manufacturer/dashboard'
@@ -53,7 +51,12 @@ const LoginPage = () => {
     setIsLoading(true);
     
     try {
-      // Handle remember me
+      if (!formData.email.trim() || !formData.password) {
+        setError('Please enter both email and password');
+        setIsLoading(false);
+        return;
+      }
+
       if (rememberMe) {
         localStorage.setItem('rememberedEmail', formData.email);
       } else {
@@ -63,7 +66,6 @@ const LoginPage = () => {
       const response = await login(formData.email.trim(), formData.password);
       
       if (response?.success || response?.user) {
-        // Check if user is manufacturer and redirect accordingly
         const loggedInUser = response.user;
         const redirectPath = loggedInUser?.isManufacturer 
           ? '/manufacturer/dashboard'
@@ -74,10 +76,15 @@ const LoginPage = () => {
         throw new Error(response?.message || 'Login failed');
       }
     } catch (err) {
-      setError(err.response?.data?.message || err.message || authError || 'Invalid credentials. Please try again.');
+      setError(
+        err.response?.data?.message || 
+        err.message || 
+        authError || 
+        'Invalid credentials. Please try again.'
+      );
       setFormData(prev => ({
         ...prev,
-        password: '' // Clear password on error
+        password: ''
       }));
     } finally {
       setIsLoading(false);
@@ -86,109 +93,157 @@ const LoginPage = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-orange-600">Loading...</div>
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-sm text-gray-600">Loading...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white to-orange-50 flex items-center justify-center px-4 py-12">
-      <div className="max-w-md w-full space-y-8 bg-white shadow-2xl rounded-3xl border border-orange-100/50 p-10 relative overflow-hidden">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 text-transparent bg-clip-text">
-            FurniMart
-          </h1>
-          <p className="mt-2 text-gray-500">
-            Welcome back! Please login
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex items-center justify-center p-4 py-8">
+      <div className="w-full max-w-5xl grid lg:grid-cols-2 gap-0 bg-white shadow-2xl rounded-3xl overflow-hidden">
+        
+        {/* Left Panel - Branding */}
+        <div className="hidden lg:flex flex-col justify-center p-12 bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 text-white relative overflow-hidden">
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-10 left-10 w-32 h-32 bg-white rounded-full blur-3xl"></div>
+            <div className="absolute bottom-20 right-10 w-40 h-40 bg-white rounded-full blur-3xl"></div>
+          </div>
+          
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                <Sofa className="w-7 h-7" />
+              </div>
+              <h1 className="text-3xl font-bold">FurniMart</h1>
+            </div>
+            
+            <h2 className="text-4xl font-bold mb-4 leading-tight">
+              Welcome Back!
+            </h2>
+            <p className="text-lg text-white/90 mb-8">
+              Sign in to explore premium furniture collections and exclusive deals.
+            </p>
+            
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <span className="text-sm">Save your favorite items</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg flex items-center">
-            <AlertTriangle className="mr-2 h-5 w-5" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Mail className="h-5 w-5 text-gray-400" />
+        {/* Right Panel - Form */}
+        <div className="p-8 lg:p-12">
+          <div className="lg:hidden flex items-center gap-2 mb-6">
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center">
+              <Sofa className="w-6 h-6 text-white" />
             </div>
-            <input
-              type="email"
-              name="email"
-              placeholder="Email Address"
-              value={formData.email}
-              onChange={handleInputChange}
-              required
-              className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-            />
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 text-transparent bg-clip-text">
+              FurniMart
+            </h1>
           </div>
 
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Lock className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              placeholder="Password"
-              value={formData.password}
-              onChange={handleInputChange}
-              required
-              className="block w-full pl-10 pr-12 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-            >
-              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-            </button>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-1">Welcome Back</h2>
+            <p className="text-xs text-gray-500">Please sign in to your account</p>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
-              />
-              <label className="ml-2 block text-sm text-gray-900">
-                Remember me
-              </label>
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg mb-4 text-xs">
+              {error}
             </div>
-            <div className="text-sm">
-              <a href="#" className="font-medium text-orange-600 hover:text-orange-500">
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Email Field */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Email Address</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="john@example.com"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full pl-10 pr-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+                />
+              </div>
+            </div>
+
+            {/* Password Field */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  placeholder="Enter your password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Remember Me & Forgot Password */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                />
+                <label className="ml-2 block text-xs text-gray-700">
+                  Remember me
+                </label>
+              </div>
+              <Link to="/forgot-password" className="text-xs font-medium text-orange-600 hover:text-orange-700">
                 Forgot password?
-              </a>
+              </Link>
             </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className={`w-full py-3 rounded-lg font-semibold text-sm transition-all duration-300 ${
+                !isLoading
+                  ? 'bg-gradient-to-r from-orange-500 to-amber-600 text-white hover:from-orange-600 hover:to-amber-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5' 
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              {isLoading ? 'Signing in...' : 'Sign In'}
+            </button>
+          </form>
+
+          {/* Sign Up Link */}
+          <div className="mt-6 text-center">
+            <p className="text-xs text-gray-600">
+              Don't have an account?{' '}
+              <Link to="/signup" className="font-semibold text-orange-600 hover:text-orange-700">
+                Create Account
+              </Link>
+            </p>
           </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className={`w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-lg shadow-orange-200 font-bold hover:from-orange-600 hover:to-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-all duration-300 ${
-              !isLoading
-                ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' 
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            {isLoading ? 'Logging in...' : 'Log In'}
-            {!isLoading && <ArrowRight className="h-5 w-5" />}
-          </button>
-        </form>
-
-        <div className="text-center">
-          <p className="mt-2 text-sm text-gray-600">
-            Don't have an account? {' '}
-            <a href="/signup" className="font-medium text-orange-600 hover:text-orange-500">
-              Sign Up
-            </a>
-          </p>
         </div>
       </div>
     </div>
@@ -196,3 +251,4 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
+                  

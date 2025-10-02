@@ -21,14 +21,13 @@ import {
   Edit,
   Search,
   Loader2,
-  Lightbulb
+  Lightbulb,
+  Plus
 } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useCart } from '../contexts/CartContext';
 import api from '../axios/axiosInstance';
 
-// Updated menu sections with conditional rendering
 const menuSections = [
   {
     icon: <User className="h-5 w-5 text-indigo-600" />,
@@ -97,7 +96,6 @@ const ProfileMenu = ({ user, handleLogout }) => {
     return !item.showOnlyForManufacturer;
   });
 
-  // Close the menu when clicking outside
   useEffect(() => {
     const closeMenu = (e) => {
       setIsOpen(false);
@@ -175,7 +173,6 @@ const ProfileMenu = ({ user, handleLogout }) => {
   );
 };
 
-// Notifications dropdown component
 const NotificationsDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [notificationCount, setNotificationCount] = useState(3);
@@ -191,7 +188,6 @@ const NotificationsDropdown = () => {
     setNotificationCount(0);
   };
   
-  // Close the dropdown when clicking outside
   useEffect(() => {
     const closeDropdown = () => {
       setIsOpen(false);
@@ -263,7 +259,6 @@ const NotificationsDropdown = () => {
   );
 };
 
-// Search Component
 const SearchComponent = ({ isAuthenticated }) => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
@@ -292,7 +287,6 @@ const SearchComponent = ({ isAuthenticated }) => {
     try {
       setIsSearching(true);
       
-      // Check if the search query matches any category name
       const matchedCategory = categories.find(
         cat => cat.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
@@ -304,7 +298,6 @@ const SearchComponent = ({ isAuthenticated }) => {
         return;
       }
       
-      // Search for products
       const response = await api.get(`/products?search=${encodeURIComponent(searchQuery)}`);
       const products = Array.isArray(response.data) ? response.data : (response.data.products || []);
       
@@ -326,7 +319,6 @@ const SearchComponent = ({ isAuthenticated }) => {
     }
   };
 
-  // Mobile search overlay
   if (isExpanded) {
     return (
       <div className="fixed inset-0 bg-white z-50 md:relative md:bg-transparent md:inset-auto">
@@ -363,7 +355,6 @@ const SearchComponent = ({ isAuthenticated }) => {
             </form>
           </div>
           
-          {/* Popular searches on mobile */}
           <div className="md:hidden">
             <h3 className="text-sm font-medium text-gray-500 mb-3">Popular Searches</h3>
             <div className="flex flex-wrap gap-2">
@@ -415,7 +406,6 @@ const SearchComponent = ({ isAuthenticated }) => {
   );
 };
 
-// Mobile Profile Page Component
 const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
   const navigate = useNavigate();
   const filteredMenuSections = menuSections.filter(item => {
@@ -433,42 +423,44 @@ const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-white z-50 md:hidden">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white p-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold">Profile</h1>
-          <button onClick={onClose} className="p-2 hover:bg-orange-700 rounded-full">
-            <X className="h-6 w-6" />
-          </button>
-        </div>
-        
-        {/* User Info */}
-        <div className="mt-4 flex items-center">
-          <div className="p-3 bg-white bg-opacity-20 rounded-full">
-            <User className="h-8 w-8" />
+    <div className="fixed inset-0 bg-white z-50 md:hidden flex flex-col">
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0 bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-xl font-bold">Profile</h1>
+            <button onClick={onClose} className="p-2 hover:bg-orange-700 rounded-full transition-colors">
+              <X className="h-6 w-6" />
+            </button>
           </div>
-          <div className="ml-4">
-            <h2 className="text-lg font-semibold">{user?.name || 'Guest'}</h2>
-            <p className="text-orange-100 text-sm">{user?.email || 'No email'}</p>
-            {user?.isManufacturer && (
-              <span className="inline-block px-3 py-1 mt-2 text-xs font-medium text-emerald-700 bg-white rounded-full">
-                Manufacturer
-              </span>
-            )}
+          
+          {/* User Info */}
+          <div className="flex items-center">
+            <div className="p-3 bg-white bg-opacity-20 rounded-full">
+              <User className="h-8 w-8" />
+            </div>
+            <div className="ml-4">
+              <h2 className="text-lg font-semibold">{user?.name || 'Guest'}</h2>
+              <p className="text-orange-100 text-sm">{user?.email || 'No email'}</p>
+              {user?.isManufacturer && (
+                <span className="inline-block px-3 py-1 mt-2 text-xs font-medium text-emerald-700 bg-white rounded-full">
+                  Manufacturer
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      {/* Content - Scrollable */}
+      <div className="flex-1 overflow-y-auto p-4 pb-6">
         {/* Quick Actions */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-3">Quick Actions</h3>
           <div className="grid grid-cols-2 gap-3">
             <button 
               onClick={() => handleNavigation('/profile')}
-              className="flex items-center justify-center p-4 bg-orange-50 rounded-lg border border-orange-200"
+              className="flex items-center justify-center p-4 bg-orange-50 rounded-lg border border-orange-200 hover:bg-orange-100 transition-colors"
             >
               <Edit className="h-5 w-5 text-orange-600 mr-2" />
               <span className="text-sm font-medium text-gray-700">Edit Profile</span>
@@ -477,7 +469,7 @@ const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
             {user?.isManufacturer && (
               <button 
                 onClick={() => handleNavigation('/manufacturer/dashboard')}
-                className="flex items-center justify-center p-4 bg-emerald-50 rounded-lg border border-emerald-200"
+                className="flex items-center justify-center p-4 bg-emerald-50 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition-colors"
               >
                 <Factory className="h-5 w-5 text-emerald-600 mr-2" />
                 <span className="text-sm font-medium text-gray-700">Dashboard</span>
@@ -487,7 +479,7 @@ const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
             {!user?.isManufacturer && (
               <button 
                 onClick={() => handleNavigation('/manufacturer/register')}
-                className="flex items-center justify-center p-4 bg-purple-50 rounded-lg border border-purple-200"
+                className="flex items-center justify-center p-4 bg-purple-50 rounded-lg border border-purple-200 hover:bg-purple-100 transition-colors"
               >
                 <Factory className="h-5 w-5 text-purple-600 mr-2" />
                 <span className="text-sm font-medium text-gray-700">Become Seller</span>
@@ -504,7 +496,7 @@ const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
               <button
                 key={index}
                 onClick={() => handleNavigation(item.link)}
-                className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+                className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200 active:scale-95"
               >
                 <div className="flex items-center">
                   {item.icon}
@@ -523,7 +515,7 @@ const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
               handleLogout();
               onClose();
             }}
-            className="w-full flex items-center justify-center p-4 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors duration-200"
+            className="w-full flex items-center justify-center p-4 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors duration-200 active:scale-95"
           >
             <LogOut className="h-5 w-5 mr-2" />
             <span className="font-medium">Logout</span>
@@ -534,26 +526,49 @@ const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
   );
 };
 
-// Mobile footer navigation component
-const MobileFooter = ({ isAuthenticated, onProfileClick }) => {
+const MobileFooter = ({ isAuthenticated, onProfileClick, wishlistCount }) => {
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden z-40">
-      <div className="grid grid-cols-3 h-16">
-        <Link to="/" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
+    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden z-40 shadow-lg safe-area-bottom">
+      <div className="grid grid-cols-5 h-16">
+        <Link to="/" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600 transition-colors active:scale-95">
           <Home className="h-6 w-6" />
           <span className="text-xs mt-1">Home</span>
         </Link>
-        <Link to="/categories" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
+        
+        <Link to="/categories" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600 transition-colors active:scale-95">
           <Grid className="h-6 w-6" />
           <span className="text-xs mt-1">Categories</span>
         </Link>
+        
+        <Link to="/wishlist" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600 transition-colors relative active:scale-95">
+          <Heart className="h-6 w-6" />
+          {wishlistCount > 0 && (
+            <span className="absolute top-1 right-1/4 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+              {wishlistCount}
+            </span>
+          )}
+          <span className="text-xs mt-1">Wishlist</span>
+        </Link>
+        
         {isAuthenticated ? (
-          <button onClick={onProfileClick} className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
+          <Link to="/new-idea" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600 transition-colors active:scale-95">
+            <Plus className="h-6 w-6" />
+            <span className="text-xs mt-1">Post</span>
+          </Link>
+        ) : (
+          <Link to="/login" className="flex flex-col items-center justify-center text-gray-400 transition-colors">
+            <Plus className="h-6 w-6" />
+            <span className="text-xs mt-1">Post</span>
+          </Link>
+        )}
+        
+        {isAuthenticated ? (
+          <button onClick={onProfileClick} className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600 transition-colors active:scale-95">
             <User className="h-6 w-6" />
             <span className="text-xs mt-1">Profile</span>
           </button>
         ) : (
-          <Link to="/login" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600">
+          <Link to="/login" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600 transition-colors active:scale-95">
             <User className="h-6 w-6" />
             <span className="text-xs mt-1">Login</span>
           </Link>
@@ -567,7 +582,6 @@ const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
-  const { cartCount } = useCart();
   const [mobileProfileOpen, setMobileProfileOpen] = useState(false);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [wishlistAnimation, setWishlistAnimation] = useState(false);
@@ -577,7 +591,6 @@ const Header = () => {
     navigate('/login');
   };
 
-  // Enhanced useEffect to load wishlist items and listen for changes
   useEffect(() => {
     const getWishlistCount = () => {
       try {
@@ -627,7 +640,6 @@ const Header = () => {
     };
   }, []);
 
-  // Early return for manufacturer routes
   if (location.pathname.startsWith('/manufacturer') && user?.isManufacturer) {
     return null;
   }
@@ -659,14 +671,16 @@ const Header = () => {
             <SearchComponent isAuthenticated={isAuthenticated} />
             
             <div className="flex items-center space-x-4"> 
-              {/* Submit New Idea Button */}
-              <Link
-                to="/new-idea"
-                className="px-4 py-2 text-white bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300 flex items-center space-x-2"
-              >
-                <Lightbulb className="h-4 w-4" />
-                <span className="text-sm">Submit New Idea</span>
-              </Link>
+              {/* Submit New Idea Button - Only show when authenticated */}
+              {isAuthenticated && (
+                <Link
+                  to="/new-idea"
+                  className="px-4 py-2 text-white bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300 flex items-center space-x-2"
+                >
+                  <Lightbulb className="h-4 w-4" />
+                  <span className="text-sm">Submit New Idea</span>
+                </Link>
+              )}
 
               {isAuthenticated && user?.isManufacturer && (
                 <Link
@@ -696,14 +710,6 @@ const Header = () => {
                       </span>
                     )}
                   </Link>
-                  <Link to="/cart" className="relative p-2 hover:bg-orange-100 rounded-full">
-                    <ShoppingCart className="h-6 w-6 text-orange-600" />
-                    {cartCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {cartCount}
-                      </span>
-                    )}
-                  </Link>
                   <NotificationsDropdown />
                   <ProfileMenu user={user} handleLogout={handleLogout} />
                 </>
@@ -730,7 +736,6 @@ const Header = () => {
         </div>
       </header>
       
-      {/* Mobile Profile Page */}
       <MobileProfilePage 
         isOpen={mobileProfileOpen}
         onClose={() => setMobileProfileOpen(false)}
@@ -738,12 +743,11 @@ const Header = () => {
         handleLogout={handleLogout}
       />
       
-      {/* Mobile Footer Navigation */}
       <MobileFooter 
         isAuthenticated={isAuthenticated} 
         onProfileClick={() => setMobileProfileOpen(true)}
+        wishlistCount={wishlistCount}
       />
-      
     </>
   );
 };

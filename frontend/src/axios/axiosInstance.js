@@ -7,22 +7,34 @@ const api = axios.create({
     "Content-Type": "application/json",
     "Accept": "application/json",
   },
-  withCredentials: true,
-  timeout: 10000, // 10 second timeout
+  withCredentials: true, // CRITICAL: This sends cookies with every request
+  timeout: 10000,
 });
 
-// Add a request interceptor to handle token injection
+// Track if we're currently refreshing to avoid multiple refresh calls
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  
+  failedQueue = [];
+};
+
+// Request interceptor
 api.interceptors.request.use(
   (config) => {
-    // Always get the latest token from localStorage
     const currentToken = localStorage.getItem("accessToken"); 
     
     if (currentToken) {
       config.headers.Authorization = `Bearer ${currentToken}`;
     }
-    
-    // Ensure CORS headers are properly set
-    config.headers["X-Requested-With"] = "XMLHttpRequest";
     
     return config;
   },
@@ -31,7 +43,7 @@ api.interceptors.request.use(
   }
 );
 
-// Add a response interceptor to handle common errors and token refresh
+// Response interceptor
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -46,42 +58,92 @@ api.interceptors.response.use(
       });
     }
 
-    // Handle 401 errors (Unauthorized)
+    // Handle 401 errors (Unauthorized) - Token expired
     if (error.response.status === 401 && !originalRequest._retry) {
+      
+      // If this is already a refresh token request that failed, logout
+      if (originalRequest.url.includes('/refresh-token')) {
+        console.error('Refresh token invalid or expired - logging out');
+        handleAuthFailure();
+        return Promise.reject(error);
+      }
+
+      if (isRefreshing) {
+        // If already refreshing, queue this request
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then(token => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch(err => {
+            return Promise.reject(err);
+          });
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
 
       try {
-        // Try to refresh the token
-        const refreshResponse = await api.post('/auth/refresh-token');
+        console.log('🔄 Attempting to refresh token...');
         
-        if (refreshResponse.data.accessToken) {
-          // Update the token in localStorage
-          localStorage.setItem('accessToken', refreshResponse.data.accessToken);
+        // Try to refresh the token
+        // The refresh token is sent automatically via cookies (withCredentials: true)
+        const refreshResponse = await axios.post(
+          `${import.meta.env.VITE_BACKEND_URL || "http://localhost:5000"}/api/users/refresh-token`,
+          {}, // Empty body
+          {
+            withCredentials: true, // Send cookies
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        if (refreshResponse.data.success && refreshResponse.data.accessToken) {
+          const newAccessToken = refreshResponse.data.accessToken;
           
-          // Update the Authorization header for this request
-          originalRequest.headers.Authorization = `Bearer ${refreshResponse.data.accessToken}`;
+          // Update localStorage
+          localStorage.setItem('accessToken', newAccessToken);
+          
+          // Update default header
+          api.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
+          
+          // Update the failed request's header
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+          
+          console.log('✅ Token refreshed successfully');
+          
+          // Process queued requests
+          processQueue(null, newAccessToken);
+          
+          isRefreshing = false;
           
           // Retry the original request
           return api(originalRequest);
         } else {
-          // Refresh failed, redirect to login
-          handleAuthFailure();
+          throw new Error('Invalid refresh response');
         }
       } catch (refreshError) {
-        // Refresh failed, redirect to login
-        console.error('Token refresh failed:', refreshError);
+        console.error('❌ Token refresh failed:', refreshError.response?.data || refreshError.message);
+        
+        processQueue(refreshError, null);
+        isRefreshing = false;
+        
+        // Refresh failed, logout user
         handleAuthFailure();
+        return Promise.reject(refreshError);
       }
     }
 
-    // Handle other specific error cases
+    // Handle other status codes
     switch (error.response.status) {
-      case 401:
-        console.error("Unauthorized access");
-        handleAuthFailure();
-        break;
       case 403:
         console.error("Access forbidden");
+        break;
+      case 404:
+        console.error("Resource not found");
         break;
       case 429:
         console.error("Too many requests");
@@ -89,8 +151,6 @@ api.interceptors.response.use(
       case 500:
         console.error("Server error");
         break;
-      default:
-        console.error("Request failed:", error.response.data);
     }
 
     return Promise.reject(error);
@@ -99,18 +159,22 @@ api.interceptors.response.use(
 
 // Helper function to handle authentication failure
 const handleAuthFailure = () => {
+  console.log('🚪 Logging out user...');
+  
   // Clear tokens
   localStorage.removeItem("accessToken");
   localStorage.removeItem("userData");
+  localStorage.removeItem("refreshToken"); // Just in case it's stored here
   
-  // Remove cookies if using js-cookie
-  if (typeof window !== 'undefined' && window.Cookies) {
-    window.Cookies.remove('refreshToken');
-  }
+  // Clear axios default header
+  delete api.defaults.headers.common['Authorization'];
   
-  // Redirect to login page (you might want to use your router here)
+  // Redirect to login page
   if (typeof window !== 'undefined') {
-    window.location.href = '/login';
+    // Small delay to ensure cleanup completes
+    setTimeout(() => {
+      window.location.href = '/login';
+    }, 100);
   }
 };
 

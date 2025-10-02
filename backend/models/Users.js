@@ -12,20 +12,30 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "Please add an email"],
       unique: true,
+      lowercase: true,
+      trim: true,
     },
     address: {
       type: String,
-      required: [false, "Please add an address"],
+      required: false,
       trim: true,
     },
     phone: {
       type: String,
-      required: [true, "Please add a phone number"],
-      unique: true,
+      required: false,
     },
     password: {
       type: String,
       required: [true, "Please add a password"],
+      minlength: [6, "Password must be at least 6 characters"],
+    },
+    resetPasswordToken: {
+    type: String,
+    required: false,
+    },
+    resetPasswordExpires: {
+    type: Date,
+    required: false,
     },
     refreshToken: {
       type: String,
@@ -33,25 +43,21 @@ const userSchema = new mongoose.Schema(
     refreshTokenExpiresAt: {
       type: Date,
     },
-    otp: {
-      type: String,
-      required: false,
-    },
-    otpExpiresAt: {
-      type: Date,
-      required: false,
-    },
-    otpAttempts: {
-      type: Number,
-      default: 0,
-    },
     isManufacturer: {
+      type: Boolean,
+      default: false,
+    },
+    isAdmin: {
       type: Boolean,
       default: false,
     },
     isActive: {
       type: Boolean,
-      default: false,
+      default: true,
+    },
+    isVerified: {
+      type: Boolean,
+      default: true, // Set to true since we're removing OTP verification
     },
   },
   { timestamps: true }
@@ -81,6 +87,5 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
   }
 };
 
-// Check if the model already exists, if not, create it
 const User = mongoose.models.User || mongoose.model("User", userSchema);
-export {User};
+export { User };

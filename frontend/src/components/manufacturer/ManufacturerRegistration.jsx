@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { motion } from 'framer-motion';
-import api from '../../axios/axiosInstance'; // Use the configured api instance
+import api from '../../axios/axiosInstance';
 
-// AlreadySubmittedPopup component
 const AlreadySubmittedPopup = ({ onClose }) => (
   <motion.div
     initial={{ opacity: 0 }}
@@ -52,9 +51,9 @@ const ManufacturerRegistration = () => {
     'sole_proprietorship'
   ]);
 
-  // New states for submission status checking
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [showAlreadySubmittedPopup, setShowAlreadySubmittedPopup] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
 
   const [formData, setFormData] = useState({
     businessName: '',
@@ -76,6 +75,7 @@ const ManufacturerRegistration = () => {
     qualityCertifications: []
   });
 
+  // Check if user is already approved manufacturer
   useEffect(() => {
     if (user?.isManufacturer) {
       setSuccessMessage('You are already registered as a manufacturer!');
@@ -86,26 +86,38 @@ const ManufacturerRegistration = () => {
     }
   }, [user, navigate]);
 
-  // Check if user has already submitted registration
+  // Check if user has pending submission
   useEffect(() => {
     const checkSubmissionStatus = async () => {
+      if (!user || user.isManufacturer) {
+        setIsCheckingStatus(false);
+        return;
+      }
+
       try {
         const response = await api.get('/manufacturers/me');
-        if (response.data.success) {
+        
+        // If we get a successful response, user has already submitted
+        if (response.data.success && response.data.data) {
+          console.log('User has already submitted:', response.data.data);
           setHasSubmitted(true);
           setShowAlreadySubmittedPopup(true);
         }
       } catch (error) {
-        // If 404, user hasn't submitted yet - this is normal
-        if (error.response?.status !== 404) {
+        // 404 means no submission yet - this is normal and expected
+        if (error.response?.status === 404) {
+          console.log('No previous submission found - user can register');
+          setHasSubmitted(false);
+        } else {
+          // Other errors - log but don't block registration
           console.error('Error checking submission status:', error);
         }
+      } finally {
+        setIsCheckingStatus(false);
       }
     };
 
-    if (user && !user.isManufacturer) {
-      checkSubmissionStatus();
-    }
+    checkSubmissionStatus();
   }, [user]);
 
   const handleChange = (e) => {
@@ -122,7 +134,7 @@ const ManufacturerRegistration = () => {
     if (name === 'qualityCertifications') {
       setFiles(prev => ({
         ...prev,
-        [name]: [...prev[name], ...fileList]
+        [name]: [...prev[name], ...Array.from(fileList)]
       }));
     } else {
       setFiles(prev => ({
@@ -140,30 +152,39 @@ const ManufacturerRegistration = () => {
   };
 
   const validateForm = () => {
+    // Check all required form fields
     for (const key in formData) {
       if (!formData[key]) {
         setErrorMessage(`Please fill in the ${key.replace(/([A-Z])/g, ' $1').toLowerCase()} field`);
         return false;
       }
     }
+
+    // Check required files
     if (!files.businessLicense || !files.taxCertificate) {
-      setErrorMessage('Please upload all required documents');
+      setErrorMessage('Please upload Business License and Tax Certificate');
       return false;
     }
+
+    // Validate year
     const currentYear = new Date().getFullYear();
     const year = parseInt(formData.yearEstablished);
-    if (year < 1800 || year > currentYear) {
+    if (isNaN(year) || year < 1800 || year > currentYear) {
       setErrorMessage(`Year must be between 1800 and ${currentYear}`);
       return false;
     }
+
+    // Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       setErrorMessage('Please enter a valid email address');
       return false;
     }
-    const phoneRegex = /^\+?[\d\s-]{10,}$/;
+
+    // Validate phone
+    const phoneRegex = /^\+?[\d\s-()]{10,}$/;
     if (!phoneRegex.test(formData.phone)) {
-      setErrorMessage('Please enter a valid phone number');
+      setErrorMessage('Please enter a valid phone number (at least 10 digits)');
       return false;
     }
 
@@ -175,12 +196,13 @@ const ManufacturerRegistration = () => {
     setErrorMessage('');
     setSuccessMessage('');
 
-    // Check if already submitted before proceeding
+    // Check if already submitted
     if (hasSubmitted) {
       setShowAlreadySubmittedPopup(true);
       return;
     }
 
+    // Validate form
     if (!validateForm()) {
       return;
     }
@@ -188,14 +210,15 @@ const ManufacturerRegistration = () => {
     setIsSubmitting(true);
 
     try {
+      // Create FormData for file upload
       const formDataToSend = new FormData();
       
-      // Append form fields
+      // Append all form fields
       Object.entries(formData).forEach(([key, value]) => {
         formDataToSend.append(key, value);
       });
       
-      // Append files
+      // Append required files
       if (files.businessLicense) {
         formDataToSend.append('businessLicense', files.businessLicense);
       }
@@ -204,9 +227,12 @@ const ManufacturerRegistration = () => {
         formDataToSend.append('taxCertificate', files.taxCertificate);
       }
       
+      // Append optional quality certifications
       files.qualityCertifications.forEach(file => {
         formDataToSend.append('qualityCertifications', file);
       });
+
+      console.log('Submitting manufacturer registration...');
 
       const response = await api.post('/manufacturers/register', formDataToSend, {
         headers: {
@@ -214,29 +240,52 @@ const ManufacturerRegistration = () => {
         }
       });
 
+      console.log('Registration response:', response.data);
+
       if (response.data.success) {
-        setSuccessMessage('Registration submitted successfully! Redirecting...');
+        setSuccessMessage('Registration submitted successfully! Please wait for admin approval.');
         setHasSubmitted(true);
-        await refreshUserData(); 
         
-        // Redirect to home page after successful submission
+        // Refresh user data
+        await refreshUserData();
+        
+        // Redirect to home after 2 seconds
         setTimeout(() => {
           navigate('/');
         }, 2000);
+      } else {
+        throw new Error(response.data.message || 'Registration failed');
       }
     } catch (error) {
       console.error('Registration error:', error);
       
+      let errorMsg = 'An error occurred during registration. Please try again.';
+      
       if (error.response?.data?.message) {
-        setErrorMessage(error.response.data.message);
-      } else {
-        setErrorMessage('An error occurred during registration. Please try again.');
+        errorMsg = error.response.data.message;
+      } else if (error.message) {
+        errorMsg = error.message;
       }
+      
+      setErrorMessage(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Show loading while checking status
+  if (isCheckingStatus) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center bg-gradient-to-r from-blue-900 to-indigo-900">
+        <div className="text-blue-100 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto mb-4"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show message if already a manufacturer
   if (user?.isManufacturer) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center bg-gradient-to-r from-blue-900 to-indigo-900">
@@ -256,7 +305,6 @@ const ManufacturerRegistration = () => {
 
   return (
     <div className="py-10 px-4 min-h-screen bg-gradient-to-r from-blue-900 to-indigo-900 text-blue-50 font-sans">
-      {/* Already Submitted Popup */}
       {showAlreadySubmittedPopup && (
         <AlreadySubmittedPopup 
           onClose={() => {
@@ -505,6 +553,7 @@ const ManufacturerRegistration = () => {
                   id="businessLicense"
                   name="businessLicense"
                   onChange={handleFileChange}
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                   className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
                   required
                 />
@@ -528,6 +577,7 @@ const ManufacturerRegistration = () => {
                   id="taxCertificate"
                   name="taxCertificate"
                   onChange={handleFileChange}
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                   className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
                   required
                 />
@@ -553,6 +603,7 @@ const ManufacturerRegistration = () => {
                   id="qualityCertifications"
                   name="qualityCertifications"
                   onChange={handleFileChange}
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                   multiple
                   className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
                 />
@@ -592,12 +643,12 @@ const ManufacturerRegistration = () => {
           <div className="text-center mt-8">
             <motion.button
               type="submit"
-              disabled={isSubmitting}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.98 }}
+              disabled={isSubmitting || hasSubmitted}
+              whileHover={{ scale: isSubmitting || hasSubmitted ? 1 : 1.03 }}
+              whileTap={{ scale: isSubmitting || hasSubmitted ? 1 : 0.98 }}
               className={`
                 px-10 py-3 rounded-full font-semibold text-lg relative overflow-hidden
-                ${isSubmitting 
+                ${isSubmitting || hasSubmitted
                   ? 'bg-blue-700 cursor-not-allowed' 
                   : 'bg-blue-500 hover:bg-blue-600 shadow-lg hover:shadow-blue-500/50 transition-all'
                 }
