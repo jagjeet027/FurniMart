@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { Edit, Trash2, Search, ArrowLeft, Plus, AlertCircle, Loader, X, RefreshCw } from 'lucide-react';
 import ProductUploadForm from './ProductUploadForm';
 import { motion, AnimatePresence } from 'framer-motion';
-
-// Access environment variables
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
-axios.defaults.baseURL = BACKEND_URL;
+import api from '../../axios/axiosInstance';
 
 const ProductManagement = () => {
   const navigate = useNavigate();
@@ -22,24 +18,50 @@ const ProductManagement = () => {
   const [deletingId, setDeletingId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  const token = localStorage.getItem("accessToken");
+
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/products`);
       
-      console.log("Products data:", response.data);
-      // Fix here: accessing the products array from the response
+      if (!token) {
+        setError('Please login to view products');
+        navigate('/login');
+        return;
+      }
+
+      // ✅ FIXED: Fetch only manufacturer's own products
+      const response = await api.get('/products/manufacturer/my-products', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        }
+      });
+      
+      console.log("My Products data:", response.data);
       const productsData = Array.isArray(response.data.products) ? response.data.products : [];
       setProducts(productsData);
       
-      // Extract unique categories from products
-      const uniqueCategories = [...new Set(productsData.map(product => product.category).filter(Boolean))];
+      // Extract unique categories
+      const categoryMap = new Map();
+      productsData.forEach(product => {
+        if (product.category) {
+          categoryMap.set(product.category, product.categoryName || product.category);
+        }
+      });
+      const uniqueCategories = Array.from(categoryMap, ([id, name]) => ({ id, name }));
       setCategories(uniqueCategories);
       
       setError(null);
     } catch (err) {
       console.error('Data fetch error:', err);
-      setError(err.response?.data?.message || 'Failed to load data. Please try again.');
+      if (err.response?.status === 401) {
+        setError('Session expired. Please login again.');
+        navigate('/login');
+      } else if (err.response?.status === 403) {
+        setError(err.response?.data?.message || 'You need to be an approved manufacturer to view products.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to load data. Please try again.');
+      }
       setProducts([]);
       setCategories([]);
     } finally {
@@ -48,8 +70,13 @@ const ProductManagement = () => {
   };
 
   useEffect(() => {
+    if (!token) {
+      setError('Please login to access this page');
+      navigate('/login');
+      return;
+    }
     fetchData();
-  }, []);
+  }, [token, navigate]);
 
   const handleEditProduct = (productId) => {
     navigate(`/products/${productId}/edit`);
@@ -69,16 +96,26 @@ const ProductManagement = () => {
   const fetchProducts = async () => {
     try {
       setRefreshing(true);
-      const response = await axios.get(`/api/products`);
-      // Fix here: accessing the products array from the response
+      
+      // ✅ FIXED: Fetch only manufacturer's own products
+      const response = await api.get('/products/manufacturer/my-products', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        }
+      });
+      
       const productsData = Array.isArray(response.data.products) ? response.data.products : [];
       
-      // Adding a small delay for visual effect
       setTimeout(() => {
         setProducts(productsData);
         
-        // Also update categories when products are refreshed
-        const uniqueCategories = [...new Set(productsData.map(product => product.category).filter(Boolean))];
+        const categoryMap = new Map();
+        productsData.forEach(product => {
+          if (product.category) {
+            categoryMap.set(product.category, product.categoryName || product.category);
+          }
+        });
+        const uniqueCategories = Array.from(categoryMap, ([id, name]) => ({ id, name }));
         setCategories(uniqueCategories);
         
         setError(null);
@@ -86,7 +123,14 @@ const ProductManagement = () => {
       }, 600);
     } catch (err) {
       console.error('Product refresh error:', err);
-      setError(err.response?.data?.message || 'Failed to refresh products. Please try again.');
+      if (err.response?.status === 401) {
+        setError('Session expired. Please login again.');
+        navigate('/login');
+      } else if (err.response?.status === 403) {
+        setError(err.response?.data?.message || 'Access denied.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to refresh products. Please try again.');
+      }
       setRefreshing(false);
     }
   };
@@ -97,16 +141,17 @@ const ProductManagement = () => {
         setDeleteLoading(productId);
         setDeletingId(productId);
         
-        // Try the first endpoint
-        try {
-          await axios.delete(`/api/products/${productId}`);
-        } catch (deleteErr) {
-          console.error('First delete endpoint failed, trying alternative:', deleteErr);
-          // Try the fallback endpoint
-          await axios.delete(`/api/products/${productId}`);
-        }
+        console.log('🗑️ Deleting product:', productId);
         
-        // Wait before removing from UI for animation effect
+        const response = await api.delete(`/products/${productId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        console.log('✅ Delete response:', response.data);
+        
         setTimeout(() => {
           setProducts(products.filter(product => product._id !== productId));
           setDeleteLoading(null);
@@ -115,18 +160,25 @@ const ProductManagement = () => {
         
         setError(null);
       } catch (err) {
-        console.error('Delete error:', err);
-        setError(err.response?.data?.message || 'Failed to delete product. Please try again.');
+        console.error('❌ Delete error:', err);
+        
+        if (err.response?.status === 401) {
+          setError('Session expired. Please login again.');
+          setTimeout(() => navigate('/login'), 1500);
+        } else if (err.response?.status === 403) {
+          const errorMsg = err.response?.data?.message || 'You can only delete your own products.';
+          setError(errorMsg);
+        } else {
+          setError(err.response?.data?.message || 'Failed to delete product. Please try again.');
+        }
         setDeleteLoading(null);
         setDeletingId(null);
       }
     }
   };
 
-  // Clear error message
   const clearError = () => setError(null);
 
-  // Filter products based on search term and category
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (product.description?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
@@ -134,20 +186,16 @@ const ProductManagement = () => {
     return matchesSearch && matchesCategory;
   });
 
-  // Format price to display correctly
   const formatPrice = (price) => {
     if (!price) return '$0.00';
-    
     if (typeof price === 'string') {
       return price.startsWith('$') ? price : `$${price}`;
     }
-    
     return `$${price.toFixed(2)}`;
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4 lg:p-8 relative">
-      {/* Header */}
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -165,7 +213,7 @@ const ProductManagement = () => {
             <ArrowLeft size={20} />
           </motion.button>
           <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
-            Product Management
+            My Products
           </h1>
         </div>
         
@@ -190,7 +238,9 @@ const ProductManagement = () => {
           >
             <option value="">All Categories</option>
             {categories.map(category => (
-              <option key={category} value={category}>{category}</option>
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
             ))}
           </select>
           
@@ -219,7 +269,6 @@ const ProductManagement = () => {
         </div>
       </motion.div>
 
-      {/* Error message */}
       <AnimatePresence>
         {error && (
           <motion.div 
@@ -252,7 +301,7 @@ const ProductManagement = () => {
           className="text-center py-20 flex flex-col items-center justify-center"
         >
           <Loader className="animate-spin mb-4 text-blue-600" size={40} />
-          <p className="text-lg text-blue-800">Loading your amazing products...</p>
+          <p className="text-lg text-blue-800">Loading your products...</p>
         </motion.div>
       ) : filteredProducts.length === 0 ? (
         <motion.div 
@@ -261,20 +310,15 @@ const ProductManagement = () => {
           className="text-center py-16 text-gray-500 bg-white rounded-xl shadow-sm p-8"
         >
           <div className="flex flex-col items-center max-w-md mx-auto">
-            <img 
-              src="/api/placeholder/200/200" 
-              alt="No products" 
-              className="mb-6 rounded-lg opacity-50"
-            />
             <h3 className="text-xl font-semibold text-gray-700 mb-2">
               {searchTerm || selectedCategory ? 
                 "No matching products found" : 
-                "Your product showcase is empty"}
+                "You haven't added any products yet"}
             </h3>
             <p className="mb-6">
               {searchTerm || selectedCategory ? 
-                "Try adjusting your search or filters to find what you're looking for." : 
-                "Click 'Add Product' to start building your inventory and showcase your items."}
+                "Try adjusting your search or filters." : 
+                "Start building your product catalog by adding your first product."}
             </p>
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -381,7 +425,6 @@ const ProductManagement = () => {
         </motion.div>
       )}
 
-      {/* Modal Popup */}
       <AnimatePresence>
         {isModalOpen && (
           <motion.div 
@@ -408,25 +451,13 @@ const ProductManagement = () => {
               
               <div className="p-6">
                 <h2 className="text-2xl font-bold text-gray-800 mb-6">Add New Product</h2>
-                <ProductUploadFormWrapper onSuccess={() => handleCloseModal(true)} />
+                <ProductUploadForm onSubmitSuccess={() => handleCloseModal(true)} />
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
     </div>
-  );
-};
-
-const ProductUploadFormWrapper = ({ onSuccess }) => {
-  const handleFormSuccess = () => {
-    if (onSuccess) onSuccess();
-  };
-  
-  return (
-    <ProductUploadForm 
-      onSubmitSuccess={handleFormSuccess}
-    />
   );
 };
 

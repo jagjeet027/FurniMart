@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Share2, Heart, ShoppingCart, Eye, Tag, Zap, TrendingUp, Award, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Star, Share2, Heart, Eye, Tag, Zap, TrendingUp, Award, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -10,8 +10,6 @@ const ProductCard = ({ product, updateWishlist, listView = false }) => {
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [showImageGallery, setShowImageGallery] = useState(false);
-  const [addingToCart, setAddingToCart] = useState(false);
   
   useEffect(() => {
     checkWishlistStatus();
@@ -103,35 +101,11 @@ const ProductCard = ({ product, updateWishlist, listView = false }) => {
       });
     } else {
       navigator.clipboard.writeText(url).then(() => {
-        // Show a nice notification instead of alert
         const event = new CustomEvent('showNotification', { 
           detail: { message: 'Product link copied to clipboard!', type: 'success' } 
         });
         window.dispatchEvent(event);
       });
-    }
-  };
-
-  const handleAddToCart = async (e) => {
-    e.stopPropagation();
-    setAddingToCart(true);
-    
-    try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Add to cart logic here
-      const event = new CustomEvent('showNotification', { 
-        detail: { message: 'Product added to cart!', type: 'success' } 
-      });
-      window.dispatchEvent(event);
-    } catch (error) {
-      const event = new CustomEvent('showNotification', { 
-        detail: { message: 'Failed to add to cart!', type: 'error' } 
-      });
-      window.dispatchEvent(event);
-    } finally {
-      setAddingToCart(false);
     }
   };
 
@@ -180,7 +154,7 @@ const ProductCard = ({ product, updateWishlist, listView = false }) => {
       >
         <div className="flex flex-col sm:flex-row">
           {/* Enhanced Image Section */}
-          <div className="relative sm:w-1/3 h-64 sm:h-56">
+          <div className="relative sm:w-1/3 h-64 sm:h-56 group">
             <motion.img
               src={currentImage}
               alt={product.name}
@@ -341,8 +315,7 @@ const ProductCard = ({ product, updateWishlist, listView = false }) => {
                     </div>
                   )}
                   {product.soldCount && (
-                    <div className="flex items-center">
-                      <ShoppingCart className="w-3 h-3 mr-1" />
+                    <div className="flex items-center bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
                       {product.soldCount} sold
                     </div>
                   )}
@@ -376,25 +349,6 @@ const ProductCard = ({ product, updateWishlist, listView = false }) => {
                   </motion.button>
                 </div>
                 <div className="flex space-x-2">
-                  <motion.button
-                    onClick={handleAddToCart}
-                    disabled={addingToCart}
-                    className="px-3 py-2 bg-orange-100 text-orange-600 rounded-lg hover:bg-orange-200 disabled:opacity-50 transition-colors text-sm font-medium flex items-center shadow-md"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    {addingToCart ? (
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      >
-                        <Clock className="w-4 h-4 mr-1" />
-                      </motion.div>
-                    ) : (
-                      <ShoppingCart className="w-4 h-4 mr-1" />
-                    )}
-                    {addingToCart ? 'Adding...' : 'Add to Cart'}
-                  </motion.button>
                   <motion.button
                     onClick={handleViewClick}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center shadow-md"
@@ -667,43 +621,16 @@ const ProductCard = ({ product, updateWishlist, listView = false }) => {
           </div>
         )}
         
-        {/* Enhanced Action Buttons */}
-        <div className="flex space-x-2">
-          <motion.button
-            onClick={handleAddToCart}
-            disabled={addingToCart}
-            className="flex-1 py-2.5 px-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:opacity-50 text-white rounded-lg transition-all text-sm font-semibold flex items-center justify-center shadow-md hover:shadow-lg"
-            whileHover={{ scale: 1.02, y: -1 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            {addingToCart ? (
-              <>
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="mr-2"
-                >
-                  <Clock className="w-4 h-4" />
-                </motion.div>
-                Adding...
-              </>
-            ) : (
-              <>
-                <ShoppingCart className="w-4 h-4 mr-2" />
-                Add to Cart
-              </>
-            )}
-          </motion.button>
-          
-          <motion.button
-            onClick={handleViewClick}
-            className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold flex items-center justify-center shadow-md hover:shadow-lg"
-            whileHover={{ scale: 1.02, y: -1 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <Eye className="w-4 h-4" />
-          </motion.button>
-        </div>
+        {/* View Details Button Only */}
+        <motion.button
+          onClick={handleViewClick}
+          className="w-full py-2.5 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold flex items-center justify-center shadow-md hover:shadow-lg"
+          whileHover={{ scale: 1.02, y: -1 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <Eye className="w-4 h-4 mr-2" />
+          View Details
+        </motion.button>
       </div>
     </motion.div>
   );

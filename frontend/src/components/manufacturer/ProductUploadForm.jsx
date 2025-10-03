@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Upload, X, Plus, Camera, Star, ArrowLeft, Grid, Tag, Layers } from "lucide-react";
+import { Upload, X, Plus, Camera, Star, ArrowLeft, Grid, Tag, Layers, AlertCircle, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../../axios/axiosInstance";
 
@@ -12,15 +12,16 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
   const [categories, setCategories] = useState([]);
   const [categoryCounts, setCategoryCounts] = useState({});
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [manufacturerInfo, setManufacturerInfo] = useState(null);
+  const [isLoadingManufacturer, setIsLoadingManufacturer] = useState(true);
+  const [manufacturerError, setManufacturerError] = useState("");
+  
   const [productData, setProductData] = useState({
     name: "",
     price: "",
     category: "",
     categoryName: "",
     description: "",
-    manufacturer: "",
-    manufacturerInfo: "",
     sizes: [],
     features: [""],
     rating: 0,
@@ -28,7 +29,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
     stock: 10,
   });
 
-  // Expanded default categories list
   const DEFAULT_CATEGORIES = [
     { _id: "main-outdoor-gate", name: "Main Outdoor Gate" },
     { _id: "sofas", name: "Sofas" },
@@ -51,13 +51,61 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
     { _id: "other", name: "Other" }
   ];
 
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("accessToken");  
   const [newSize, setNewSize] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
-  // Fetch categories from API, fallback to defaults if needed
+  // Fetch manufacturer info first
+  useEffect(() => {
+    const fetchManufacturerInfo = async () => {
+      setIsLoadingManufacturer(true);
+      setManufacturerError("");
+      
+      try {
+        const response = await api.get('/manufacturers/me', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          }
+        });
+        
+        if (response.data.success && response.data.data) {
+          const manufacturer = response.data.data;
+          
+          // Check manufacturer status
+          if (manufacturer.status !== 'approved') {
+            setManufacturerError(
+              manufacturer.status === 'pending' 
+                ? 'Your manufacturer registration is pending approval. You cannot add products yet.'
+                : 'Your manufacturer registration has been rejected. Please contact support.'
+            );
+            setManufacturerInfo(null);
+          } else {
+            setManufacturerInfo(manufacturer);
+          }
+        } else {
+          setManufacturerError('Manufacturer profile not found. Please register as a manufacturer first.');
+        }
+      } catch (error) {
+        console.error("Failed to fetch manufacturer info:", error);
+        const errorMsg = error.response?.data?.message || 'Failed to verify manufacturer status';
+        setManufacturerError(errorMsg);
+        setManufacturerInfo(null);
+      } finally {
+        setIsLoadingManufacturer(false);
+      }
+    };
+
+    if (token) {
+      fetchManufacturerInfo();
+    } else {
+      setManufacturerError("Please login to add products");
+      setIsLoadingManufacturer(false);
+    }
+  }, [token]);
+
+  // Fetch categories
   useEffect(() => {
     const fetchCategories = async () => {
       setIsLoadingCategories(true);
@@ -68,7 +116,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
         if (Array.isArray(categoriesData) && categoriesData.length > 0) {
           setCategories(categoriesData);
         } else {
-          console.log("No categories found in API response, using defaults");
           setCategories(DEFAULT_CATEGORIES);
         }
       } catch (error) {
@@ -82,10 +129,9 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
     fetchCategories();
   }, []);
 
-  // Fetch product counts for each category
+  // Fetch product counts
   useEffect(() => {
     const fetchProductCounts = async () => {
-      setIsLoadingProducts(true);
       const counts = {};
       
       try {
@@ -93,7 +139,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
         const products = response.data.products || response.data;
         
         if (Array.isArray(products) && products.length > 0) {
-          // Count products per category
           products.forEach(product => {
             const categoryId = product.category;
             if (categoryId) {
@@ -105,8 +150,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
         setCategoryCounts(counts);
       } catch (error) {
         console.error("Failed to fetch product counts:", error);
-      } finally {
-        setIsLoadingProducts(false);
       }
     };
 
@@ -145,11 +188,8 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
     }));
   };
 
-  // Updated handler for category change to store both ID and name
   const handleCategoryChange = (e) => {
     const selectedValue = e.target.value;
-    
-    // Find the selected category's name
     const selectedCategory = categories.find(cat => cat._id === selectedValue);
     
     if (selectedCategory) {
@@ -159,7 +199,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
         categoryName: selectedCategory.name
       }));
     } else {
-      // If not found, use the value directly
       setProductData(prev => ({
         ...prev,
         category: selectedValue,
@@ -215,40 +254,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
     navigate("/products");
   };
 
-  // Function to create category if it doesn't exist already
-  const ensureCategoryExists = async (categoryId, categoryName) => {
-    try {
-      // Check if category exists in our categories list
-      const categoryExists = categories.some(cat => cat._id === categoryId);
-      
-      // If no category was selected or if category doesn't exist, create it
-      if (!categoryId || !categoryExists) {
-        // Try to create the category
-        const response = await api.post('/categories', {
-          name: categoryName,
-          description: `Products in the ${categoryName} category`
-        }, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          }
-        });
-        
-        // Return the category ID from the response
-        if (response.data && response.data.category && response.data.category._id) {
-          return response.data.category._id;
-        }
-      }
-      
-      // If category already exists, return its ID
-      return categoryId;
-    } catch (error) {
-      console.error("Failed to create category:", error);
-      // Fall back to using the original category ID
-      return categoryId || categoryName;
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsUploading(true);
@@ -256,9 +261,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
     setUploadSuccess(false);
     
     try {
-      // First, ensure the category exists
-      const categoryId = await ensureCategoryExists(productData.category, productData.categoryName);
-      
       let imageUrls = [];
       if (images.length > 0) {
         try {
@@ -268,7 +270,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
               formData.append("file", img.file);
               formData.append("upload_preset", uploadPreset);
               
-              // Using fetch instead of axios to avoid CORS issue with auth headers
               const response = await fetch(
                 `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
                 {
@@ -299,13 +300,21 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
         ? productData.price
         : `$${productData.price}`;
       
+      // Remove manufacturer and manufacturerInfo from productData
+      // Backend will automatically set these from authenticated manufacturer
       const finalProductData = {
-        ...productData,
-        category: categoryId, // Use the confirmed category ID
+        name: productData.name,
         price: formattedPrice,
+        category: productData.category,
+        categoryName: productData.categoryName,
+        description: productData.description,
+        sizes: productData.sizes,
+        features: productData.features,
         images: imageUrls,
-        stock: parseInt(productData.stock) || 10,
         imageUrl: imageUrls.length > 0 ? imageUrls[0] : "",
+        rating: productData.rating,
+        reviews: productData.reviews,
+        stock: parseInt(productData.stock) || 10,
       };
       
       try {
@@ -326,8 +335,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
           category: "",
           categoryName: "",
           description: "",
-          manufacturer: "",
-          manufacturerInfo: "",
           sizes: [],
           features: [""],
           rating: 0,
@@ -336,50 +343,14 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
         });
         setImages([]);
         
-        // Call the success callback
         if (onSubmitSuccess && typeof onSubmitSuccess === 'function') {
           onSubmitSuccess();
         }
         
       } catch (error) {
-        console.error("Error with first endpoint, trying fallback:", error);
-        try {
-          const response = await api.post("/products", finalProductData, {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          
-          console.log("Product uploaded successfully with fallback endpoint:", response.data);
-          setUploadSuccess(true);
-          
-          // Reset form
-          setProductData({
-            name: "",
-            price: "",
-            category: "",
-            categoryName: "",
-            description: "",
-            manufacturer: "",
-            manufacturerInfo: "",
-            sizes: [],
-            features: [""],
-            rating: 0,
-            reviews: 0,
-            stock: 10,
-          });
-          setImages([]);
-          
-          // Call the success callback
-          if (onSubmitSuccess && typeof onSubmitSuccess === 'function') {
-            onSubmitSuccess();
-          }
-          
-        } catch (fallbackError) {
-          console.error("Both endpoints failed:", fallbackError);
-          setUploadError("Failed to save product. Please check your server connection.");
-        }
+        console.error("Error uploading product:", error);
+        const errorMsg = error.response?.data?.message || "Failed to save product";
+        setUploadError(errorMsg);
       }
       
     } catch (error) {
@@ -390,10 +361,63 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
     }
   };
 
+  // Show loading state
+  if (isLoadingManufacturer) {
+    return (
+      <div className="max-w-5xl mx-auto p-6 bg-white rounded-xl shadow-md">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Verifying manufacturer status...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if manufacturer not approved
+  if (manufacturerError) {
+    return (
+      <div className="max-w-5xl mx-auto p-6">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+          <div className="flex items-start">
+            <AlertCircle className="w-6 h-6 text-red-600 mr-3 flex-shrink-0 mt-1" />
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-red-900 mb-2">Cannot Add Products</h3>
+              <p className="text-red-700 mb-4">{manufacturerError}</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => navigate("/manufacturer/register")}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                >
+                  Register as Manufacturer
+                </button>
+                <button
+                  onClick={navigateToProducts}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                >
+                  Back to Products
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto p-6 bg-gradient-to-r from-white to-orange-50 rounded-xl shadow-md">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold text-orange-800">Upload New Product</h2>
+        <div>
+          <h2 className="text-3xl font-bold text-orange-800">Upload New Product</h2>
+          {manufacturerInfo && (
+            <div className="flex items-center mt-2 text-sm text-green-700 bg-green-50 px-3 py-1 rounded-full w-fit">
+              <CheckCircle className="w-4 h-4 mr-2" />
+              <span>Uploading as: <strong>{manufacturerInfo.businessName}</strong></span>
+            </div>
+          )}
+        </div>
         <button
           type="button"
           onClick={navigateToProducts}
@@ -462,7 +486,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
               />
             </label>
           </div>
-          <p className="text-xs text-orange-500 mt-1">Add up to 4 high-quality product images</p>
         </div>
         
         {/* Basic product info */}
@@ -543,7 +566,7 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
           </div>
         </div>
         
-        {/* Category Selection - Enhanced with category counts and visual indicators */}
+        {/* Category Selection */}
         <div className="bg-orange-50 p-4 rounded-lg border border-orange-100 shadow-sm">
           <label className="block text-sm font-medium text-orange-700 mb-1 flex items-center">
             <Grid className="w-4 h-4 mr-2 text-orange-500" />
@@ -554,7 +577,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
             <div className="w-full h-10 bg-orange-100 animate-pulse rounded-lg"></div>
           ) : (
             <>
-              {/* Category dropdown */}
               <select
                 name="category"
                 value={productData.category}
@@ -572,7 +594,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
                 <option value="custom">➕ Add New Category</option>
               </select>
               
-              {/* Category cards for quick visual selection */}
               <div className="grid grid-cols-4 gap-2 mt-3">
                 {categories.slice(0, 8).map((category) => (
                   <div 
@@ -602,7 +623,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
             </>
           )}
           
-          {/* Custom category input field - shows when "Add New Category" is selected */}
           {productData.category === 'custom' && (
             <div className="mt-3 p-3 bg-white rounded-lg border border-orange-200 shadow-sm">
               <label className="block text-sm font-medium text-orange-700 mb-1">
@@ -619,29 +639,7 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
               />
             </div>
           )}
-          
-          {isLoadingCategories && (
-            <p className="text-sm text-orange-500 mt-1">Loading categories...</p>
-          )}
-          {!isLoadingCategories && categories.length === 0 && (
-            <p className="text-sm text-orange-500 mt-1">No categories found. You can add a new one.</p>
-          )}
         </div>
-        
-        {/* Selected Category Display */}
-        {productData.category && productData.category !== 'custom' && (
-          <div className="px-4 py-3 bg-orange-100 rounded-lg border border-orange-200 shadow-sm">
-            <p className="text-sm text-orange-700 flex items-center">
-              <Tag className="w-4 h-4 mr-2 text-orange-500" />
-              Selected Category: <span className="font-medium ml-1">{productData.categoryName}</span>
-              {categoryCounts[productData.category] && (
-                <span className="ml-2 px-2 py-0.5 bg-orange-200 text-orange-800 rounded-full text-xs">
-                  {categoryCounts[productData.category]} {categoryCounts[productData.category] === 1 ? 'product' : 'products'}
-                </span>
-              )}
-            </p>
-          </div>
-        )}
         
         {/* Description */}
         <div>
@@ -656,36 +654,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
             className="w-full px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm"
             required
           />
-        </div>
-        
-        {/* Manufacturer info */}
-        <div className="grid grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-orange-700 mb-1">
-              Manufacturer Name
-            </label>
-            <input
-              type="text"
-              name="manufacturer"
-              value={productData.manufacturer}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-orange-700 mb-1">
-              Manufacturer Info
-            </label>
-            <input
-              type="text"
-              name="manufacturerInfo"
-              value={productData.manufacturerInfo}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm"
-              required
-            />
-          </div>
         </div>
         
         {/* Sizes */}
@@ -726,9 +694,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
                 </button>
               </div>
             ))}
-            {productData.sizes.length === 0 && (
-              <p className="text-sm text-orange-500 italic">No sizes added yet</p>
-            )}
           </div>
         </div>
         

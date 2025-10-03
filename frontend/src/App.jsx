@@ -30,7 +30,7 @@ import APIDebugComponent from './services/APIDebugComponent.jsx';
 import IdeaSharingPlatform from './components/userDashBoard/IdeaSharingPlatform.jsx';
 import ForgotPasswordPage from './components/userDashBoard/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './components/userDashBoard/ResetPasswordPage.jsx';
-
+import SearchResultsPage from './components/userDashBoard/SearchResultsPage.jsx';
 
 const App = () => {
   const location = useLocation();
@@ -85,7 +85,7 @@ const App = () => {
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage/>} />
           <Route path="/reset-password/:token" element={<ResetPasswordPage/>} />
-          {/* EXACT STATIC ROUTES - Second Priority */}
+          <Route path="/search-results" element={<SearchResultsPage />} />
           <Route path="/checkout" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
           <Route path="/wishlist" element={<PrivateRoute><WishlistPage /></PrivateRoute>} />
           <Route path="/order-tracking" element={<PrivateRoute><OrderTrackingPage /></PrivateRoute>} />

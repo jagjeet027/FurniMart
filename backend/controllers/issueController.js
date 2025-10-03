@@ -3,11 +3,13 @@ import Issue from '../models/issue.js';
 import {User} from '../models/Users.js';
 import { Manufacturer } from '../models/manufacturer.js';
 
-// Create new issue - ONLY FOR MANUFACTURERS
+// Create new issue - FOR MANUFACTURERS
 export const createIssue = async (req, res) => {
   try {
     const { name, description, category } = req.body;
     const userId = req.user.id; // From manufacturer auth middleware
+
+    console.log('📝 Creating issue for manufacturer:', userId);
 
     // Validate required fields
     if (!name || name.trim().length === 0) {
@@ -45,6 +47,8 @@ export const createIssue = async (req, res) => {
       { path: 'manufacturerId', select: 'businessName contact.email contact.contactPerson' }
     ]);
 
+    console.log('✅ Issue created successfully:', savedIssue._id);
+
     res.status(201).json({
       success: true,
       message: 'Issue created successfully',
@@ -54,7 +58,7 @@ export const createIssue = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error creating issue:', error);
+    console.error('❌ Error creating issue:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -77,11 +81,6 @@ export const getAllIssues = async (req, res) => {
       });
     }
 
-    console.log('✅ Admin access confirmed:', {
-      adminId: req.adminId,
-      email: req.admin?.email
-    });
-
     const {
       page = 1,
       limit = 10,
@@ -94,8 +93,6 @@ export const getAllIssues = async (req, res) => {
 
     // Build filter object - Admin can see ALL issues
     const filter = { 
-
-
       isDeleted: false
     };
     
@@ -131,10 +128,7 @@ export const getAllIssues = async (req, res) => {
     const totalIssues = await Issue.countDocuments(filter);
     const totalPages = Math.ceil(totalIssues / limit);
 
-    console.log('✅ Issues retrieved successfully:', {
-      count: issues.length,
-      totalCount: totalIssues
-    });
+    console.log('✅ Issues retrieved successfully:', issues.length);
 
     res.status(200).json({
       success: true,
@@ -163,9 +157,6 @@ export const getAllIssues = async (req, res) => {
 // Get single issue by ID - ONLY FOR ADMIN
 export const getIssueById = async (req, res) => {
   try {
-    console.log('🔍 Getting issue by ID for admin:', req.params.id);
-    
-    // Check if request is from admin
     if (!req.admin && !req.adminId) {
       return res.status(403).json({
         success: false,
@@ -198,8 +189,6 @@ export const getIssueById = async (req, res) => {
       });
     }
 
-    console.log('✅ Issue found:', issue._id);
-
     res.status(200).json({
       success: true,
       data: {
@@ -220,9 +209,6 @@ export const getIssueById = async (req, res) => {
 // Update issue - ONLY FOR ADMIN
 export const updateIssue = async (req, res) => {
   try {
-    console.log('✏️ Updating issue for admin:', req.params.id);
-    
-    // Check if request is from admin
     if (!req.admin && !req.adminId) {
       return res.status(403).json({
         success: false,
@@ -252,7 +238,7 @@ export const updateIssue = async (req, res) => {
       });
     }
 
-    // Build update object - Admin can update everything
+    // Build update object
     const updateData = {};
     
     if (name) updateData.name = name.trim();
@@ -305,6 +291,7 @@ export const updateIssue = async (req, res) => {
   }
 };
 
+// Delete issue - ONLY FOR ADMIN
 export const deleteIssue = async (req, res) => {
   try {
     if (!req.admin && !req.adminId) {
@@ -323,15 +310,6 @@ export const deleteIssue = async (req, res) => {
       });
     }
 
-    const issue = await Issue.findById(id);
-
-    if (!issue) {
-      return res.status(404).json({
-        success: false,
-        message: 'Issue not found'
-      });
-    }
-
     const deletedIssue = await Issue.findByIdAndDelete(id);
 
     if (!deletedIssue) {
@@ -341,12 +319,15 @@ export const deleteIssue = async (req, res) => {
       });
     }
 
+    console.log('✅ Issue deleted:', id);
+
     res.status(200).json({
       success: true,
       message: 'Issue permanently deleted from database'
     });
 
   } catch (error) {
+    console.error('❌ Error deleting issue:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -358,9 +339,6 @@ export const deleteIssue = async (req, res) => {
 // Add comment to issue - ONLY FOR ADMIN
 export const addComment = async (req, res) => {
   try {
-    console.log('💬 Adding comment for admin:', req.params.id);
-    
-    // Check if request is from admin
     if (!req.admin && !req.adminId) {
       return res.status(403).json({
         success: false,
@@ -402,17 +380,14 @@ export const addComment = async (req, res) => {
       userId: req.adminId,
       message: message.trim(),
       timestamp: new Date(),
-      isAdminComment: true // Flag to identify admin comments
+      isAdminComment: true
     };
 
     issue.comments.push(comment);
     issue.updatedAt = new Date();
     await issue.save();
 
-    // Populate the new comment
     await issue.populate('comments.userId', 'name email');
-
-    console.log('✅ Comment added:', issue._id);
 
     res.status(201).json({
       success: true,
@@ -435,9 +410,6 @@ export const addComment = async (req, res) => {
 // Get issue statistics - ONLY FOR ADMIN
 export const getIssueStats = async (req, res) => {
   try {
-    console.log('📊 Getting issue statistics for admin...');
-    
-    // Check if request is from admin
     if (!req.admin && !req.adminId) {
       return res.status(403).json({
         success: false,
@@ -445,85 +417,52 @@ export const getIssueStats = async (req, res) => {
       });
     }
 
-    console.log('✅ Admin access confirmed for stats');
-
-    // Build base filter - Admin sees all issues
     const baseFilter = { 
       isDeleted: false
     };
 
-    // Get statistics
-    const [totalIssues, statusStats, categoryStats, recentIssues] = await Promise.allSettled([
-      // Total issues
+    const [totalIssues, statusStats, categoryStats, recentIssues] = await Promise.all([
       Issue.countDocuments(baseFilter),
-      
-      // By status
       Issue.aggregate([
         { $match: baseFilter },
         { $group: { _id: '$status', count: { $sum: 1 } } }
       ]),
-      
-      // By category
       Issue.aggregate([
         { $match: baseFilter },
         { $group: { _id: '$category', count: { $sum: 1 } } }
       ]),
-      
-      // Recent issues (last 7 days)
       Issue.countDocuments({
         ...baseFilter,
         createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
       })
     ]);
 
-    // Handle results
-    const handleResult = (result, defaultValue) => {
-      if (result.status === 'fulfilled') {
-        return result.value;
-      } else {
-        console.error('Stats query failed:', result.reason);
-        return defaultValue;
-      }
-    };
-
-    const resolvedStats = {
-      total: handleResult(totalIssues, 0),
-      statusStats: handleResult(statusStats, []),
-      categoryStats: handleResult(categoryStats, []),
-      recent: handleResult(recentIssues, 0)
-    };
-
-    // Format statistics
     const formattedStats = {
-      total: resolvedStats.total,
-      recent: resolvedStats.recent,
-      byStatus: {},
-      byCategory: {}
+      total: totalIssues,
+      recent: recentIssues,
+      byStatus: {
+        open: 0,
+        'in-progress': 0,
+        resolved: 0,
+        closed: 0
+      },
+      byCategory: {
+        technical: 0,
+        billing: 0,
+        order: 0,
+        product: 0,
+        general: 0,
+        other: 0
+      }
     };
 
-    // Initialize with default values
-    ['open', 'in-progress', 'resolved', 'closed'].forEach(status => {
-      formattedStats.byStatus[status] = 0;
+    statusStats.forEach(stat => {
+      if (stat._id) formattedStats.byStatus[stat._id] = stat.count;
     });
 
-    ['technical', 'billing', 'order', 'product', 'general', 'other'].forEach(category => {
-      formattedStats.byCategory[category] = 0;
+    categoryStats.forEach(stat => {
+      if (stat._id) formattedStats.byCategory[stat._id] = stat.count;
     });
-
-    // Fill with actual data
-    resolvedStats.statusStats.forEach(stat => {
-      if (stat._id && typeof stat.count === 'number') {
-        formattedStats.byStatus[stat._id] = stat.count;
-      }
-    });
-
-    resolvedStats.categoryStats.forEach(stat => {
-      if (stat._id && typeof stat.count === 'number') {
-        formattedStats.byCategory[stat._id] = stat.count;
-      }
-    });
-
-    console.log('✅ Statistics retrieved:', formattedStats);
 
     res.status(200).json({
       success: true,

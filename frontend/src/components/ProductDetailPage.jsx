@@ -400,10 +400,7 @@ const ProductDetailPage = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center text-sm">
-              <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
-            </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <button 
               className="bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 flex items-center justify-center text-sm"
               onClick={handleBuyNow}

@@ -287,6 +287,7 @@ const SearchComponent = ({ isAuthenticated }) => {
     try {
       setIsSearching(true);
       
+      // First check if query matches a category
       const matchedCategory = categories.find(
         cat => cat.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
@@ -298,27 +299,30 @@ const SearchComponent = ({ isAuthenticated }) => {
         return;
       }
       
+      // Search for products
       const response = await api.get(`/products?search=${encodeURIComponent(searchQuery)}`);
       const products = Array.isArray(response.data) ? response.data : (response.data.products || []);
       
+      // Navigate to search results page regardless of results
       if (products.length > 0) {
-        navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+        navigate(`/search-results?q=${encodeURIComponent(searchQuery)}`);
       } else {
-        navigate(`/search?q=${encodeURIComponent(searchQuery)}&no-results=true`);
+        navigate(`/search-results?q=${encodeURIComponent(searchQuery)}&no-results=true`);
       }
       
       setSearchQuery('');
       setIsExpanded(false);
       
     } catch (err) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery)}&no-results=true`);
+      console.error('Search error:', err);
+      // Navigate to search results page with error flag
+      navigate(`/search-results?q=${encodeURIComponent(searchQuery)}&no-results=true`);
       setSearchQuery('');
       setIsExpanded(false);
     } finally {
       setIsSearching(false);
     }
   };
-
   if (isExpanded) {
     return (
       <div className="fixed inset-0 bg-white z-50 md:relative md:bg-transparent md:inset-auto">

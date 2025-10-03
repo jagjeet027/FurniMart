@@ -9,8 +9,7 @@ import dotenv from 'dotenv';
 import http from 'http';
 import { Server } from 'socket.io';
 import fs from 'fs';
-
-// Database and configurations
+import cookieParser from 'cookie-parser';
 import connectDB from './db/db.js';
 import { setupSocket } from './config/socketConfig.js';
 import { predefinedIssues } from './data/issues.js';
@@ -171,11 +170,8 @@ app.use(
     exposedHeaders: ['Content-Range', 'X-Content-Range']
   })
 );
-
-
-
-// Body parser middleware
-app.use(express.json({ limit: '10mb' })); // Increased for chat images
+app.use(cookieParser());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 

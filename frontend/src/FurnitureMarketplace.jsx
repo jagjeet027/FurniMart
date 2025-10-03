@@ -12,12 +12,9 @@ import {
   Truck,
   Gift,
   Tag,
-  ArrowRight,
-  Star,
   ChevronRight,
   Package,
   ChevronLeft,
-  Search,
   Grid,
   FileText,
   Send,
@@ -27,15 +24,14 @@ import {
   Trash2,
   Share2,
   Paperclip,
-  Heart,
-  ShoppingCart,
-  Eye,
-  Loader2
+  Loader2,
+  ArrowLeft,
+  Filter,
+  SlidersHorizontal
 } from 'lucide-react';
 import api from './axios/axiosInstance';
-import { useNavigate } from 'react-router-dom';
+import ProductCard from './components/ProductCard';
 
-// Map category names to icons
 const categoryIcons = {
   'Sofas': Sofa,
   'Dining Tables': Lamp,
@@ -57,7 +53,6 @@ const PostRequirements = () => {
     description: '',
     media: []
   });
-
   const [showNewPostForm, setShowNewPostForm] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [quotationText, setQuotationText] = useState({});
@@ -76,7 +71,6 @@ const PostRequirements = () => {
       setPosts(postsData);
     } catch (error) {
       console.error('Error fetching posts:', error);
-      // Set mock data on error
       setPosts([
         {
           _id: '1',
@@ -117,24 +111,20 @@ const PostRequirements = () => {
         formData.append('title', newPost.title);
         formData.append('description', newPost.description);
         
-        // Add files if any
         selectedFiles.forEach((file, index) => {
           formData.append('media', file);
         });
 
-        const response = await api.post('/posts', formData, {
+        await api.post('/posts', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
 
-        // Refresh posts
         fetchPosts();
-        
         setNewPost({ title: '', description: '', media: [] });
         setSelectedFiles([]);
         setShowNewPostForm(false);
       } catch (error) {
         console.error('Error creating post:', error);
-        // Fallback: Add post locally
         const post = {
           _id: Date.now().toString(),
           author: { name: "Current User", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=User" },
@@ -155,16 +145,13 @@ const PostRequirements = () => {
   const handleQuotationSubmit = async (postId) => {
     if (quotationText[postId]?.trim()) {
       try {
-        const response = await api.post(`/posts/${postId}/quotations`, {
+        await api.post(`/posts/${postId}/quotations`, {
           message: quotationText[postId]
         });
-
-        // Refresh posts
         fetchPosts();
         setQuotationText({ ...quotationText, [postId]: '' });
       } catch (error) {
         console.error('Error adding quotation:', error);
-        // Fallback: Add quotation locally
         setPosts(posts.map(post => {
           if (post._id === postId) {
             return {
@@ -211,7 +198,7 @@ const PostRequirements = () => {
   const formatTimestamp = (timestamp) => {
     const date = new Date(timestamp);
     const now = new Date();
-    const diff = Math.floor((now - date) / 1000); // seconds
+    const diff = Math.floor((now - date) / 1000);
 
     if (diff < 60) return 'Just now';
     if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
@@ -230,18 +217,16 @@ const PostRequirements = () => {
 
   return (
     <div className="space-y-6">
-      {/* Create New Post Button */}
       <motion.button
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         onClick={() => setShowNewPostForm(!showNewPostForm)}
-        className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center justify-center space-x-2"
+        className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center justify-center space-x-2 text-sm"
       >
-        <FileText className="h-5 w-5" />
+        <FileText className="h-4 w-4" />
         <span>Post Your Requirement</span>
       </motion.button>
 
-      {/* New Post Form */}
       <AnimatePresence>
         {showNewPostForm && (
           <motion.div
@@ -250,39 +235,33 @@ const PostRequirements = () => {
             exit={{ opacity: 0, height: 0 }}
             className="bg-white rounded-xl shadow-lg p-6 overflow-hidden"
           >
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Create New Requirement Post</h3>
+            <h3 className="text-base font-bold text-gray-800 mb-3">Create New Requirement Post</h3>
             
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Title *
-              </label>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Title *</label>
               <input
                 type="text"
                 value={newPost.title}
                 onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
                 placeholder="e.g., Looking for Custom Office Desk"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
               />
             </div>
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Description *
-              </label>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Description *</label>
               <textarea
                 value={newPost.description}
                 onChange={(e) => setNewPost({ ...newPost, description: e.target.value })}
                 placeholder="Describe your requirements in detail..."
-                rows="6"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent resize-none"
+                rows="4"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent resize-none"
               />
             </div>
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Attach Photos/Videos (Optional)
-              </label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Attach Photos/Videos (Optional)</label>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-orange-400 transition-colors">
                 <input
                   type="file"
                   multiple
@@ -292,26 +271,22 @@ const PostRequirements = () => {
                   id="file-upload"
                 />
                 <label htmlFor="file-upload" className="cursor-pointer">
-                  <Paperclip className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">Click to upload files</p>
-                  <p className="text-xs text-gray-400 mt-1">Images and videos supported</p>
+                  <Paperclip className="h-6 w-6 text-gray-400 mx-auto mb-1" />
+                  <p className="text-xs text-gray-600">Click to upload files</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Images and videos supported</p>
                 </label>
               </div>
 
               {selectedFiles.length > 0 && (
-                <div className="mt-4 grid grid-cols-3 gap-2">
+                <div className="mt-3 grid grid-cols-3 gap-2">
                   {selectedFiles.map((file, index) => (
                     <div key={index} className="relative group">
-                      <img
-                        src={file}
-                        alt={`Preview ${index + 1}`}
-                        className="w-full h-24 object-cover rounded-lg"
-                      />
+                      <img src={file} alt={`Preview ${index + 1}`} className="w-full h-20 object-cover rounded-lg" />
                       <button
                         onClick={() => removeFile(index)}
                         className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
-                        <X className="h-4 w-4" />
+                        <X className="h-3 w-3" />
                       </button>
                     </div>
                   ))}
@@ -319,13 +294,13 @@ const PostRequirements = () => {
               )}
             </div>
 
-            <div className="flex space-x-3">
+            <div className="flex space-x-2">
               <button
                 onClick={handlePostSubmit}
                 disabled={!newPost.title || !newPost.description}
-                className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 rounded-lg font-semibold hover:from-orange-600 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center space-x-2"
+                className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white py-2 rounded-lg text-sm font-semibold hover:from-orange-600 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center space-x-2"
               >
-                <Send className="h-5 w-5" />
+                <Send className="h-4 w-4" />
                 <span>Post Requirement</span>
               </button>
               <button
@@ -334,7 +309,7 @@ const PostRequirements = () => {
                   setNewPost({ title: '', description: '', media: [] });
                   setSelectedFiles([]);
                 }}
-                className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
@@ -343,7 +318,6 @@ const PostRequirements = () => {
         )}
       </AnimatePresence>
 
-      {/* Posts Feed */}
       <div className="space-y-6">
         {posts.map((post) => (
           <motion.div
@@ -429,9 +403,7 @@ const PostRequirements = () => {
             <div className="border-t border-gray-200 bg-gray-50 p-6">
               <div className="flex items-center space-x-2 mb-4">
                 <MessageSquare className="h-5 w-5 text-orange-500" />
-                <h4 className="font-semibold text-gray-800">
-                  Quotations ({post.quotations?.length || 0})
-                </h4>
+                <h4 className="font-semibold text-gray-800">Quotations ({post.quotations?.length || 0})</h4>
               </div>
 
               <div className="space-y-3 mb-4">
@@ -448,9 +420,7 @@ const PostRequirements = () => {
                           <h5 className="font-semibold text-sm text-gray-800">
                             {quotation.author?.name || "Anonymous"}
                           </h5>
-                          <span className="text-xs text-gray-500">
-                            {formatTimestamp(quotation.createdAt)}
-                          </span>
+                          <span className="text-xs text-gray-500">{formatTimestamp(quotation.createdAt)}</span>
                         </div>
                         <p className="text-sm text-gray-600">{quotation.message}</p>
                       </div>
@@ -495,7 +465,7 @@ const PostRequirements = () => {
   );
 };
 
-// Category Products Component
+// Category Products Component with Horizontal Scrolling
 const CategoryProducts = ({ categoryId, categoryName, onBack }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -548,29 +518,26 @@ const CategoryProducts = ({ categoryId, categoryName, onBack }) => {
     }
   };
 
+  const handleBack = () => {
+    // Instant feedback - call onBack immediately
+    onBack();
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <button
-            onClick={onBack}
-            className="flex items-center space-x-2 text-orange-600 hover:text-orange-700 font-medium"
-          >
-            <ChevronLeft className="h-5 w-5" />
-            <span>Back to Posts</span>
-          </button>
-        </div>
+        <motion.button
+          onClick={handleBack}
+          className="flex items-center space-x-2 px-4 py-2 bg-white rounded-lg shadow-md hover:shadow-lg transition-all text-orange-600 hover:text-orange-700 font-medium"
+          whileHover={{ x: -5 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <ArrowLeft className="h-5 w-5" />
+          <span>Back to Posts</span>
+        </motion.button>
         
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="bg-white rounded-xl shadow-md overflow-hidden animate-pulse">
-              <div className="h-48 bg-gray-200"></div>
-              <div className="p-4">
-                <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-              </div>
-            </div>
-          ))}
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-12 w-12 text-orange-500 animate-spin" />
         </div>
       </div>
     );
@@ -579,13 +546,15 @@ const CategoryProducts = ({ categoryId, categoryName, onBack }) => {
   if (error) {
     return (
       <div className="space-y-6">
-        <button
-          onClick={onBack}
-          className="flex items-center space-x-2 text-orange-600 hover:text-orange-700 font-medium"
+        <motion.button
+          onClick={handleBack}
+          className="flex items-center space-x-2 px-4 py-2 bg-white rounded-lg shadow-md hover:shadow-lg transition-all text-orange-600 hover:text-orange-700 font-medium"
+          whileHover={{ x: -5 }}
+          whileTap={{ scale: 0.95 }}
         >
-          <ChevronLeft className="h-5 w-5" />
+          <ArrowLeft className="h-5 w-5" />
           <span>Back to Posts</span>
-        </button>
+        </motion.button>
         
         <div className="text-center py-12 bg-white rounded-xl shadow-lg">
           <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
@@ -601,116 +570,74 @@ const CategoryProducts = ({ categoryId, categoryName, onBack }) => {
     );
   }
 
+  // Display products in rows of 2 with horizontal scrolling
+  const rows = [];
+  for (let i = 0; i < products.length; i += 2) {
+    rows.push(products.slice(i, i + 2));
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={onBack}
-          className="flex items-center space-x-2 text-orange-600 hover:text-orange-700 font-medium"
-        >
-          <ChevronLeft className="h-5 w-5" />
-          <span>Back to Posts</span>
-        </button>
-        
-        <h2 className="text-2xl font-bold text-gray-800">
-          {categoryName} <span className="text-gray-500">({products.length})</span>
-        </h2>
+      {/* Enhanced Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-3 sm:p-4 rounded-xl shadow-lg">
+        <div className="flex items-center space-x-3">
+          <motion.button
+            onClick={handleBack}
+            className="flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg shadow-md hover:shadow-lg transition-all text-sm font-medium"
+            whileHover={{ x: -5 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Back</span>
+          </motion.button>
+          
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800">{categoryName}</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{products.length} Products Available</p>
+          </div>
+        </div>
       </div>
 
-      {/* Products Grid */}
+      {/* Products in Horizontal Scrollable Rows */}
       {products.length > 0 ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {products.map((product) => (
+        <div className="space-y-6 max-h-[calc(100vh-300px)] overflow-y-auto custom-scrollbar pr-2">
+          {rows.map((row, rowIndex) => (
             <motion.div
-              key={product._id}
-              whileHover={{ y: -5 }}
-              className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all overflow-hidden group cursor-pointer"
+              key={rowIndex}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: rowIndex * 0.05 }}
+              className="grid grid-cols-1 lg:grid-cols-2 gap-6"
             >
-              {/* Product Image */}
-              <div className="relative h-48 overflow-hidden bg-gray-100">
-                <img
-                  src={product.images?.[0] || product.image || 'https://via.placeholder.com/300'}
-                  alt={product.name}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                  onError={(e) => {
-                    e.target.src = 'https://via.placeholder.com/300?text=No+Image';
-                  }}
-                />
-                
-                {/* Wishlist Button */}
-                <button className="absolute top-2 right-2 bg-white rounded-full p-2 shadow-md hover:bg-orange-50 transition-colors">
-                  <Heart className="h-4 w-4 text-gray-600" />
-                </button>
-
-                {/* Quick View */}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <button className="bg-white text-gray-800 px-4 py-2 rounded-lg font-medium flex items-center space-x-2">
-                    <Eye className="h-4 w-4" />
-                    <span>Quick View</span>
-                  </button>
+              {row.map((product) => (
+                <div key={product._id} className="w-full">
+                  <ProductCard product={product} listView={true} />
                 </div>
-              </div>
-
-              {/* Product Info */}
-              <div className="p-4">
-                <h3 className="font-semibold text-gray-800 mb-1 truncate">
-                  {product.name}
-                </h3>
-                
-                <div className="flex items-center mb-2">
-                  <div className="flex items-center text-yellow-400">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`h-3 w-3 ${
-                          i < (product.rating || 4) ? 'fill-current' : 'fill-none stroke-current'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-xs text-gray-500 ml-2">
-                    ({product.reviews || 0})
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-lg font-bold text-orange-600">
-                      ${product.price || '0.00'}
-                    </p>
-                    {product.originalPrice && (
-                      <p className="text-xs text-gray-400 line-through">
-                        ${product.originalPrice}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <button className="bg-orange-600 text-white p-2 rounded-lg hover:bg-orange-700 transition-colors">
-                    <ShoppingCart className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
+              ))}
             </motion.div>
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 bg-white rounded-xl shadow-lg">
-          <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-600 mb-2">No Products Found</h3>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center py-20 bg-white rounded-xl shadow-lg"
+        >
+          <Package className="h-20 w-20 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-2xl font-semibold text-gray-600 mb-2">No Products Found</h3>
           <p className="text-gray-500">This category doesn't have any products yet.</p>
-        </div>
+        </motion.div>
       )}
     </div>
   );
 };
 
 const FurnitureMarketplace = () => {
-  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
     fetchCategories();
@@ -780,123 +707,160 @@ const FurnitureMarketplace = () => {
   };
 
   const handleCategoryClick = (categoryId, categoryName) => {
+    setIsTransitioning(true);
     setSelectedCategory({ id: categoryId, name: categoryName });
     if (mobileMenuOpen) {
       setMobileMenuOpen(false);
     }
+    // Reset transition state after a short delay
+    setTimeout(() => setIsTransitioning(false), 100);
   };
 
   const handleBackToPosts = () => {
+    setIsTransitioning(true);
     setSelectedCategory(null);
+    // Reset transition state immediately
+    setTimeout(() => setIsTransitioning(false), 50);
   };
 
-  const renderStaticSidebar = () => {
+  const renderEnhancedSidebar = () => {
     if (loading) {
       return (
-        <div className="h-96 overflow-y-auto">
-          <div className="space-y-3">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white rounded-lg p-3 animate-pulse">
-                <div className="w-6 h-6 bg-gray-200 rounded mx-auto mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded mb-1"></div>
-                <div className="h-2 bg-gray-200 rounded w-2/3 mx-auto"></div>
+        <div className="space-y-2">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl p-3 animate-pulse">
+              <div className="flex items-center space-x-2">
+                <div className="w-10 h-10 bg-gray-200 rounded-lg"></div>
+                <div className="flex-1">
+                  <div className="h-3 bg-gray-200 rounded mb-1"></div>
+                  <div className="h-2 bg-gray-200 rounded w-2/3"></div>
+                </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       );
     }
 
     return (
-      <div className="h-96 overflow-y-auto pr-2 custom-scrollbar">
-        <div className="space-y-2">
-          {categories.map((category) => {
-            const IconComponent = category.icon;
-            return (
-              <motion.div 
-                key={category.id} 
-                onClick={() => handleCategoryClick(category.id, category.name)}
-                whileHover={{ x: 5 }}
-                className="bg-white rounded-lg p-3 text-center hover:bg-orange-50 hover:shadow-md transition-all cursor-pointer border border-gray-100"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="flex-shrink-0">
-                    <IconComponent size={20} className="text-orange-500" />
-                  </div>
-                  <div className="flex-grow text-left">
-                    <h4 className="text-sm font-medium text-gray-800">{category.name}</h4>
-                    <p className="text-xs text-gray-500">{category.productCount || 0} products</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-gray-400" />
+      <div className="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto custom-scrollbar pr-2">
+        {categories.map((category, index) => {
+          const IconComponent = category.icon;
+          return (
+            <motion.div 
+              key={category.id} 
+              onClick={() => handleCategoryClick(category.id, category.name)}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.05 }}
+              whileHover={{ x: 8, scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="bg-white rounded-xl p-3 hover:bg-gradient-to-r hover:from-orange-50 hover:to-orange-100 hover:shadow-lg transition-all cursor-pointer border-2 border-transparent hover:border-orange-300 group"
+            >
+              <div className="flex items-center space-x-3">
+                <motion.div 
+                  className="flex-shrink-0 p-2 bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg group-hover:from-orange-500 group-hover:to-orange-600 transition-all"
+                  whileHover={{ rotate: 360 }}
+                  transition={{ duration: 0.6 }}
+                >
+                  <IconComponent size={18} className="text-orange-600 group-hover:text-white transition-colors" />
+                </motion.div>
+                <div className="flex-grow">
+                  <h4 className="text-sm font-bold text-gray-800 group-hover:text-orange-600 transition-colors">
+                    {category.name}
+                  </h4>
+                  <p className="text-xs text-gray-500 group-hover:text-orange-500 transition-colors">
+                    {category.productCount || 0} products
+                  </p>
                 </div>
-              </motion.div>
-            );
-          })}
-        </div>
+                <motion.div
+                  whileHover={{ x: 5 }}
+                  className="flex-shrink-0"
+                >
+                  <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-orange-600 transition-colors" />
+                </motion.div>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
     );
   };
 
   return (
-    <div className="bg-gradient-to-br from-orange-50 to-gray-50 min-h-screen pb-20 md:pb-0">
+    <div className="bg-gradient-to-br from-orange-50 via-white to-gray-50 min-h-screen pb-20 md:pb-0">
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
-          width: 4px;
+          width: 6px;
+          height: 6px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
           background: #f1f1f1;
-          border-radius: 2px;
+          border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #fb923c;
-          border-radius: 2px;
+          background: linear-gradient(180deg, #fb923c, #f97316);
+          border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #f97316;
+          background: linear-gradient(180deg, #f97316, #ea580c);
         }
       `}</style>
       
       <div className="container mx-auto px-4 py-4 md:px-6 lg:px-8">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center space-x-3">
-            <Sofa size={24} className="text-orange-500" />
-            <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 text-transparent bg-clip-text">
-              FurniMart
-            </h1>
-          </div>
-
-          <div className="md:hidden">
-            <button 
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="hover:bg-orange-100 p-2 rounded-full transition"
-            >
-              {mobileMenuOpen ? <X size={24} className="text-gray-700" /> : <Menu size={24} className="text-gray-700" />}
-            </button>
-          </div>
+        {/* Mobile Menu Button */}
+        <div className="md:hidden flex justify-end mb-4">
+          <motion.button 
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 bg-white rounded-lg shadow-md hover:shadow-lg transition-all"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            {mobileMenuOpen ? <X size={20} className="text-gray-700" /> : <Menu size={20} className="text-gray-700" />}
+          </motion.button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-          {/* Static Sidebar */}
-          <div className="hidden md:block md:col-span-3">
-            <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 shadow-lg sticky top-4">
-              <h3 className="text-lg font-semibold mb-4 flex items-center text-gray-800">
-                <Grid className="h-5 w-5 mr-2 text-orange-500" />
-                Product Categories
-              </h3>
-              {renderStaticSidebar()}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          {/* Enhanced Static Sidebar */}
+          <motion.div 
+            initial={{ x: -50, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            className="hidden md:block md:col-span-4 lg:col-span-3"
+          >
+            <div className="bg-gradient-to-br from-white to-gray-50 backdrop-blur-sm rounded-2xl p-4 shadow-xl border border-gray-200 sticky top-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold flex items-center text-gray-800">
+                  <Grid className="h-4 w-4 mr-2 text-orange-500" />
+                  Categories
+                </h3>
+                <motion.div
+                  whileHover={{ rotate: 180 }}
+                  transition={{ duration: 0.3 }}
+                  className="p-1.5 bg-orange-100 rounded-lg cursor-pointer"
+                >
+                  <Filter className="h-3 w-3 text-orange-600" />
+                </motion.div>
+              </div>
+              {renderEnhancedSidebar()}
             </div>
-          </div>
+          </motion.div>
 
-          {/* Main Content */}
-          <div className="md:col-span-9">
+          {/* Main Content Area */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="md:col-span-8 lg:col-span-9"
+          >
             <AnimatePresence mode="wait">
               {selectedCategory ? (
                 <motion.div
                   key="category-products"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
                 >
                   <CategoryProducts 
                     categoryId={selectedCategory.id}
@@ -907,121 +871,134 @@ const FurnitureMarketplace = () => {
               ) : (
                 <motion.div
                   key="posts"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
                 >
                   <PostRequirements />
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
+          </motion.div>
         </div>
 
-        {/* Features Section */}
-        <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 text-center">
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="bg-white p-6 rounded-xl hover:bg-orange-50 transition-all flex flex-col items-center shadow-lg"
-          >
-            <div className="p-3 bg-indigo-100 rounded-full mb-4">
-              <ShieldCheck size={28} className="text-indigo-600" />
-            </div>
-            <h4 className="text-sm md:text-base text-gray-800 font-semibold mb-1">Guaranteed Quality</h4>
-            <p className="text-xs text-gray-500">Premium materials & craftsmanship</p>
-          </motion.div>
-          
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="bg-white p-6 rounded-xl hover:bg-orange-50 transition-all flex flex-col items-center shadow-lg"
-          >
-            <div className="p-3 bg-amber-100 rounded-full mb-4">
-              <Truck size={28} className="text-amber-600" />
-            </div>
-            <h4 className="text-sm md:text-base text-gray-800 font-semibold mb-1">Free Shipping</h4>
-            <p className="text-xs text-gray-500">On orders over $500</p>
-          </motion.div>
-          
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="bg-white p-6 rounded-xl hover:bg-orange-50 transition-all flex flex-col items-center shadow-lg"
-          >
-            <div className="p-3 bg-rose-100 rounded-full mb-4">
-              <Gift size={28} className="text-rose-600" />
-            </div>
-            <h4 className="text-sm md:text-base text-gray-800 font-semibold mb-1">Special Offers</h4>
-            <p className="text-xs text-gray-500">Exclusive deals & discounts</p>
-          </motion.div>
-          
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="bg-white p-6 rounded-xl hover:bg-orange-50 transition-all flex flex-col items-center shadow-lg"
-          >
-            <div className="p-3 bg-emerald-100 rounded-full mb-4">
-              <Tag size={28} className="text-emerald-600" />
-            </div>
-            <h4 className="text-sm md:text-base text-gray-800 font-semibold mb-1">Best Prices</h4>
-            <p className="text-xs text-gray-500">Competitive pricing guaranteed</p>
-          </motion.div>
-        </div>
+        {/* Enhanced Features Section */}
+        <motion.div 
+          initial={{ y: 50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4"
+        >
+          {[
+            { icon: ShieldCheck, title: "Guaranteed Quality", desc: "Premium materials", color: "indigo" },
+            { icon: Truck, title: "Free Shipping", desc: "On orders over $500", color: "amber" },
+            { icon: Gift, title: "Special Offers", desc: "Exclusive deals", color: "rose" },
+            { icon: Tag, title: "Best Prices", desc: "Competitive pricing", color: "emerald" }
+          ].map((feature, index) => {
+            const IconComponent = feature.icon;
+            return (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 + 0.5 }}
+                whileHover={{ y: -8, scale: 1.02 }}
+                className="bg-white p-4 rounded-2xl hover:shadow-2xl transition-all flex flex-col items-center text-center group cursor-pointer border-2 border-transparent hover:border-orange-200"
+              >
+                <motion.div 
+                  className={`p-3 bg-${feature.color}-100 rounded-2xl mb-3 group-hover:scale-110 transition-transform`}
+                  whileHover={{ rotate: [0, -10, 10, 0] }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <IconComponent size={24} className={`text-${feature.color}-600`} />
+                </motion.div>
+                <h4 className="text-xs md:text-sm text-gray-800 font-bold mb-1 group-hover:text-orange-600 transition-colors">
+                  {feature.title}
+                </h4>
+                <p className="text-xs text-gray-500">{feature.desc}</p>
+              </motion.div>
+            );
+          })}
+        </motion.div>
       </div>
 
-      {/* Mobile Categories Menu */}
-      {mobileMenuOpen && (
-        <motion.div 
-          initial={{ opacity: 0, x: '100%' }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: '100%' }}
-          className="fixed inset-0 bg-white z-50 overflow-y-auto md:hidden"
-        >
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-gray-800">Categories</h2>
-              <button 
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-gray-700 hover:bg-orange-100 p-2 rounded-full"
-              >
-                <X size={24} />
-              </button>
-            </div>
-            
-            <div className="space-y-3">
-              {categories.map((category) => {
-                const IconComponent = category.icon;
-                return (
-                  <motion.div 
-                    key={category.id} 
-                    onClick={() => handleCategoryClick(category.id, category.name)}
-                    whileHover={{ x: 5 }}
-                    className="bg-gray-50 rounded-lg p-4 hover:bg-orange-50 transition-all cursor-pointer border"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className="p-2 bg-orange-100 rounded-full">
-                        <IconComponent size={24} className="text-orange-500" />
+      {/* Enhanced Mobile Categories Menu */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0, x: '100%' }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: '100%' }}
+            transition={{ type: "spring", damping: 25 }}
+            className="fixed inset-0 bg-gradient-to-br from-white to-orange-50 z-50 overflow-y-auto md:hidden"
+          >
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">Categories</h2>
+                  <p className="text-sm text-gray-500 mt-1">Explore our collection</p>
+                </div>
+                <motion.button 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-3 bg-white rounded-lg shadow-md hover:shadow-lg"
+                  whileHover={{ scale: 1.1, rotate: 90 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <X size={24} className="text-gray-700" />
+                </motion.button>
+              </div>
+              
+              <div className="space-y-4">
+                {categories.map((category, index) => {
+                  const IconComponent = category.icon;
+                  return (
+                    <motion.div 
+                      key={category.id} 
+                      onClick={() => handleCategoryClick(category.id, category.name)}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      whileHover={{ x: 5 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="bg-white rounded-xl p-5 hover:bg-gradient-to-r hover:from-orange-50 hover:to-orange-100 transition-all cursor-pointer border-2 border-gray-100 hover:border-orange-300 shadow-md hover:shadow-xl"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <motion.div 
+                          className="p-3 bg-gradient-to-br from-orange-100 to-orange-200 rounded-xl"
+                          whileHover={{ rotate: 360 }}
+                          transition={{ duration: 0.6 }}
+                        >
+                          <IconComponent size={28} className="text-orange-600" />
+                        </motion.div>
+                        <div className="flex-grow">
+                          <h4 className="font-bold text-gray-800 text-lg">{category.name}</h4>
+                          <p className="text-sm text-gray-500">{category.productCount || 0} products</p>
+                        </div>
+                        <ChevronRight className="h-6 w-6 text-gray-400" />
                       </div>
-                      <div className="flex-grow">
-                        <h4 className="font-medium text-gray-800">{category.name}</h4>
-                        <p className="text-sm text-gray-500">{category.productCount || 0} products</p>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-gray-400" />
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-            
-            <div className="mt-8">
-              <button 
-                className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 rounded-xl shadow-md font-semibold"
-                onClick={() => setMobileMenuOpen(false)}
+                    </motion.div>
+                  );
+                })}
+              </div>
+              
+              <motion.div 
+                className="mt-8"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
               >
-                Close Menu
-              </button>
+                <button 
+                  className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-xl shadow-lg font-bold text-lg hover:shadow-xl transition-all"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Close Menu
+                </button>
+              </motion.div>
             </div>
-          </div>
-        </motion.div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

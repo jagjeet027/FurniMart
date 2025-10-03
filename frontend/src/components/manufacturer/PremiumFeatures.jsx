@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Check, X, TrendingUp, Users, Globe, ShoppingBag,
   Sidebar
 } from 'lucide-react';
-import api from '../../axios/axiosInstance'
+import { useAuth } from '../../contexts/AuthContext';
+import api from '../../axios/axiosInstance';
 
 const PremiumFeatures = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated, user, isLoading: authLoading } = useAuth();
+  
   const [error, setError] = useState(null);
   const [loadingStates, setLoadingStates] = useState({});
   const [manufacturerId, setManufacturerId] = useState(null);
@@ -52,15 +57,39 @@ const PremiumFeatures = () => {
     }
   ];
 
+  // Check authentication first
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      // Not authenticated, redirect to login
+      navigate('/login', { state: { from: '/premium-features' } });
+    }
+  }, [authLoading, isAuthenticated, navigate]);
+
+  // Check if user is a manufacturer
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && user && !user.isManufacturer) {
+      // User is not a manufacturer, redirect to manufacturer registration
+      setError('You need to be a registered manufacturer to access premium features.');
+      setTimeout(() => {
+        navigate('/manufacturer/register');
+      }, 2000);
+    }
+  }, [authLoading, isAuthenticated, user, navigate]);
+
   // Fetch manufacturer ID from backend
   useEffect(() => {
     const fetchManufacturerData = async () => {
+      // Don't fetch if not authenticated or not a manufacturer
+      if (!isAuthenticated || !user?.isManufacturer) {
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
         
-        // Use the existing manufacturer route instead of auth/profile
-        const { data } = await api.get('/manufacturers/me'); // Changed from '/auth/profile'
+        const { data } = await api.get('/manufacturers/me');
         
         if (data.success && data.data) {
           const manufacturerData = data.data;
@@ -80,6 +109,9 @@ const PremiumFeatures = () => {
         console.error('Failed to fetch manufacturer data:', error);
         if (error.response?.status === 404) {
           setError('Manufacturer profile not found. Please complete your manufacturer registration first.');
+          setTimeout(() => {
+            navigate('/manufacturer/register');
+          }, 2000);
         } else {
           setError(error.response?.data?.message || error.message || 'Failed to load manufacturer data');
         }
@@ -88,8 +120,10 @@ const PremiumFeatures = () => {
       }
     };
 
-    fetchManufacturerData();
-  }, []);
+    if (!authLoading) {
+      fetchManufacturerData();
+    }
+  }, [isAuthenticated, user, authLoading, navigate]);
 
   const loadRazorpay = () => {
     return new Promise((resolve) => {
@@ -198,7 +232,7 @@ const PremiumFeatures = () => {
     },
     {
       title: "Annual Premium",
-      price: "30000", // Removed comma for proper parsing
+      price: "30000",
       period: "One-time payment",
       highlight: "Best Value",
       features: [
@@ -210,14 +244,32 @@ const PremiumFeatures = () => {
     }
   ];
 
-  // Loading state
-  if (loading) {
+  // Show loading while checking auth
+  if (authLoading || loading) {
     return (
       <div className="max-w-7xl mx-auto p-6 lg:p-8">
         <div className="flex items-center justify-center min-h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading your profile...</p>
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  // Don't render if not a manufacturer (will redirect)
+  if (!user?.isManufacturer) {
+    return (
+      <div className="max-w-7xl mx-auto p-6 lg:p-8">
+        <div className="flex items-center justify-center min-h-64">
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">{error || 'Redirecting...'}</p>
           </div>
         </div>
       </div>
@@ -225,9 +277,9 @@ const PremiumFeatures = () => {
   }
 
   return (
-    
     <div className="max-w-7xl mx-auto p-6 lg:p-8 space-y-16">
       <Sidebar/>
+      
       {/* Features Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {features.map((feature, index) => {

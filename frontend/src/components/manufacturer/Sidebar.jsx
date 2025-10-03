@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { X, Menu, AlertCircle } from 'lucide-react';
+import { X, Menu, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   HomeIcon, BookOpen, BarChart2, Crown,
   User, Sofa as SofaIcon, Lightbulb
@@ -88,6 +88,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+  const [expandedSections, setExpandedSections] = useState({});
   
   // Idea submission modal state
   const [showIdeaModal, setShowIdeaModal] = useState(false);
@@ -99,13 +100,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   // Chat modal state
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  // Handle window resize to detect mobile/desktop view
+  // Handle window resize
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
-      
-      // Auto-close sidebar on mobile when resizing down
       if (mobile && sidebarOpen) {
         setSidebarOpen(false);
       }
@@ -123,6 +122,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
       }
   
       try {
+        const token = localStorage.getItem('accessToken');
         const response = await axios.get(`http://localhost:5000/api/manufacturers/${user._id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -141,72 +141,95 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     fetchManufacturerData();
   }, [isAuthenticated, user]);
 
-  const menuItems = [
-  { path: '/', icon: HomeIcon, label: 'Dashboard', badge: null },
-  { 
-    path: '/products', 
-    icon: SofaIcon, 
-    label: 'Inventory', 
-    badge: '15',
-    requiresManufacturer: true 
-  },
-  { 
-    path: '/order', 
-    icon: BookOpen, 
-    label: 'Orders', 
-    badge: 'New',
-    requiresManufacturer: true 
-  },
-  { 
-    path: '/analytics', 
-    icon: BarChart2, 
-    label: 'Analytics', 
-    badge: null,
-    requiresManufacturer: true 
-  },
-  // ADD THIS NEW MENU ITEM
-  { 
-    path: '/new-idea', 
-    icon: Lightbulb, 
-    label: 'Innovation Hub', 
-    badge: 'NEW',
-    requiresAuth: true // Available for both users and manufacturers
-  },
-  { 
-    path: '/ideas', 
-    icon: AlertCircle, 
-    label: 'Idea Submissions', 
-    badge: null,
-    requiresManufacturer: true 
-  },
-  {
-    path: '/premium',
-    icon: Crown,
-    label: 'Premium Features',
-    badge: 'PRO',
-    isPremium: true,
-    requiresManufacturer: true
-  },
-  { path: '/profile', icon: User, label: 'Profile', badge: null },
-  { 
-    path: '/chat', 
-    icon: MessageCircle, 
-    label: 'Chat Panel', 
-    badge: '3',
-    isChat: true,
-    onClick: () => setIsChatOpen(true)
-  },
-];
+  const menuSections = [
+    {
+      title: 'Main',
+      items: [
+        { path: '/', icon: HomeIcon, label: 'Dashboard', badge: null },
+      ]
+    },
+    {
+      title: 'Business',
+      collapsible: true,
+      items: [
+        { 
+          path: '/products', 
+          icon: SofaIcon, 
+          label: 'Inventory', 
+          badge: '15',
+          requiresManufacturer: true 
+        },
+        { 
+          path: '/order', 
+          icon: BookOpen, 
+          label: 'Orders', 
+          badge: 'New',
+          requiresManufacturer: true 
+        },
+        { 
+          path: '/analytics', 
+          icon: BarChart2, 
+          label: 'Analytics', 
+          badge: null,
+          requiresManufacturer: true 
+        },
+      ]
+    },
+    {
+      title: 'Innovation',
+      collapsible: true,
+      items: [
+        { 
+          path: '/new-idea', 
+          icon: Lightbulb, 
+          label: 'Innovation Hub', 
+          badge: 'NEW',
+          requiresAuth: true
+        },
+        { 
+          path: '/ideas', 
+          icon: AlertCircle, 
+          label: 'Idea Submissions', 
+          badge: null,
+          requiresManufacturer: true 
+        },
+      ]
+    },
+    {
+      title: 'Account',
+      items: [
+        {
+          path: '/premium',
+          icon: Crown,
+          label: 'Premium Features',
+          badge: 'PRO',
+          isPremium: true,
+          requiresManufacturer: true
+        },
+        { path: '/profile', icon: User, label: 'Profile', badge: null },
+        { 
+          path: '/chat', 
+          icon: MessageCircle, 
+          label: 'Chat Panel', 
+          badge: '3',
+          isChat: true,
+          onClick: () => setIsChatOpen(true)
+        },
+      ]
+    }
+  ];
 
+  const toggleSection = (title) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [title]: !prev[title]
+    }));
+  };
 
   const handleNavigation = (path, item) => {
-    console.log('Navigation clicked:', { path, item }); // Debug log
-    
     if (item && item.onClick) {
-      console.log('Executing onClick handler');
       item.onClick();
     } else {
-      console.log('Normal navigation to:', path);
       navigate(path);
       if (isMobile) {
         setSidebarOpen(false);
@@ -223,7 +246,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     }
   };
 
-  // Handle idea submission - Fixed to match controller
   const handleIdeaSubmit = async (e) => {
     e.preventDefault();
     if (!ideaName.trim()) {
@@ -240,7 +262,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         category: ideaCategory,
       };
 
-      // Use the correct API endpoint matching your controller
       await axios.post('http://localhost:5000/api/issues', ideaData, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -261,13 +282,9 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     }
   };
 
-  const filteredMenuItems = menuItems.filter(item => 
-    !item.requiresManufacturer || (user && user.isManufacturer)
-  );
-  
   const sidebarWidthClass = isMobile
     ? sidebarOpen ? 'w-64' : 'w-0'
-    : sidebarOpen ? 'w-64' : 'w-20';
+    : sidebarOpen ? 'w-64' : 'w-16';
 
   return (
     <>
@@ -278,22 +295,27 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         />
       )}
       
-      {/* Idea Submission Modal - Fixed to match controller */}
+      {/* Idea Submission Modal */}
       {showIdeaModal && (
-        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-6">
-          <div className="bg-white rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Submit New Idea</h3>
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-100 rounded-lg">
+                  <Lightbulb className="w-5 h-5 text-amber-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Submit New Idea</h3>
+              </div>
               <button
                 onClick={() => setShowIdeaModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             
-            <form onSubmit={handleIdeaSubmit}>
-              <div className="mb-4">
+            <form onSubmit={handleIdeaSubmit} className="space-y-4">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Idea Name *
                 </label>
@@ -301,21 +323,21 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                   type="text"
                   value={ideaName}
                   onChange={(e) => setIdeaName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                  placeholder="e.g: Smart Furniture Design, New Product Concept, etc."
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all"
+                  placeholder="e.g: Smart Furniture Design"
                   required
                   maxLength={200}
                 />
               </div>
 
-              <div className="mb-4">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Category
                 </label>
                 <select
                   value={ideaCategory}
                   onChange={(e) => setIdeaCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all"
                 >
                   <option value="technical">Technical Innovation</option>
                   <option value="billing">Business Model</option>
@@ -326,32 +348,33 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </select>
               </div>
               
-              <div className="mb-6">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Idea Details (Optional)
                 </label>
                 <textarea
                   value={ideaDescription}
                   onChange={(e) => setIdeaDescription(e.target.value)}
-                  rows={3}
+                  rows={4}
                   maxLength={1000}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all resize-none"
                   placeholder="Please describe your idea in detail..."
                 />
+                <p className="text-xs text-gray-500 mt-1">{ideaDescription.length}/1000 characters</p>
               </div>
               
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowIdeaModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingIdea}
-                  className="flex-1 px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                 >
                   {isSubmittingIdea ? 'Submitting...' : 'Submit Idea'}
                 </button>
@@ -363,95 +386,162 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
 
       <aside className={`
         fixed inset-y-0 left-0 z-50 flex flex-col
-        bg-gradient-to-br from-amber-800 via-amber-700 to-amber-600
+        bg-gradient-to-br from-amber-900 via-amber-800 to-amber-700
         transition-all duration-300 ease-in-out
         ${isMobile ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'}
         ${sidebarWidthClass}
-        overflow-hidden
+        overflow-hidden shadow-xl
       `}>
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-amber-600/50">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="p-2 bg-amber-100 rounded-lg flex-shrink-0">
-              <SofaIcon className="h-6 w-6 text-amber-800" />
+        <div className="flex items-center justify-between p-3 border-b border-amber-600/30 bg-gradient-to-r from-amber-900/50 to-transparent">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <div className="p-2 bg-gradient-to-br from-amber-100 to-amber-200 rounded-xl shadow-lg flex-shrink-0">
+              <SofaIcon className="h-5 w-5 text-amber-800" />
             </div>
-            <span className={`text-white font-bold text-xl whitespace-nowrap transition-opacity duration-200 ${sidebarOpen || !isMobile ? 'opacity-100' : 'opacity-0'}`}>
-              {loading ? 'Loading...' : (user?.isManufacturer ? manufacturerData?.businessName : 'FurniMart')}
-            </span>
+            <div className={`transition-all duration-200 ${sidebarOpen || !isMobile ? 'opacity-100 w-auto' : 'opacity-0 w-0'} overflow-hidden`}>
+              <h1 className="text-white font-bold text-base whitespace-nowrap leading-tight">
+                {loading ? 'Loading...' : (user?.isManufacturer ? manufacturerData?.businessName : 'FurniMart')}
+              </h1>
+              <p className="text-amber-200 text-[10px] whitespace-nowrap">Premium Dashboard</p>
+            </div>
           </div>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-lg hover:bg-white/10 text-white transition-colors"
-          >
-            <X size={20} />
-          </button>
+          {(sidebarOpen || !isMobile) && (
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-1.5 rounded-lg hover:bg-white/10 text-white transition-colors flex-shrink-0"
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-2 overflow-y-auto scrollbar-thin">
-          {filteredMenuItems.map((item) => (
-            <button
-              key={item.path}
-              onClick={() => handleNavigation(item.path, item)} // ⭐ FIXED: Item parameter pass kiya
-              className={`
-                flex items-center w-full px-4 py-3 my-1 mx-1 rounded-lg
-                transition-all duration-200
-                ${location.pathname === item.path ? 'bg-white/20' : ''}
-                ${item.isPremium ? 'bg-amber-900/30 my-2 font-bold text-amber-100' : 'text-amber-100 hover:bg-white/10'}
-                ${item.isChat ? 'bg-white/10 border border-white/20' : ''}
-              `}
-            >
-              <item.icon size={20} className="flex-shrink-0" />
-              <span className={`ml-3 text-sm ${item.isPremium ? 'font-bold' : 'font-medium'} whitespace-nowrap transition-opacity duration-200 ${sidebarOpen || !isMobile ? 'opacity-100' : 'opacity-0 w-0'}`}>
-                {item.label}
-              </span>
-              {item.badge && (sidebarOpen || !isMobile) && (
-                <span className={`
-                  ml-auto px-2 py-1 text-xs rounded-full whitespace-nowrap
-                  ${item.isPremium ? 'bg-amber-300 text-amber-900' : ''}
-                  ${item.isChat ? 'bg-blue-200 text-blue-800' : 'bg-amber-200 text-amber-800'}
-                  transition-opacity duration-200 ${sidebarOpen || !isMobile ? 'opacity-100' : 'opacity-0 w-0'}
-                `}>
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          ))}
+        <nav className="flex-1 py-3 overflow-y-auto scrollbar-thin scrollbar-thumb-amber-600 scrollbar-track-transparent">
+          {menuSections.map((section) => {
+            const filteredItems = section.items.filter(item => 
+              !item.requiresManufacturer || (user && user.isManufacturer)
+            );
+            
+            if (filteredItems.length === 0) return null;
+            
+            const isExpanded = section.collapsible ? expandedSections[section.title] !== false : true;
+            
+            return (
+              <div key={section.title} className="mb-1">
+                {/* Section Header */}
+                {(sidebarOpen || !isMobile) && (
+                  <div 
+                    className={`px-4 py-2 flex items-center justify-between ${
+                      section.collapsible ? 'cursor-pointer hover:bg-white/5' : ''
+                    }`}
+                    onClick={() => section.collapsible && toggleSection(section.title)}
+                  >
+                    <span className="text-amber-300 text-[10px] font-bold uppercase tracking-wider">
+                      {section.title}
+                    </span>
+                    {section.collapsible && (
+                      isExpanded ? <ChevronDown size={12} className="text-amber-300" /> : <ChevronRight size={12} className="text-amber-300" />
+                    )}
+                  </div>
+                )}
+                
+                {/* Section Items */}
+                {isExpanded && (
+                  <div className="space-y-0.5 px-2">
+                    {filteredItems.map((item) => (
+                      <button
+                        key={item.path}
+                        onClick={() => handleNavigation(item.path, item)}
+                        className={`
+                          group flex items-center w-full px-3 py-2.5 rounded-lg
+                          transition-all duration-200 relative overflow-hidden
+                          ${location.pathname === item.path 
+                            ? 'bg-white/20 shadow-md' 
+                            : 'hover:bg-white/10'}
+                          ${item.isPremium ? 'bg-gradient-to-r from-amber-900/40 to-amber-800/40 border border-amber-500/30' : ''}
+                          ${item.isChat ? 'bg-blue-500/10 border border-blue-400/20' : ''}
+                        `}
+                      >
+                        <div className={`
+                          flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0
+                          ${location.pathname === item.path ? 'bg-white/10' : 'bg-white/5'}
+                          ${item.isPremium ? 'bg-amber-500/20' : ''}
+                          ${item.isChat ? 'bg-blue-500/20' : ''}
+                          transition-all duration-200
+                        `}>
+                          <item.icon size={16} className={`
+                            ${location.pathname === item.path ? 'text-white' : 'text-amber-100'}
+                            ${item.isPremium ? 'text-amber-200' : ''}
+                            ${item.isChat ? 'text-blue-200' : ''}
+                          `} />
+                        </div>
+                        
+                        <span className={`
+                          ml-3 text-xs font-medium whitespace-nowrap
+                          ${location.pathname === item.path ? 'text-white font-semibold' : 'text-amber-50'}
+                          ${item.isPremium ? 'text-amber-100 font-semibold' : ''}
+                          transition-all duration-200
+                          ${sidebarOpen || !isMobile ? 'opacity-100' : 'opacity-0 w-0'}
+                        `}>
+                          {item.label}
+                        </span>
+                        
+                        {item.badge && (sidebarOpen || !isMobile) && (
+                          <span className={`
+                            ml-auto px-2 py-0.5 text-[10px] font-bold rounded-full whitespace-nowrap
+                            ${item.isPremium ? 'bg-amber-300 text-amber-900' : ''}
+                            ${item.isChat ? 'bg-blue-400 text-blue-900' : 'bg-amber-200 text-amber-800'}
+                            transition-all duration-200 shadow-sm
+                          `}>
+                            {item.badge}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
-          {/* Quick Idea Submission Button - Only for manufacturers */}
-          {user?.isManufacturer && (
-            <button
-              onClick={() => setShowIdeaModal(true)}
-              className="flex items-center w-full px-4 py-3 my-2 mx-1 rounded-lg text-amber-100 hover:bg-blue-500/20 transition-all duration-200 border border-blue-400/30"
-            >
-              <AlertCircle size={20} className="flex-shrink-0 text-blue-300" />
-              <span className={`ml-3 text-sm font-medium whitespace-nowrap transition-opacity duration-200 ${sidebarOpen || !isMobile ? 'opacity-100' : 'opacity-0 w-0'}`}>
-                Submit Idea
-              </span>
-            </button>
+          {/* Quick Action Button */}
+          {user?.isManufacturer && (sidebarOpen || !isMobile) && (
+            <div className="px-2 mt-4">
+              <button
+                onClick={() => setShowIdeaModal(true)}
+                className="flex items-center justify-center w-full px-3 py-2.5 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl group"
+              >
+                <Lightbulb size={16} className="flex-shrink-0 group-hover:scale-110 transition-transform" />
+                <span className="ml-2 text-xs font-semibold">Submit New Idea</span>
+              </button>
+            </div>
           )}
         </nav>
 
-        {/* User profile section */}
-        <div className="border-t border-amber-600/50 p-4">
+        {/* User Profile Section */}
+        <div className="border-t border-amber-600/30 p-3 bg-gradient-to-t from-amber-900/50 to-transparent">
           {loading ? (
             <div className="flex items-center justify-center">
-              <div className="animate-pulse w-full h-12 bg-amber-600/20 rounded-lg" />
+              <div className="animate-pulse w-full h-14 bg-amber-600/20 rounded-xl" />
             </div>
           ) : isAuthenticated && user ? (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-3 rounded-lg p-2 hover:bg-white/10 transition-colors">
-                <img
-                  src="/api/placeholder/40/40"
-                  alt="Profile"
-                  className="w-10 h-10 rounded-full ring-2 ring-amber-200 flex-shrink-0"
-                />
+            <div className="space-y-2">
+              <div className="flex items-center gap-2.5 rounded-xl p-2 hover:bg-white/5 transition-colors cursor-pointer group">
+                <div className="relative flex-shrink-0">
+                  <img
+                    src="/api/placeholder/40/40"
+                    alt="Profile"
+                    className="w-9 h-9 rounded-xl ring-2 ring-amber-300/50 group-hover:ring-amber-300 transition-all"
+                  />
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-amber-900"></div>
+                </div>
                 {(sidebarOpen || !isMobile) && (
-                  <div className="flex-1 min-w-0 overflow-hidden">
-                    <h4 className="text-white font-medium text-sm truncate">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-white font-semibold text-xs truncate">
                       {user.name || user.email}
                     </h4>
-                    <p className="text-amber-200 text-xs truncate">
+                    <p className="text-amber-200 text-[10px] truncate flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-amber-300 rounded-full"></span>
                       {user.isManufacturer ? 'Manufacturer' : 'Customer'}
                     </p>
                   </div>
@@ -459,27 +549,39 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
               </div>
               <button
                 onClick={handleLogout}
-                className={`w-full px-4 py-2 text-sm text-white bg-amber-900/30 rounded-lg hover:bg-amber-900/50 transition-colors ${!sidebarOpen && !isMobile ? 'flex justify-center' : ''}`}
+                className={`
+                  w-full px-3 py-2 text-xs font-medium text-white 
+                  bg-gradient-to-r from-red-600 to-red-700 
+                  rounded-lg hover:from-red-700 hover:to-red-800 
+                  transition-all duration-200 shadow-md hover:shadow-lg
+                  ${!sidebarOpen && !isMobile ? 'flex justify-center' : ''}
+                `}
               >
-                {(sidebarOpen || !isMobile) ? 'Logout' : <X size={16} />}
+                {(sidebarOpen || !isMobile) ? 'Logout' : <X size={14} />}
               </button>
             </div>
           ) : (
             <button
               onClick={() => navigate('/login')}
-              className={`w-full px-4 py-2 text-sm text-white bg-amber-900/30 rounded-lg hover:bg-amber-900/50 transition-colors ${!sidebarOpen && !isMobile ? 'flex justify-center' : ''}`}
+              className={`
+                w-full px-3 py-2 text-xs font-medium text-white 
+                bg-gradient-to-r from-amber-600 to-amber-700 
+                rounded-lg hover:from-amber-700 hover:to-amber-800 
+                transition-all duration-200 shadow-md hover:shadow-lg
+                ${!sidebarOpen && !isMobile ? 'flex justify-center' : ''}
+              `}
             >
-              {(sidebarOpen || !isMobile) ? 'Login' : <User size={16} />}
+              {(sidebarOpen || !isMobile) ? 'Login' : <User size={14} />}
             </button>
           )}
         </div>
       </aside>
 
-      {/* Mobile toggle button */}
+      {/* Mobile Toggle Button */}
       {isMobile && !sidebarOpen && (
         <button
           onClick={() => setSidebarOpen(true)}
-          className="fixed bottom-6 right-6 z-50 p-4 bg-amber-600 text-white rounded-full shadow-lg hover:bg-amber-700 transition-colors"
+          className="fixed bottom-6 left-6 z-50 p-4 bg-gradient-to-br from-amber-600 to-amber-700 text-white rounded-2xl shadow-2xl hover:shadow-amber-500/50 hover:scale-110 transition-all duration-200"
         >
           <Menu size={24} />
         </button>

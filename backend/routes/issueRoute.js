@@ -9,21 +9,20 @@ import {
   addComment,
   getIssueStats
 } from '../controllers/issueController.js';
-import adminAuth from '../middleware/adminAuth.js'; 
+import adminAuth from '../middleware/adminAuth.js';
+import manufacturerAuth from '../middleware/manufacturerAuth.js'; // Ye middleware chahiye
 
 const router = express.Router();
 
-router.use(adminAuth);
-router.get('/stats', getIssueStats);
+// Manufacturer apne ideas submit kar sakta hai
+router.post('/', manufacturerAuth, createIssue);
 
-// CRUD routes
-router.get('/', getAllIssues);           
-router.post('/', createIssue);          
-router.get('/:id', getIssueById);      
-router.put('/:id', updateIssue);        
-router.delete('/:id', deleteIssue);     
-
-// Comments route
-router.post('/:id/comments', addComment); 
+// Admin sabhi issues dekh sakta hai aur manage kar sakta hai
+router.get('/stats', adminAuth, getIssueStats);
+router.get('/', adminAuth, getAllIssues);
+router.get('/:id', adminAuth, getIssueById);
+router.put('/:id', adminAuth, updateIssue);
+router.delete('/:id', adminAuth, deleteIssue);
+router.post('/:id/comments', adminAuth, addComment);
 
 export default router;
