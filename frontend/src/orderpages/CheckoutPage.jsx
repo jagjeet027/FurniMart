@@ -25,7 +25,7 @@ import {
   Package,
   MessageCircle
 } from 'lucide-react';
-import ChatModal from './ChatModal'; // Import the ChatModal component
+import ChatModal from '../components/userDashBoard/UserChatModal'; // Import the ChatModal component
 
 const CheckoutPage = () => {
   const location = useLocation();

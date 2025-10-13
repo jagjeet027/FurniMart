@@ -22,8 +22,8 @@ const JobDetailsModal = ({ job, isOpen, onClose }) => {
   const navigate = useNavigate();
 
   const handleApplyNow = () => {
-    onClose(); // Close the modal first
-    navigate(`/jobs/${job._id}/apply`); // Navigate to application form
+    onClose();
+    navigate(`/jobs/${job._id}/apply`);
   };
 
   const formatSalary = (salary) => {
@@ -45,15 +45,15 @@ const JobDetailsModal = ({ job, isOpen, onClose }) => {
 
   const getUrgencyBadge = (urgency) => {
     const urgencyStyles = {
-      'Urgent': 'bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-lg shadow-red-500/25',
-      'Hot': 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white shadow-lg shadow-orange-500/25',
-      'New': 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/25',
-      'High': 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-lg shadow-purple-500/25'
+      'Urgent': 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md',
+      'Hot': 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md',
+      'New': 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md',
+      'High': 'bg-gradient-to-r from-purple-500 to-violet-500 text-white shadow-md'
     };
     
     if (urgency && urgencyStyles[urgency]) {
       return (
-        <div className={`inline-flex items-center px-3 py-1 text-xs font-bold rounded-full border ${urgencyStyles[urgency]} animate-pulse`}>
+        <div className={`inline-flex items-center px-2.5 py-1 text-xs font-bold rounded-full ${urgencyStyles[urgency]} animate-pulse`}>
           <Zap className="w-3 h-3 mr-1" />
           {urgency}
         </div>
@@ -68,7 +68,6 @@ const JobDetailsModal = ({ job, isOpen, onClose }) => {
     }
   };
 
-  // Handle escape key
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape') {
@@ -87,26 +86,25 @@ const JobDetailsModal = ({ job, isOpen, onClose }) => {
     };
   }, [isOpen, onClose]);
 
-  // Add custom CSS styles
   useEffect(() => {
     const styleElement = document.createElement('style');
     styleElement.textContent = `
       .custom-scrollbar::-webkit-scrollbar {
-        width: 8px;
+        width: 6px;
       }
       
       .custom-scrollbar::-webkit-scrollbar-track {
-        background: #1e293b;
-        border-radius: 4px;
+        background: #fef3e2;
+        border-radius: 3px;
       }
       
       .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: #475569;
-        border-radius: 4px;
+        background: #d4a373;
+        border-radius: 3px;
       }
       
       .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #64748b;
+        background: #c08552;
       }
 
       @keyframes fade-in {
@@ -147,86 +145,81 @@ const JobDetailsModal = ({ job, isOpen, onClose }) => {
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in p-2 sm:p-4"
       onClick={handleBackdropClick}
     >
-      <div className="relative w-full max-w-5xl max-h-[90vh] mx-4 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl border border-slate-700 shadow-2xl animate-scale-in overflow-hidden">
+      <div className="relative w-full max-w-4xl max-h-[95vh] bg-gradient-to-br from-amber-50 via-orange-50 to-amber-50 rounded-xl sm:rounded-2xl border-2 border-amber-200 shadow-2xl animate-scale-in overflow-hidden">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white rounded-full transition-all duration-300 backdrop-blur-sm"
+          className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 p-1.5 sm:p-2 bg-white/90 hover:bg-amber-100 text-amber-800 hover:text-amber-900 rounded-full transition-all duration-300 shadow-md"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
 
         {/* Scrollable Content */}
-        <div className="overflow-y-auto max-h-[90vh] custom-scrollbar">
+        <div className="overflow-y-auto max-h-[95vh] custom-scrollbar">
           {/* Header Section */}
-          <div className="relative p-8 bg-gradient-to-r from-cyan-900/30 to-purple-900/30 border-b border-slate-700">
-            <div className="absolute inset-0 opacity-10">
-              <div className="absolute top-0 left-1/4 w-32 h-32 bg-cyan-500 rounded-full blur-2xl"></div>
-              <div className="absolute bottom-0 right-1/4 w-32 h-32 bg-purple-500 rounded-full blur-2xl"></div>
-            </div>
-
+          <div className="relative p-4 sm:p-6 lg:p-8 bg-gradient-to-r from-amber-100 to-orange-100 border-b-2 border-amber-200">
             <div className="relative">
               {/* Job Title and Apply Button Row */}
-              <div className="flex items-start justify-between mb-6">
-                <div className="flex-1">
-                  <div className="flex items-center gap-4 mb-4">
-                    <h1 className="text-3xl font-bold text-white">{job.title}</h1>
+              <div className="flex flex-col lg:flex-row items-start justify-between gap-4 mb-4">
+                <div className="flex-1 w-full">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3">
+                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-amber-900">{job.title}</h1>
                     {getUrgencyBadge(job.urgency)}
                   </div>
                   
                   {/* Company/Department Info */}
-                  <div className="flex flex-wrap items-center gap-6 text-slate-300">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-3 sm:gap-4 text-amber-800 text-sm">
                     <div className="flex items-center gap-2">
-                      <Building2 className="w-5 h-5 text-cyan-400" />
-                      <span className="font-medium">{job.department}</span>
+                      <Building2 className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                      <span className="font-medium truncate">{job.department}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <MapPin className="w-5 h-5 text-green-400" />
-                      <span>{job.location}</span>
+                      <MapPin className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span className="truncate">{job.location}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Clock className="w-5 h-5 text-blue-400" />
-                      <span>{job.type || job.jobType}</span>
+                      <Clock className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                      <span className="truncate">{job.type || job.jobType}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <DollarSign className="w-5 h-5 text-yellow-400" />
-                      <span className="font-semibold text-green-400">{formatSalary(job.salary)}</span>
+                      <DollarSign className="w-4 h-4 text-green-600 flex-shrink-0" />
+                      <span className="font-semibold text-green-700 truncate">{formatSalary(job.salary)}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Apply Button */}
-                <div className="ml-8">
+                <div className="w-full lg:w-auto lg:ml-4">
                   <button
                     onClick={handleApplyNow}
-                    className="group relative px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-bold text-lg transition-all duration-300 hover:from-cyan-600 hover:to-blue-700 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1"
+                    className="group relative w-full lg:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg sm:rounded-xl font-bold text-base sm:text-lg transition-all duration-300 hover:from-amber-600 hover:to-orange-700 hover:shadow-xl hover:shadow-amber-500/30 transform hover:-translate-y-0.5"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center gap-2">
                       <span>Apply Now</span>
-                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                      <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
                     </div>
                   </button>
                 </div>
               </div>
 
               {/* Job Meta Info */}
-              <div className="flex flex-wrap items-center gap-6 text-sm text-slate-400">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-amber-700">
                 {(job.postedDate || job.createdAt) && (
                   <div className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
+                    <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
                     <span>Posted {new Date(job.postedDate || job.createdAt).toLocaleDateString()}</span>
                   </div>
                 )}
                 <div className="flex items-center gap-1">
-                  <User className="w-4 h-4" />
+                  <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
                   <span>{job.experience || job.experienceLevel}</span>
                 </div>
                 {job.applicationsCount !== undefined && (
                   <div className="flex items-center gap-1">
-                    <Users className="w-4 h-4" />
+                    <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
                     <span>{job.applicationsCount} Applied</span>
                   </div>
                 )}
@@ -235,34 +228,32 @@ const JobDetailsModal = ({ job, isOpen, onClose }) => {
           </div>
 
           {/* Content Section */}
-          <div className="p-8">
-            <div className="max-w-4xl mx-auto space-y-8">
+          <div className="p-4 sm:p-6 lg:p-8">
+            <div className="max-w-4xl mx-auto space-y-6">
               {/* Job Description */}
               <div>
-                <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-                  <Briefcase className="w-6 h-6 text-cyan-400" />
+                <h2 className="text-lg sm:text-xl font-bold text-amber-900 mb-3 flex items-center gap-2">
+                  <Briefcase className="w-5 h-5 text-amber-600 flex-shrink-0" />
                   Job Description
                 </h2>
-                <div className="prose prose-invert max-w-none">
-                  <p className="text-slate-300 leading-relaxed text-lg">
-                    {job.description}
-                  </p>
-                </div>
+                <p className="text-amber-800 leading-relaxed text-sm sm:text-base">
+                  {job.description}
+                </p>
               </div>
 
               {/* Two Column Layout for Requirements and Responsibilities */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Requirements */}
                 {job.requirements && job.requirements.length > 0 && (
                   <div>
-                    <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                      <CheckCircle className="w-5 h-5 text-green-400" />
+                    <h2 className="text-base sm:text-lg font-bold text-amber-900 mb-3 flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
                       Requirements
                     </h2>
-                    <ul className="space-y-3">
+                    <ul className="space-y-2">
                       {job.requirements.map((req, index) => (
-                        <li key={index} className="flex items-start gap-3 text-slate-300">
-                          <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
+                        <li key={index} className="flex items-start gap-2 text-amber-800 text-sm">
+                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
                           <span>{req}</span>
                         </li>
                       ))}
@@ -273,14 +264,14 @@ const JobDetailsModal = ({ job, isOpen, onClose }) => {
                 {/* Responsibilities */}
                 {job.responsibilities && job.responsibilities.length > 0 && (
                   <div>
-                    <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                      <Target className="w-5 h-5 text-purple-400" />
+                    <h2 className="text-base sm:text-lg font-bold text-amber-900 mb-3 flex items-center gap-2">
+                      <Target className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 flex-shrink-0" />
                       Key Responsibilities
                     </h2>
-                    <ul className="space-y-3">
+                    <ul className="space-y-2">
                       {job.responsibilities.map((resp, index) => (
-                        <li key={index} className="flex items-start gap-3 text-slate-300">
-                          <div className="w-2 h-2 bg-purple-400 rounded-full mt-2 flex-shrink-0"></div>
+                        <li key={index} className="flex items-start gap-2 text-amber-800 text-sm">
+                          <div className="w-1.5 h-1.5 bg-purple-500 rounded-full mt-2 flex-shrink-0"></div>
                           <span>{resp}</span>
                         </li>
                       ))}
@@ -292,15 +283,15 @@ const JobDetailsModal = ({ job, isOpen, onClose }) => {
               {/* Benefits */}
               {job.benefits && job.benefits.length > 0 && (
                 <div>
-                  <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                    <Award className="w-5 h-5 text-yellow-400" />
+                  <h2 className="text-base sm:text-lg font-bold text-amber-900 mb-4 flex items-center gap-2">
+                    <Award className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 flex-shrink-0" />
                     Benefits & Perks
                   </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {job.benefits.map((benefit, index) => (
-                      <div key={index} className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700 hover:border-yellow-400/50 transition-colors">
-                        <Star className="w-4 h-4 text-yellow-400 flex-shrink-0" />
-                        <span className="text-slate-300">{benefit}</span>
+                      <div key={index} className="flex items-center gap-2 p-3 bg-white rounded-lg border border-amber-200 hover:border-yellow-400 transition-colors">
+                        <Star className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+                        <span className="text-amber-800 text-sm">{benefit}</span>
                       </div>
                     ))}
                   </div>
@@ -310,12 +301,12 @@ const JobDetailsModal = ({ job, isOpen, onClose }) => {
               {/* Skills/Tags */}
               {job.tags && job.tags.length > 0 && (
                 <div>
-                  <h2 className="text-xl font-bold text-white mb-6">Skills & Technologies</h2>
-                  <div className="flex flex-wrap gap-3">
+                  <h2 className="text-base sm:text-lg font-bold text-amber-900 mb-4">Skills & Technologies</h2>
+                  <div className="flex flex-wrap gap-2">
                     {job.tags.map((tag, index) => (
                       <span 
                         key={index}
-                        className="px-4 py-2 bg-gradient-to-r from-slate-700 to-slate-800 text-cyan-300 rounded-full border border-slate-600 hover:border-cyan-400 transition-colors text-sm font-medium"
+                        className="px-3 py-1.5 bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 rounded-full border border-amber-300 hover:border-amber-400 transition-colors text-xs sm:text-sm font-medium"
                       >
                         {tag}
                       </span>
@@ -325,18 +316,18 @@ const JobDetailsModal = ({ job, isOpen, onClose }) => {
               )}
 
               {/* Bottom Apply Section */}
-              <div className="bg-gradient-to-r from-cyan-900/20 to-blue-900/20 p-8 rounded-2xl border border-cyan-500/30 text-center">
-                <h3 className="text-2xl font-bold text-white mb-4">Interested in this position?</h3>
-                <p className="text-slate-300 mb-6 max-w-2xl mx-auto">
-                  Take the next step in your career journey. Submit your application and join our growing team.
+              <div className="bg-gradient-to-r from-amber-100 to-orange-100 p-6 sm:p-8 rounded-xl sm:rounded-2xl border-2 border-amber-300 text-center">
+                <h3 className="text-lg sm:text-xl font-bold text-amber-900 mb-3">Interested in this position?</h3>
+                <p className="text-amber-800 mb-5 text-sm sm:text-base max-w-2xl mx-auto">
+                  Take the next step in your career journey. Submit your application today.
                 </p>
                 
                 <button
                   onClick={handleApplyNow}
-                  className="inline-flex items-center gap-3 px-10 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-bold text-lg transition-all duration-300 hover:from-cyan-600 hover:to-blue-700 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1"
+                  className="inline-flex items-center gap-2 px-8 py-3 sm:px-10 sm:py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg sm:rounded-xl font-bold text-base sm:text-lg transition-all duration-300 hover:from-amber-600 hover:to-orange-700 hover:shadow-xl hover:shadow-amber-500/30 transform hover:-translate-y-0.5"
                 >
                   <span>Submit Application</span>
-                  <ArrowRight className="w-6 h-6" />
+                  <ArrowRight className="w-5 h-5" />
                 </button>
               </div>
             </div>

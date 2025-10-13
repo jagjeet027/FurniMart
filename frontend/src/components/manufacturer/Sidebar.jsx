@@ -1,84 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { X, Menu, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { X, Menu, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   HomeIcon, BookOpen, BarChart2, Crown,
-  User, Sofa as SofaIcon, Lightbulb
+  User, Sofa as SofaIcon, Lightbulb, MessageCircle
 } from 'lucide-react';
-import { MessageCircle, Minimize2, Maximize2 } from 'lucide-react';
-import ManufacturerChat from '../manufacturer/ManufacturerChat';
 import { useAuth } from '../../contexts/AuthContext';
-
-const ChatModal = ({ isOpen, onClose, manufacturerId }) => {
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  if (!isOpen) return null;
-
-  return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50 z-[100]" onClick={onClose} />
-      
-      {/* Modal */}
-      <div className={`fixed z-[101] transition-all duration-300 ${
-        isFullscreen 
-          ? 'inset-0' 
-          : isMinimized 
-            ? 'bottom-4 right-4 w-80 h-16'
-            : 'top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90vw] h-[80vh] max-w-6xl'
-      }`}>
-        <div className="bg-white rounded-lg shadow-2xl h-full flex flex-col overflow-hidden">
-          {/* Header */}
-          <div className="bg-blue-600 text-white p-4 flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <MessageCircle className="w-6 h-6" />
-              <div>
-                <h3 className="font-semibold">
-                  {isMinimized ? 'Chat' : 'Manufacturer Chat Panel'}
-                </h3>
-                {!isMinimized && (
-                  <p className="text-blue-100 text-sm">Manage your conversations</p>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setIsMinimized(!isMinimized)}
-                className="p-2 hover:bg-blue-700 rounded-lg transition-colors"
-                title={isMinimized ? "Expand" : "Minimize"}
-              >
-                <Minimize2 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setIsFullscreen(!isFullscreen)}
-                className="p-2 hover:bg-blue-700 rounded-lg transition-colors"
-                title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-              >
-                <Maximize2 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-blue-700 rounded-lg transition-colors"
-                title="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Chat Content */}
-          {!isMinimized && (
-            <div className="flex-1 overflow-hidden">
-              <ManufacturerChat manufacturerId={manufacturerId} />
-            </div>
-          )}
-        </div>
-      </div>
-    </>
-  );
-};
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const navigate = useNavigate();
@@ -89,18 +17,16 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const [error, setError] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [expandedSections, setExpandedSections] = useState({});
+  const [unreadCount, setUnreadCount] = useState(0);
   
-  // Idea submission modal state
   const [showIdeaModal, setShowIdeaModal] = useState(false);
   const [ideaName, setIdeaName] = useState('');
   const [ideaDescription, setIdeaDescription] = useState('');
   const [ideaCategory, setIdeaCategory] = useState('general');
   const [isSubmittingIdea, setIsSubmittingIdea] = useState(false);
-  
-  // Chat modal state
-  const [isChatOpen, setIsChatOpen] = useState(false);
 
-  // Handle window resize
+  const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 1024;
@@ -123,7 +49,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   
       try {
         const token = localStorage.getItem('accessToken');
-        const response = await axios.get(`http://localhost:5000/api/manufacturers/${user._id}`, {
+        const response = await axios.get(`${API_BASE_URL}/api/manufacturers/${user._id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           }
@@ -141,6 +67,31 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     fetchManufacturerData();
   }, [isAuthenticated, user]);
 
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      if (!isAuthenticated || !user) return;
+      
+      try {
+        const token = localStorage.getItem('accessToken');
+        const response = await axios.get(`${API_BASE_URL}/api/chats/unread/count`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          }
+        });
+        
+        if (response.data.success) {
+          setUnreadCount(response.data.data.unreadCount);
+        }
+      } catch (err) {
+        console.error('Error fetching unread count:', err);
+      }
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, user]);
+
   const menuSections = [
     {
       title: 'Main',
@@ -153,7 +104,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
       collapsible: true,
       items: [
         { 
-          path: '/products', 
+          path: '/products/management', 
           icon: SofaIcon, 
           label: 'Inventory', 
           badge: '15',
@@ -180,18 +131,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
       collapsible: true,
       items: [
         { 
-          path: '/new-idea', 
+          path: '/community', 
           icon: Lightbulb, 
-          label: 'Innovation Hub', 
+          label: 'Posts', 
           badge: 'NEW',
           requiresAuth: true
-        },
-        { 
-          path: '/ideas', 
-          icon: AlertCircle, 
-          label: 'Idea Submissions', 
-          badge: null,
-          requiresManufacturer: true 
         },
       ]
     },
@@ -206,14 +150,14 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
           isPremium: true,
           requiresManufacturer: true
         },
-        { path: '/profile', icon: User, label: 'Profile', badge: null },
+        { path: '/user-profile', icon: User, label: 'Profile', badge: null },
         { 
-          path: '/chat', 
+          path: '/chat-history', 
           icon: MessageCircle, 
           label: 'Chat Panel', 
-          badge: '3',
+          badge: unreadCount > 0 ? unreadCount.toString() : null,
           isChat: true,
-          onClick: () => setIsChatOpen(true)
+          requiresAuth: true
         },
       ]
     }
@@ -226,14 +170,10 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     }));
   };
 
-  const handleNavigation = (path, item) => {
-    if (item && item.onClick) {
-      item.onClick();
-    } else {
-      navigate(path);
-      if (isMobile) {
-        setSidebarOpen(false);
-      }
+  const handleNavigation = (path) => {
+    navigate(path);
+    if (isMobile) {
+      setSidebarOpen(false);
     }
   };
 
@@ -262,7 +202,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         category: ideaCategory,
       };
 
-      await axios.post('http://localhost:5000/api/issues', ideaData, {
+      await axios.post(`${API_BASE_URL}/api/issues`, ideaData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -295,7 +235,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         />
       )}
       
-      {/* Idea Submission Modal */}
       {showIdeaModal && (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -392,7 +331,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         ${sidebarWidthClass}
         overflow-hidden shadow-xl
       `}>
-        {/* Header */}
         <div className="flex items-center justify-between p-3 border-b border-amber-600/30 bg-gradient-to-r from-amber-900/50 to-transparent">
           <div className="flex items-center gap-2.5 overflow-hidden">
             <div className="p-2 bg-gradient-to-br from-amber-100 to-amber-200 rounded-xl shadow-lg flex-shrink-0">
@@ -415,12 +353,13 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
           )}
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 py-3 overflow-y-auto scrollbar-thin scrollbar-thumb-amber-600 scrollbar-track-transparent">
           {menuSections.map((section) => {
-            const filteredItems = section.items.filter(item => 
-              !item.requiresManufacturer || (user && user.isManufacturer)
-            );
+            const filteredItems = section.items.filter(item => {
+              if (item.requiresManufacturer && (!user || !user.isManufacturer)) return false;
+              if (item.requiresAuth && !isAuthenticated) return false;
+              return true;
+            });
             
             if (filteredItems.length === 0) return null;
             
@@ -428,7 +367,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
             
             return (
               <div key={section.title} className="mb-1">
-                {/* Section Header */}
                 {(sidebarOpen || !isMobile) && (
                   <div 
                     className={`px-4 py-2 flex items-center justify-between ${
@@ -445,13 +383,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                   </div>
                 )}
                 
-                {/* Section Items */}
                 {isExpanded && (
                   <div className="space-y-0.5 px-2">
                     {filteredItems.map((item) => (
                       <button
                         key={item.path}
-                        onClick={() => handleNavigation(item.path, item)}
+                        onClick={() => handleNavigation(item.path)}
                         className={`
                           group flex items-center w-full px-3 py-2.5 rounded-lg
                           transition-all duration-200 relative overflow-hidden
@@ -490,7 +427,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                           <span className={`
                             ml-auto px-2 py-0.5 text-[10px] font-bold rounded-full whitespace-nowrap
                             ${item.isPremium ? 'bg-amber-300 text-amber-900' : ''}
-                            ${item.isChat ? 'bg-blue-400 text-blue-900' : 'bg-amber-200 text-amber-800'}
+                            ${item.isChat ? 'bg-blue-400 text-blue-900 animate-pulse' : 'bg-amber-200 text-amber-800'}
                             transition-all duration-200 shadow-sm
                           `}>
                             {item.badge}
@@ -504,7 +441,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
             );
           })}
 
-          {/* Quick Action Button */}
           {user?.isManufacturer && (sidebarOpen || !isMobile) && (
             <div className="px-2 mt-4">
               <button
@@ -518,7 +454,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
           )}
         </nav>
 
-        {/* User Profile Section */}
         <div className="border-t border-amber-600/30 p-3 bg-gradient-to-t from-amber-900/50 to-transparent">
           {loading ? (
             <div className="flex items-center justify-center">
@@ -577,7 +512,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         </div>
       </aside>
 
-      {/* Mobile Toggle Button */}
       {isMobile && !sidebarOpen && (
         <button
           onClick={() => setSidebarOpen(true)}
@@ -586,13 +520,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
           <Menu size={24} />
         </button>
       )}
-      
-      {/* Chat Modal */}
-      <ChatModal 
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        manufacturerId={user?._id}
-      />
     </>
   );
 };

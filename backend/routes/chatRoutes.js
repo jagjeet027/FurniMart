@@ -1,31 +1,40 @@
 import express from 'express';
-import {
-  createOrGetChatRoom,
-  getUserChatRooms,
-  getManufacturerChatRooms,
-  getChatMessages,
-  sendMessage,
-  markMessagesAsRead
+import { 
+  createChat, 
+  sendMessage, 
+  getChatById, 
+  getUserChats, 
+  getManufacturerChats,
+  deleteChat,
+  getUnreadCount
 } from '../controllers/chatController.js';
+import { auth } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Create or get chat room
-router.post('/room', createOrGetChatRoom);
+// All routes require authentication
+router.use(auth);
 
-// Get user's chat rooms
-router.get('/user/:userId/rooms', getUserChatRooms);
+// IMPORTANT: Specific routes MUST come before parameterized routes
+// Get unread count - MUST be before /:chatId
+router.get('/unread/count', getUnreadCount);
 
-// Get manufacturer's chat rooms
-router.get('/manufacturer/:manufacturerId/rooms', getManufacturerChatRooms);
+// Get user's chats - MUST be before /:chatId
+router.get('/user', getUserChats);
 
-// Get messages for a chat room
-router.get('/messages/:chatRoomId', getChatMessages);
+// Get manufacturer's chats - MUST be before /:chatId
+router.get('/manufacturer', getManufacturerChats);
 
-// Send message
-router.post('/message', sendMessage);
+// Create or get chat
+router.post('/', createChat);
 
-// Mark messages as read
-router.post('/messages/read', markMessagesAsRead);
+// Get specific chat by ID - parameterized route comes last
+router.get('/:chatId', getChatById);
+
+// Send message in chat
+router.post('/:chatId/messages', sendMessage);
+
+// Delete chat
+router.delete('/:chatId', deleteChat);
 
 export default router;

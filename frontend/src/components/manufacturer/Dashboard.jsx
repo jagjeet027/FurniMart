@@ -25,7 +25,7 @@ const Dashboard = () => {
 
   // Updated to match the path in ProductManagement component
   const handleNavigateToProducts = () => {
-    navigate('/products');
+    navigate('/products/management');
   };
   
   const statsList = [

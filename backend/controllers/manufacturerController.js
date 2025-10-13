@@ -36,6 +36,39 @@ export const getMyManufacturer = async (req, res) => {
   }
 };
 
+
+export const getMyManufacturerProfile = async (req, res) => {
+  try {
+    console.log('=== GET MY MANUFACTURER PROFILE ===');
+    console.log('User ID:', req.userId);
+
+    const manufacturer = await Manufacturer.findOne({ userId: req.userId })
+      .lean();
+    
+    if (!manufacturer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Manufacturer profile not found'
+      });
+    }
+
+    console.log('✅ Found manufacturer:', manufacturer.businessName);
+
+    res.json({
+      success: true,
+      data: {
+        manufacturer
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get manufacturer profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
 export const registerManufacturer = async (req, res) => {
   try {
     const {

@@ -1,47 +1,26 @@
-import { ChatRoom, Message } from '../models/chat.js';
+import asyncHandler from 'express-async-handler';
+import Chat from '../models/Chat.js';
 import Product from '../models/product.js';
-import { User } from '../models/Users.js';
 import { Manufacturer } from '../models/manufacturer.js';
-import mongoose from 'mongoose';
+import { User } from '../models/Users.js';
 
-// Helper function to validate ObjectId
-const isValidObjectId = (id) => {
-  return mongoose.Types.ObjectId.isValid(id);
-};
-
-// Create or get existing chat room - FIXED VERSION
-export const createOrGetChatRoom = async (req, res) => {
+// @desc    Create or get existing chat
+// @route   POST /api/chats
+// @access  Private
+export const createChat = asyncHandler(async (req, res) => {
   try {
-    const { productId, userId, userType, userName, userEmail, productName, manufacturerId, manufacturerName } = req.body;
+    const { productId } = req.body;
+    const userId = req.userId;
 
-    console.log('Creating chat room with data:', req.body);
+    console.log('=== CREATE CHAT REQUEST ===');
+    console.log('User ID:', userId);
+    console.log('Product ID:', productId);
 
-    // Validate required fields
-    if (!productId || !userId || !userType || !userName) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields: productId, userId, userType, userName'
-      });
-    }
+    // Validate product exists
+    const product = await Product.findById(productId)
+      .populate('manufacturerId')
+      .populate('uploadedBy');
 
-    // Validate ObjectId format for productId
-    if (!isValidObjectId(productId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid product ID format'
-      });
-    }
-    
-    // Validate ObjectId format for userId
-    if (!isValidObjectId(userId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid user ID format'
-      });
-    }
-
-    // Get product details to find manufacturer
-    const product = await Product.findById(productId);
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -49,373 +28,457 @@ export const createOrGetChatRoom = async (req, res) => {
       });
     }
 
-    // FIXED: Handle manufacturer info stored as strings in Product model
-    let actualManufacturerId = manufacturerId || product.manufacturer;
-    const actualManufacturerName = manufacturerName || product.manufacturerInfo || 'Manufacturer';
-
-    // Validate manufacturer ID exists
-    if (!actualManufacturerId) {
+    // Check if user is trying to chat with their own product
+    if (product.uploadedBy._id.toString() === userId) {
       return res.status(400).json({
         success: false,
-        message: 'Manufacturer information not found for this product'
+        message: 'You cannot chat about your own product'
       });
     }
 
-    // FIXED: Since your products store manufacturer as string, we'll create a virtual manufacturer ObjectId
-    // This approach doesn't require a separate Manufacturer collection
-    let manufacturerObjectId;
-    
-    if (isValidObjectId(actualManufacturerId)) {
-      // If it's already a valid ObjectId, use it
-      manufacturerObjectId = new mongoose.Types.ObjectId(actualManufacturerId);
-    } else {
-      // If it's a string (like "Jaggie brand"), create a consistent ObjectId from it
-      // This ensures the same manufacturer name always gets the same ObjectId
-      const crypto = await import('crypto');
-      const hash = crypto.createHash('md5').update(actualManufacturerId).digest('hex');
-      // Take first 24 chars of hash to create a valid ObjectId
-      const objectIdString = hash.substring(0, 24);
-      manufacturerObjectId = new mongoose.Types.ObjectId(objectIdString);
-    }
-    
-    // Convert string IDs to Mongoose ObjectIds for the query
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-
-    // FIXED: Check if chat room already exists between this user and manufacturer for this product
-    let chatRoom = await ChatRoom.findOne({
-      product: new mongoose.Types.ObjectId(productId),
-      participants: {
-        $all: [
-          { $elemMatch: { userId: userObjectId, userType: userType } },
-          { $elemMatch: { userId: manufacturerObjectId, userType: 'manufacturer' } }
-        ]
-      }
-    });
-
-    if (chatRoom) {
-      console.log('Existing chat room found:', chatRoom._id);
-      return res.status(200).json({
-        success: true,
-        chatRoom: chatRoom
-      });
-    }
-
-    // Create new chat room with both participants
-    const participants = [
-      {
-        userId: userObjectId,
-        userType: userType,
-        name: userName,
-        email: userEmail || 'user@example.com'
-      },
-      {
-        userId: manufacturerObjectId,
-        userType: 'manufacturer',
-        name: actualManufacturerName,
-        email: 'manufacturer@example.com'
-      }
-    ];
-
-    chatRoom = new ChatRoom({
-      participants: participants,
-      product: new mongoose.Types.ObjectId(productId),
-      productName: productName || product.name,
-      manufacturerName: actualManufacturerName,
-      unreadCount: new Map(),
-      isActive: true
-    });
-
-    await chatRoom.save();
-    console.log('New chat room created:', chatRoom._id);
-
-    res.status(201).json({
-      success: true,
-      chatRoom: chatRoom
-    });
-
-  } catch (error) {
-    console.error('Error creating/getting chat room:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
-  }
-};
-
-// Get manufacturer's chat rooms - FIXED
-export const getManufacturerChatRooms = async (req, res) => {
-  try {
-    const { manufacturerId } = req.params;
-
-    console.log('Getting chat rooms for manufacturer:', manufacturerId);
-
-    // FIXED: Handle both ObjectId and string manufacturer identifiers
-    let manufacturerObjectId;
-    
-    if (isValidObjectId(manufacturerId)) {
-      manufacturerObjectId = new mongoose.Types.ObjectId(manufacturerId);
-    } else {
-      // Create consistent ObjectId from string manufacturer name
-      const crypto = await import('crypto');
-      const hash = crypto.createHash('md5').update(manufacturerId).digest('hex');
-      const objectIdString = hash.substring(0, 24);
-      manufacturerObjectId = new mongoose.Types.ObjectId(objectIdString);
-    }
-
-    const chatRooms = await ChatRoom.find({
-      participants: {
-        $elemMatch: {
-          userId: manufacturerObjectId,
-          userType: 'manufacturer'
-        }
-      },
-      isActive: true
-    })
-    .populate('product', 'name images price')
-    .sort({ updatedAt: -1 });
-
-    // Add last message and unread count for each chat room
-    const chatRoomsWithDetails = await Promise.all(
-      chatRooms.map(async (room) => {
-        // Get last message
-        const lastMessage = await Message.findOne({ chatRoom: room._id })
-          .sort({ createdAt: -1 })
-          .select('content sender createdAt');
-
-        // Get unread count for this manufacturer
-        const unreadCount = await Message.countDocuments({
-          chatRoom: room._id,
-          'sender.userId': { $ne: manufacturerObjectId },
-          deliveryStatus: { $ne: 'read' }
-        });
-
-        const roomObj = room.toObject();
-        if (lastMessage) {
-          roomObj.lastMessage = {
-            message: lastMessage.content,
-            sender: lastMessage.sender.name,
-            timestamp: lastMessage.createdAt
-          };
-        }
-        
-        // FIXED: Properly handle unreadCount as a regular object instead of Map
-        roomObj.unreadCount = { [manufacturerId]: unreadCount };
-        
-        return roomObj;
-      })
-    );
-
-    console.log(`Found ${chatRooms.length} chat rooms for manufacturer`);
-
-    res.status(200).json({
-      success: true,
-      chatRooms: chatRoomsWithDetails
-    });
-
-  } catch (error) {
-    console.error('Error getting manufacturer chat rooms:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
-  }
-};
-
-// Get user's chat rooms
-export const getUserChatRooms = async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    if (!isValidObjectId(userId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid user ID format'
-      });
-    }
-
-    const chatRooms = await ChatRoom.find({
-      participants: {
-        $elemMatch: {
-          userId: new mongoose.Types.ObjectId(userId),
-          userType: { $ne: 'manufacturer' }
-        }
-      },
-      isActive: true
-    })
-    .populate('product', 'name images price')
-    .sort({ updatedAt: -1 });
-
-    res.status(200).json({
-      success: true,
-      chatRooms: chatRooms
-    });
-
-  } catch (error) {
-    console.error('Error getting chat rooms:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
-  }
-};
-
-// Get messages for a chat room
-export const getChatMessages = async (req, res) => {
-  try {
-    const { chatRoomId } = req.params;
-    const { page = 1, limit = 50 } = req.query;
-
-    if (!isValidObjectId(chatRoomId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid chat room ID format'
-      });
-    }
-
-    const messages = await Message.find({ chatRoom: chatRoomId })
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-
-    res.status(200).json({
-      success: true,
-      messages: messages.reverse() // Show oldest first
-    });
-
-  } catch (error) {
-    console.error('Error getting messages:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
-  }
-};
-
-// Send text message
-export const sendMessage = async (req, res) => {
-  try {
-    const { chatRoomId, senderId, senderType, senderName, content } = req.body;
-
-    console.log('Sending message:', req.body);
-
-    if (!chatRoomId || !senderId || !senderType || !senderName || !content) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields'
-      });
-    }
-
-    if (!isValidObjectId(chatRoomId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid chat room ID format'
-      });
-    }
-
-    // Verify chat room exists and user is participant
-    const chatRoom = await ChatRoom.findById(chatRoomId);
-    if (!chatRoom) {
+    // Get user details
+    const user = await User.findById(userId);
+    if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'Chat room not found'
+        message: 'User not found'
       });
     }
 
-    // FIXED: Better participant validation
-    const senderObjectId = new mongoose.Types.ObjectId(senderId);
-    const isParticipant = chatRoom.participants.some(p => 
-      p.userId.equals(senderObjectId) && p.userType === senderType
-    );
+    // FIXED: Check if chat already exists - use findOne with exact match
+    let chat = await Chat.findOne({
+      userId: userId,
+      manufacturerId: product.manufacturerId._id,
+      productId: productId
+    }).populate('productId', 'name images price');
 
-    if (!isParticipant) {
-      return res.status(403).json({
-        success: false,
-        message: 'You are not a participant in this chat'
+    if (chat) {
+      console.log('✅ Existing chat found:', chat._id);
+      return res.status(200).json({
+        success: true,
+        message: 'Chat retrieved successfully',
+        data: chat
       });
     }
 
-    // Create message
-    const message = new Message({
-      chatRoom: chatRoomId,
-      sender: {
-        userId: senderObjectId,
-        userType: senderType,
-        name: senderName
-      },
-      messageType: 'text',
-      content: content,
-      deliveryStatus: 'sent',
-      readBy: []
-    });
+    // FIXED: Create new chat with proper error handling
+    try {
+      chat = new Chat({
+        productId,
+        productName: product.name,
+        userId,
+        userName: user.name,
+        manufacturerId: product.manufacturerId._id,
+        manufacturerUserId: product.uploadedBy._id,
+        manufacturerName: product.manufacturerId.businessName,
+        messages: [],
+        status: 'active'
+      });
 
-    await message.save();
+      await chat.save();
+      console.log('✅ New chat created:', chat._id);
 
-    // Update chat room's last message
-    chatRoom.lastMessage = {
-      message: content,
-      timestamp: new Date(),
-      sender: senderName
-    };
-    chatRoom.updatedAt = new Date();
-    await chatRoom.save();
+      // Populate the product details before sending response
+      chat = await Chat.findById(chat._id).populate('productId', 'name images price');
 
-    console.log('Message saved successfully:', message._id);
+      res.status(201).json({
+        success: true,
+        message: 'Chat created successfully',
+        data: chat
+      });
+    } catch (saveError) {
+      // Handle race condition - another request might have created the chat
+      if (saveError.code === 11000) {
+        console.log('⚠️ Chat was created by another request, fetching existing chat');
+        
+        chat = await Chat.findOne({
+          userId: userId,
+          manufacturerId: product.manufacturerId._id,
+          productId: productId
+        }).populate('productId', 'name images price');
 
-    res.status(201).json({
-      success: true,
-      message: message
-    });
+        if (chat) {
+          return res.status(200).json({
+            success: true,
+            message: 'Chat retrieved successfully',
+            data: chat
+          });
+        }
+      }
+      throw saveError;
+    }
 
   } catch (error) {
-    console.error('Error sending message:', error);
+    console.error('❌ Error creating chat:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error',
-      error: error.message
+      message: 'Failed to create chat',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
-};
+});
 
-// Mark messages as read
-export const markMessagesAsRead = async (req, res) => {
+// @desc    Send message in chat
+// @route   POST /api/chats/:chatId/messages
+// @access  Private
+export const sendMessage = asyncHandler(async (req, res) => {
   try {
-    const { chatRoomId, userId } = req.body;
+    const { chatId } = req.params;
+    const { message } = req.body;
+    const userId = req.userId;
 
-    if (!isValidObjectId(chatRoomId) || !isValidObjectId(userId)) {
+    console.log('=== SEND MESSAGE ===');
+    console.log('Chat ID:', chatId);
+    console.log('User ID:', userId);
+    console.log('Message:', message);
+
+    if (!message || !message.trim()) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid ID format'
+        message: 'Message content is required'
       });
     }
 
-    const result = await Message.updateMany(
-      { 
-        chatRoom: chatRoomId,
-        'sender.userId': { $ne: new mongoose.Types.ObjectId(userId) },
-        deliveryStatus: { $ne: 'read' }
-      },
-      { 
-        $set: { deliveryStatus: 'read' },
-        $addToSet: { readBy: { userId: new mongoose.Types.ObjectId(userId), readAt: new Date() } }
-      }
-    );
+    // Find chat and verify user is part of it
+    const chat = await Chat.findById(chatId);
+    
+    if (!chat) {
+      console.log('❌ Chat not found');
+      return res.status(404).json({
+        success: false,
+        message: 'Chat not found'
+      });
+    }
+
+    console.log('Chat Details:');
+    console.log('- Chat User ID:', chat.userId.toString());
+    console.log('- Manufacturer User ID:', chat.manufacturerUserId.toString());
+    console.log('- Current User ID:', userId);
+
+    // FIXED: Convert ObjectId to string properly for comparison
+    const chatUserId = chat.userId.toString();
+    const chatManufacturerId = chat.manufacturerUserId.toString();
+    const currentUserId = userId.toString();
+
+    const isUser = chatUserId === currentUserId;
+    const isManufacturer = chatManufacturerId === currentUserId;
+
+    console.log('Authorization Check:');
+    console.log('- Is User:', isUser);
+    console.log('- Is Manufacturer:', isManufacturer);
+
+    if (!isUser && !isManufacturer) {
+      console.log('❌ User not authorized');
+      console.log('Debug Info:', {
+        chatUserId,
+        chatManufacturerId,
+        currentUserId,
+        userIdType: typeof chatUserId,
+        currentUserIdType: typeof currentUserId
+      });
+      
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to send messages in this chat',
+        debug: process.env.NODE_ENV === 'development' ? {
+          chatUserId,
+          chatManufacturerId,
+          currentUserId
+        } : undefined
+      });
+    }
+
+    // Get sender name
+    const sender = await User.findById(userId);
+    
+    if (!sender) {
+      console.log('❌ Sender not found');
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    console.log('✅ User authorized as:', isUser ? 'User' : 'Manufacturer');
+    
+    // Add message
+    chat.messages.push({
+      senderId: userId,
+      senderName: sender.name,
+      message: message.trim(),
+      isRead: false
+    });
+
+    // Update unread count
+    if (isUser) {
+      chat.unreadCountManufacturer += 1;
+    } else {
+      chat.unreadCountUser += 1;
+    }
+
+    chat.lastMessageAt = Date.now();
+    await chat.save();
+
+    console.log('✅ Message sent successfully');
 
     res.status(200).json({
       success: true,
-      message: 'Messages marked as read',
-      modifiedCount: result.modifiedCount
+      message: 'Message sent successfully',
+      data: chat
     });
 
   } catch (error) {
-    console.error('Error marking messages as read:', error);
+    console.error('❌ Error sending message:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error',
-      error: error.message
+      message: 'Failed to send message',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
-};
+});
+
+// @desc    Get chat by ID
+// @route   GET /api/chats/:chatId
+// @access  Private
+export const getChatById = asyncHandler(async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.userId;
+
+    console.log('=== GET CHAT BY ID ===');
+    console.log('Chat ID:', chatId);
+    console.log('User ID:', userId);
+
+    const chat = await Chat.findById(chatId)
+      .populate('productId', 'name images price')
+      .populate('userId', 'name email')
+      .populate('manufacturerUserId', 'name email');
+
+    if (!chat) {
+      console.log('❌ Chat not found');
+      return res.status(404).json({
+        success: false,
+        message: 'Chat not found'
+      });
+    }
+
+    // FIXED: Convert ObjectId to string properly for comparison
+    const chatUserId = chat.userId._id.toString();
+    const chatManufacturerId = chat.manufacturerUserId._id.toString();
+    const currentUserId = userId.toString();
+
+    const isUser = chatUserId === currentUserId;
+    const isManufacturer = chatManufacturerId === currentUserId;
+
+    console.log('Authorization Check:');
+    console.log('- Is User:', isUser);
+    console.log('- Is Manufacturer:', isManufacturer);
+
+    if (!isUser && !isManufacturer) {
+      console.log('❌ Access denied');
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied',
+        debug: process.env.NODE_ENV === 'development' ? {
+          chatUserId,
+          chatManufacturerId,
+          currentUserId
+        } : undefined
+      });
+    }
+
+    console.log('✅ Access granted as:', isUser ? 'User' : 'Manufacturer');
+
+    // Mark messages as read
+    let needsSave = false;
+    
+    if (isUser && chat.unreadCountUser > 0) {
+      chat.messages.forEach(msg => {
+        if (msg.senderId.toString() !== currentUserId && !msg.isRead) {
+          msg.isRead = true;
+        }
+      });
+      chat.unreadCountUser = 0;
+      needsSave = true;
+    } else if (isManufacturer && chat.unreadCountManufacturer > 0) {
+      chat.messages.forEach(msg => {
+        if (msg.senderId.toString() !== currentUserId && !msg.isRead) {
+          msg.isRead = true;
+        }
+      });
+      chat.unreadCountManufacturer = 0;
+      needsSave = true;
+    }
+
+    if (needsSave) {
+      await chat.save();
+      console.log('✅ Messages marked as read');
+    }
+
+    res.status(200).json({
+      success: true,
+      data: chat
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching chat:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch chat',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// @desc    Get all chats for user
+// @route   GET /api/chats/user
+// @access  Private
+export const getUserChats = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { status = 'active' } = req.query;
+
+    console.log('=== GET USER CHATS ===');
+    console.log('User ID:', userId);
+
+    const chats = await Chat.find({
+      userId,
+      status
+    })
+      .populate('productId', 'name images price')
+      .sort({ lastMessageAt: -1 })
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      count: chats.length,
+      data: chats
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching user chats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch chats',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// @desc    Get all chats for manufacturer
+// @route   GET /api/chats/manufacturer
+// @access  Private (Manufacturer)
+export const getManufacturerChats = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { status = 'active' } = req.query;
+
+    console.log('=== GET MANUFACTURER CHATS ===');
+    console.log('Manufacturer User ID:', userId);
+
+    const chats = await Chat.find({
+      manufacturerUserId: userId,
+      status
+    })
+      .populate('productId', 'name images price')
+      .populate('userId', 'name email')
+      .sort({ lastMessageAt: -1 })
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      count: chats.length,
+      data: chats
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching manufacturer chats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch chats',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// @desc    Delete chat
+// @route   DELETE /api/chats/:chatId
+// @access  Private
+export const deleteChat = asyncHandler(async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.userId;
+
+    const chat = await Chat.findById(chatId);
+
+    if (!chat) {
+      return res.status(404).json({
+        success: false,
+        message: 'Chat not found'
+      });
+    }
+
+    // Only user who initiated chat can delete it
+    if (chat.userId.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the user who initiated the chat can delete it'
+      });
+    }
+
+    await Chat.findByIdAndDelete(chatId);
+
+    console.log('✅ Chat deleted successfully');
+
+    res.status(200).json({
+      success: true,
+      message: 'Chat deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Error deleting chat:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete chat',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// @desc    Get unread message count
+// @route   GET /api/chats/unread/count
+// @access  Private
+export const getUnreadCount = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.userId;
+    const user = await User.findById(userId);
+
+    let totalUnread = 0;
+
+    if (user.isManufacturer) {
+      const chats = await Chat.find({
+        manufacturerUserId: userId,
+        status: 'active'
+      });
+      totalUnread = chats.reduce((sum, chat) => sum + chat.unreadCountManufacturer, 0);
+    } else {
+      const chats = await Chat.find({
+        userId,
+        status: 'active'
+      });
+      totalUnread = chats.reduce((sum, chat) => sum + chat.unreadCountUser, 0);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { unreadCount: totalUnread }
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching unread count:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch unread count'
+    });
+  }
+});

@@ -10,7 +10,8 @@ import {
   Tag, 
   Layers, 
   Save, 
-  Trash2 
+  Trash2,
+  Building2
 } from "lucide-react";
 import api from "../../axios/axiosInstance";
 
@@ -24,7 +25,6 @@ const EditProduct = () => {
   const [categories, setCategories] = useState([]);
   const [categoryCounts, setCategoryCounts] = useState({});
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [productData, setProductData] = useState({
     name: "",
@@ -41,7 +41,6 @@ const EditProduct = () => {
     stock: 10,
   });
 
-  // Expanded default categories list
   const DEFAULT_CATEGORIES = [
     { _id: "main-outdoor-gate", name: "Main Outdoor Gate" },
     { _id: "sofas", name: "Sofas" },
@@ -70,7 +69,6 @@ const EditProduct = () => {
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
-  // Fetch product data by ID
   useEffect(() => {
     const fetchProduct = async () => {
       try {
@@ -78,13 +76,11 @@ const EditProduct = () => {
         const response = await api.get(`/products/${id}`);
         const product = response.data.product || response.data;
         
-        // Format price to remove $ if present
         let formattedPrice = product.price;
         if (typeof formattedPrice === 'string' && formattedPrice.startsWith('$')) {
           formattedPrice = formattedPrice.substring(1);
         }
         
-        // Prepare product data
         const processedProduct = {
           name: product.name || "",
           price: formattedPrice || "",
@@ -104,7 +100,6 @@ const EditProduct = () => {
         
         setProductData(processedProduct);
         
-        // Process images
         if (product.images && Array.isArray(product.images) && product.images.length > 0) {
           const formattedImages = product.images.map(img => ({
             url: img,
@@ -126,7 +121,6 @@ const EditProduct = () => {
     fetchProduct();
   }, [id]);
 
-  // Fetch categories from API, fallback to defaults if needed
   useEffect(() => {
     const fetchCategories = async () => {
       setIsLoadingCategories(true);
@@ -136,7 +130,7 @@ const EditProduct = () => {
         
         if (Array.isArray(categoriesData) && categoriesData.length > 0) {
           setCategories(categoriesData);
-        } else {
+          } else {
           console.log("No categories found in API response, using defaults");
           setCategories(DEFAULT_CATEGORIES);
         }
@@ -151,10 +145,8 @@ const EditProduct = () => {
     fetchCategories();
   }, []);
 
-  // Fetch product counts for each category
   useEffect(() => {
     const fetchProductCounts = async () => {
-      setIsLoadingProducts(true);
       const counts = {};
       
       try {
@@ -162,7 +154,6 @@ const EditProduct = () => {
         const products = response.data.products || response.data;
         
         if (Array.isArray(products) && products.length > 0) {
-          // Count products per category
           products.forEach(product => {
             const categoryId = product.category;
             if (categoryId) {
@@ -174,8 +165,6 @@ const EditProduct = () => {
         setCategoryCounts(counts);
       } catch (error) {
         console.error("Failed to fetch product counts:", error);
-      } finally {
-        setIsLoadingProducts(false);
       }
     };
 
@@ -214,26 +203,36 @@ const EditProduct = () => {
     }));
   };
 
-  // Updated handler for category change to store both ID and name
   const handleCategoryChange = (e) => {
     const selectedValue = e.target.value;
-    
-    // Find the selected category's name
     const selectedCategory = categories.find(cat => cat._id === selectedValue);
     
-    if (selectedCategory) {
+    if (selectedValue === "custom") {
+      setProductData(prev => ({
+        ...prev,
+        category: "custom",
+        categoryName: ""
+      }));
+    } else if (selectedCategory) {
       setProductData(prev => ({
         ...prev,
         category: selectedValue,
         categoryName: selectedCategory.name
       }));
     } else {
-      // If not found, use the value directly
       setProductData(prev => ({
         ...prev,
         category: selectedValue,
         categoryName: selectedValue
       }));
+    }
+  };
+
+  // Prevent form submission on Enter key
+  const handleKeyDown = (e, action) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (action) action();
     }
   };
 
@@ -284,15 +283,11 @@ const EditProduct = () => {
     navigate("/products");
   };
 
-  // Function to create category if it doesn't exist already
   const ensureCategoryExists = async (categoryId, categoryName) => {
     try {
-      // Check if category exists in our categories list
       const categoryExists = categories.some(cat => cat._id === categoryId);
       
-      // If no category was selected or if category doesn't exist, create it
       if (!categoryId || !categoryExists) {
-        // Try to create the category
         const response = await api.post('/categories', {
           name: categoryName,
           description: `Products in the ${categoryName} category`
@@ -303,17 +298,14 @@ const EditProduct = () => {
           }
         });
         
-        // Return the category ID from the response
         if (response.data && response.data.category && response.data.category._id) {
           return response.data.category._id;
         }
       }
       
-      // If category already exists, return its ID
       return categoryId;
     } catch (error) {
       console.error("Failed to create category:", error);
-      // Fall back to using the original category ID
       return categoryId || categoryName;
     }
   };
@@ -351,7 +343,6 @@ const EditProduct = () => {
     setUploadSuccess(false);
     
     try {
-      // First, ensure the category exists
       const categoryId = await ensureCategoryExists(productData.category, productData.categoryName);
       
       let imageUrls = [];
@@ -363,7 +354,6 @@ const EditProduct = () => {
               formData.append("file", img.file);
               formData.append("upload_preset", uploadPreset);
               
-              // Using fetch instead of axios to avoid CORS issue with auth headers
               const response = await fetch(
                 `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
                 {
@@ -396,7 +386,7 @@ const EditProduct = () => {
       
       const finalProductData = {
         ...productData,
-        category: categoryId, // Use the confirmed category ID
+        category: categoryId,
         price: formattedPrice,
         images: imageUrls,
         stock: parseInt(productData.stock) || 10,
@@ -530,6 +520,7 @@ const EditProduct = () => {
               name="name"
               value={productData.name}
               onChange={handleInputChange}
+              onKeyDown={(e) => handleKeyDown(e, null)}
               className="w-full px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm"
               required
             />
@@ -544,6 +535,7 @@ const EditProduct = () => {
               name="price"
               value={productData.price}
               onChange={handleInputChange}
+              onKeyDown={(e) => handleKeyDown(e, null)}
               placeholder="299"
               className="w-full px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm"
               required
@@ -564,6 +556,7 @@ const EditProduct = () => {
                 name="rating"
                 value={productData.rating}
                 onChange={handleInputChange}
+                onKeyDown={(e) => handleKeyDown(e, null)}
                 min="0"
                 max="5"
                 step="0.1"
@@ -589,6 +582,7 @@ const EditProduct = () => {
               name="stock"
               value={productData.stock}
               onChange={handleInputChange}
+              onKeyDown={(e) => handleKeyDown(e, null)}
               min="0"
               className="w-full px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm"
               required
@@ -596,7 +590,7 @@ const EditProduct = () => {
           </div>
         </div>
         
-        {/* Category Selection - Enhanced with category counts and visual indicators */}
+        {/* Category Selection */}
         <div className="bg-orange-50 p-4 rounded-lg border border-orange-100 shadow-sm">
           <label className="block text-sm font-medium text-orange-700 mb-1 flex items-center">
             <Grid className="w-4 h-4 mr-2 text-orange-500" />
@@ -607,7 +601,6 @@ const EditProduct = () => {
             <div className="w-full h-10 bg-orange-100 animate-pulse rounded-lg"></div>
           ) : (
             <>
-              {/* Category dropdown */}
               <select
                 name="category"
                 value={productData.category}
@@ -625,12 +618,12 @@ const EditProduct = () => {
                 <option value="custom">➕ Add New Category</option>
               </select>
               
-              {/* Category cards for quick visual selection */}
               <div className="grid grid-cols-4 gap-2 mt-3">
                 {categories.slice(0, 8).map((category) => (
-                  <div 
-                    key={category._id} 
-                    className={`py-2 px-3 rounded-lg cursor-pointer text-sm text-center transition-colors ${
+                  <button
+                    key={category._id}
+                    type="button"
+                    className={`py-2 px-3 rounded-lg text-sm text-center transition-colors ${
                       productData.category === category._id 
                         ? 'bg-orange-500 text-white shadow-md' 
                         : 'bg-white hover:bg-orange-100 text-orange-800 border border-orange-200'
@@ -649,13 +642,12 @@ const EditProduct = () => {
                         {categoryCounts[category._id]} {categoryCounts[category._id] === 1 ? 'product' : 'products'}
                       </span>
                     ) : null}
-                  </div>
+                  </button>
                 ))}
               </div>
             </>
           )}
           
-          {/* Custom category input field - shows when "Add New Category" is selected */}
           {productData.category === 'custom' && (
             <div className="mt-3 p-3 bg-white rounded-lg border border-orange-200 shadow-sm">
               <label className="block text-sm font-medium text-orange-700 mb-1">
@@ -666,18 +658,12 @@ const EditProduct = () => {
                 name="categoryName"
                 value={productData.categoryName}
                 onChange={handleInputChange}
+                onKeyDown={(e) => handleKeyDown(e, null)}
                 placeholder="Enter new category name"
                 className="w-full px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white"
                 required
               />
             </div>
-          )}
-          
-          {isLoadingCategories && (
-            <p className="text-sm text-orange-500 mt-1">Loading categories...</p>
-          )}
-          {!isLoadingCategories && categories.length === 0 && (
-            <p className="text-sm text-orange-500 mt-1">No categories found. You can add a new one.</p>
           )}
         </div>
         
@@ -711,33 +697,35 @@ const EditProduct = () => {
           />
         </div>
         
-        {/* Manufacturer info */}
-        <div className="grid grid-cols-2 gap-6">
+        {/* Manufacturer info - READ ONLY */}
+        <div className="grid grid-cols-2 gap-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
           <div>
-            <label className="block text-sm font-medium text-orange-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+              <Building2 className="w-4 h-4 mr-2 text-gray-500" />
               Manufacturer Name
             </label>
             <input
               type="text"
-              name="manufacturer"
               value={productData.manufacturer}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm"
-              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+              readOnly
+              disabled
             />
+            <p className="text-xs text-gray-500 mt-1">Manufacturer information cannot be changed</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-orange-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+              <Building2 className="w-4 h-4 mr-2 text-gray-500" />
               Manufacturer Info
             </label>
             <input
               type="text"
-              name="manufacturerInfo"
               value={productData.manufacturerInfo}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm"
-              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+              readOnly
+              disabled
             />
+            <p className="text-xs text-gray-500 mt-1">Manufacturer information cannot be changed</p>
           </div>
         </div>
         
@@ -751,6 +739,7 @@ const EditProduct = () => {
               type="text"
               value={newSize}
               onChange={(e) => setNewSize(e.target.value)}
+              onKeyDown={(e) => handleKeyDown(e, addSize)}
               className="flex-1 px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm"
               placeholder="Enter size (e.g., 8x6 ft)"
             />
@@ -787,7 +776,7 @@ const EditProduct = () => {
         
         {/* Features */}
         <div className="space-y-2 bg-orange-50 p-4 rounded-lg border border-orange-100 shadow-sm">
-        <label className="block text-sm font-medium text-orange-700 mb-2">
+          <label className="block text-sm font-medium text-orange-700 mb-2">
             Product Features
           </label>
           <div className="space-y-3">
@@ -797,6 +786,7 @@ const EditProduct = () => {
                   type="text"
                   value={feature}
                   onChange={(e) => updateFeature(index, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, null)}
                   className="flex-1 px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm"
                   placeholder={`Feature ${index + 1}`}
                   required={index === 0}

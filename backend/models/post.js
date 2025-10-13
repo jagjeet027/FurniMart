@@ -1,101 +1,92 @@
+// models/Post.js
 import mongoose from 'mongoose';
 
 const postSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: [true, 'Title is required'],
+    trim: true,
+    minlength: [3, 'Title must be at least 3 characters long'],
+    maxlength: [200, 'Title cannot exceed 200 characters']
+  },
+  type: {
+    type: String,
+    enum: ['idea', 'requirement'],
+    required: [true, 'Type is required']
+  },
+  description: {
+    type: String,
+    required: [true, 'Description is required'],
+    trim: true,
+    minlength: [10, 'Description must be at least 10 characters long'],
+    maxlength: [5000, 'Description cannot exceed 5000 characters']
+  },
+  category: {
+    type: String,
+    default: 'General'
+  },
+  files: [{
+    url: {
+      type: String,
+      required: true
+    },
+    filename: {
+      type: String,
+      required: true
+    },
+    mimetype: {
+      type: String,
+      required: true
+    },
+    size: {
+      type: Number,
+      required: true
+    },
+    fileType: {
+      type: String,
+      enum: ['image', 'document'],
+      required: true
+    }
+  }],
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  title: {
+  status: {
     type: String,
-    required: true,
-    trim: true,
-    maxlength: 200
+    enum: ['open', 'closed'],
+    default: 'open'
   },
-  description: {
-    type: String,
-    required: true,
-    maxlength: 5000
-  },
-  category: {
-    type: String,
-    required: true,
-    enum: [
-      'Storage Solutions',
-      'Office Furniture',
-      'Living Room',
-      'Bedroom',
-      'Outdoor',
-      'Lighting',
-      'Decor',
-      'Custom Design',
-      'Innovation',
-      'Other'
-    ]
-  },
-  tags: [{
-    type: String,
-    trim: true
-  }],
-  images: [{
-    url: String,
-    publicId: String
-  }],
-  likes: [{
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    userType: {
-      type: String,
-      enum: ['user', 'manufacturer', 'admin']
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  dislikes: [{
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    userType: {
-      type: String,
-      enum: ['user', 'manufacturer', 'admin']
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  views: {
+  quotationsCount: {
     type: Number,
     default: 0
   },
-  viewedBy: [{
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    viewedAt: {
-      type: Date,
-      default: Date.now
-    }
+  quotations: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Quotation'
   }],
-  status: {
-    type: String,
-    enum: ['draft', 'published', 'archived'],
-    default: 'published'
+  isActive: {
+    type: Boolean,
+    default: true
   }
-}, { timestamps: true });
+}, {
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
 
-// Indexes for better performance
+// Indexes for better query performance
 postSchema.index({ userId: 1, createdAt: -1 });
-postSchema.index({ category: 1 });
-postSchema.index({ tags: 1 });
-postSchema.index({ status: 1 });
-postSchema.index({ 'likes.userId': 1 });
+postSchema.index({ status: 1, createdAt: -1 });
+postSchema.index({ type: 1, createdAt: -1 });
 
-const Post = mongoose.model('Post', postSchema);
-export default Post;
+// Virtual populate for user details
+postSchema.virtual('author', {
+  ref: 'User',
+  localField: 'userId',
+  foreignField: '_id',
+  justOne: true
+});
+
+export const Post = mongoose.model('Post', postSchema);

@@ -1,165 +1,109 @@
 import mongoose from 'mongoose';
 
-// Chat Room Schema
-const chatRoomSchema = new mongoose.Schema({
-  participants: [{
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: true,
-      refPath: 'participants.userType'
-    },
-    userType: {
-      type: String,
-      required: true,
-      enum: ['wholeseller', 'retailer', 'manufacturer', 'user']
-    },
-    name: {
-      type: String,
-      required: true
-    },
-    email: {
-      type: String,
-      required: true
-    },
-    joinedAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  product: {
+const messageSchema = new mongoose.Schema({
+  senderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  senderName: {
+    type: String,
+    required: true
+  },
+  message: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 2000
+  },
+  isRead: {
+    type: Boolean,
+    default: false
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+const chatSchema = new mongoose.Schema({
+  productId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product',
-    required: true
+    required: true,
+    index: true
   },
   productName: {
     type: String,
     required: true
   },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true
+  },
+  userName: {
+    type: String,
+    required: true
+  },
+  manufacturerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Manufacturer',
+    required: true,
+    index: true
+  },
+  manufacturerUserId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true
+  },
   manufacturerName: {
     type: String,
     required: true
   },
-  lastMessage: {
-    message: String,
-    timestamp: Date,
-    sender: String
-  },
-  unreadCount: {
-    type: Map,
-    of: Number,
-    default: new Map()
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  createdAt: {
+  messages: [messageSchema],
+  lastMessageAt: {
     type: Date,
     default: Date.now
   },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+  status: {
+    type: String,
+    enum: ['active', 'closed'],
+    default: 'active'
+  },
+  unreadCountUser: {
+    type: Number,
+    default: 0
+  },
+  unreadCountManufacturer: {
+    type: Number,
+    default: 0
   }
+}, {
+  timestamps: true
 });
 
-// Update the updatedAt field before saving
-chatRoomSchema.pre('save', function(next) {
-  this.updatedAt = new Date();
+// Compound index for unique chat per user-manufacturer-product combination
+chatSchema.index({ userId: 1, manufacturerId: 1, productId: 1 }, { unique: true });
+
+// Index for efficient queries
+chatSchema.index({ userId: 1, lastMessageAt: -1 });
+chatSchema.index({ manufacturerUserId: 1, lastMessageAt: -1 });
+chatSchema.index({ status: 1, lastMessageAt: -1 });
+
+// TTL index to auto-delete chats after 30 days of last message
+chatSchema.index({ lastMessageAt: 1 }, { expireAfterSeconds: 2592000 }); // 30 days = 2592000 seconds
+
+// Update lastMessageAt before saving
+chatSchema.pre('save', function(next) {
+  if (this.isModified('messages')) {
+    this.lastMessageAt = Date.now();
+  }
   next();
 });
 
-// Message Schema
-const messageSchema = new mongoose.Schema({
-  chatRoom: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'ChatRoom',
-    required: true
-  },
-  sender: {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: true
-    },
-    userType: {
-      type: String,
-      required: true,
-      enum: ['wholeseller', 'retailer', 'manufacturer', 'user']
-    },
-    name: {
-      type: String,
-      required: true
-    }
-  },
-  messageType: {
-    type: String,
-    enum: ['text', 'image', 'file', 'system'],
-    default: 'text'
-  },
-  content: {
-    type: String,
-    required: function() {
-      return this.messageType === 'text' || this.messageType === 'system';
-    }
-  },
-  imageUrl: {
-    type: String,
-    required: function() {
-      return this.messageType === 'image';
-    }
-  },
-  fileUrl: {
-    type: String,
-    required: function() {
-      return this.messageType === 'file';
-    }
-  },
-  fileName: {
-    type: String,
-    required: function() {
-      return this.messageType === 'file';
-    }
-  },
-  deliveryStatus: {
-    type: String,
-    enum: ['sent', 'delivered', 'read'],
-    default: 'sent'
-  },
-  readBy: [{
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: true
-    },
-    readAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+const Chat = mongoose.models.Chat || mongoose.model('Chat', chatSchema);
 
-// Update the updatedAt field before saving
-messageSchema.pre('save', function(next) {
-  this.updatedAt = new Date();
-  next();
-});
-
-// Create indexes for better query performance
-chatRoomSchema.index({ 'participants.userId': 1, 'participants.userType': 1 });
-chatRoomSchema.index({ product: 1 });
-chatRoomSchema.index({ updatedAt: -1 });
-
-messageSchema.index({ chatRoom: 1, createdAt: -1 });
-messageSchema.index({ 'sender.userId': 1 });
-messageSchema.index({ deliveryStatus: 1 });
-
-// Export models
-export const ChatRoom = mongoose.models.ChatRoom || mongoose.model('ChatRoom', chatRoomSchema);
-export const Message = mongoose.models.Message || mongoose.model('Message', messageSchema);
+export default Chat;

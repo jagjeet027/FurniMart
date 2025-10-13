@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import api from '../axios/axiosInstance';
 import { useAuth } from '../contexts/AuthContext';
-import ChatModal from '../orderpages/ChatModal'; // Import your ChatModal component
+import ChatModal from '../components/userDashBoard/UserChatModal'; // Import your ChatModal component
 
 const ProductDetailPage = () => {
   const { id } = useParams();

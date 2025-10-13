@@ -9,6 +9,7 @@ import {
   forgotPassword,
   resetPassword
 } from '../Controllers/userController.js';
+import { updateUserProfile } from '../Controllers/profileController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 import adminAuth from '../middleware/adminAuth.js';
 import loginAuth from '../middleware/loginAuth.js';
@@ -19,16 +20,18 @@ const router = express.Router();
 // ===== PUBLIC ROUTES =====
 router.post('/register', registerUser);
 router.post('/login', loginAuth, loginUser);
-
-// FIXED: Changed from /refresh-token to match API calls
 router.post('/refresh-token', refreshToken);
-
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password/:token', resetPassword);
 
 // ===== PROTECTED USER ROUTES =====
 router.post('/logout', authenticateToken, logoutUser);
 router.get('/me', authenticateToken, getUserProfile);
+
+// NEW: Update user profile (name, phone, address only)
+router.patch('/profile', authenticateToken, updateUserProfile);
+
+// Update user to manufacturer
 router.put('/me', authenticateToken, updateUserToManufacturer);
 
 // ===== ADMIN ROUTES =====

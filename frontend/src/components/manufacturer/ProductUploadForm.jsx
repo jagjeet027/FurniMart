@@ -57,7 +57,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
-  // Fetch manufacturer info first
   useEffect(() => {
     const fetchManufacturerInfo = async () => {
       setIsLoadingManufacturer(true);
@@ -73,7 +72,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
         if (response.data.success && response.data.data) {
           const manufacturer = response.data.data;
           
-          // Check manufacturer status
           if (manufacturer.status !== 'approved') {
             setManufacturerError(
               manufacturer.status === 'pending' 
@@ -105,7 +103,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
     }
   }, [token]);
 
-  // Fetch categories
   useEffect(() => {
     const fetchCategories = async () => {
       setIsLoadingCategories(true);
@@ -129,7 +126,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
     fetchCategories();
   }, []);
 
-  // Fetch product counts
   useEffect(() => {
     const fetchProductCounts = async () => {
       const counts = {};
@@ -192,7 +188,13 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
     const selectedValue = e.target.value;
     const selectedCategory = categories.find(cat => cat._id === selectedValue);
     
-    if (selectedCategory) {
+    if (selectedValue === "custom") {
+      setProductData(prev => ({
+        ...prev,
+        category: "custom",
+        categoryName: ""
+      }));
+    } else if (selectedCategory) {
       setProductData(prev => ({
         ...prev,
         category: selectedValue,
@@ -204,6 +206,13 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
         category: selectedValue,
         categoryName: selectedValue
       }));
+    }
+  };
+
+  const handleKeyDown = (e, action) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (action) action();
     }
   };
 
@@ -254,6 +263,43 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
     navigate("/products");
   };
 
+  // Helper function to create category if needed
+  const ensureCategoryExists = async (categoryId, categoryName) => {
+    try {
+      // If it's a custom category, create it first
+      if (categoryId === "custom" && categoryName.trim()) {
+        console.log("Creating new category:", categoryName);
+        
+        const response = await api.post('/categories', {
+          name: categoryName.trim(),
+          description: `Products in the ${categoryName.trim()} category`
+        }, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          }
+        });
+        
+        if (response.data && response.data.category && response.data.category._id) {
+          console.log("Category created successfully:", response.data.category);
+          return {
+            categoryId: response.data.category._id,
+            categoryName: response.data.category.name
+          };
+        }
+      }
+      
+      // If it's an existing category, just return it
+      return {
+        categoryId: categoryId,
+        categoryName: categoryName
+      };
+    } catch (error) {
+      console.error("Failed to create category:", error);
+      throw new Error(`Failed to create category: ${error.response?.data?.message || error.message}`);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsUploading(true);
@@ -261,6 +307,31 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
     setUploadSuccess(false);
     
     try {
+      // Validate category name for custom categories
+      if (productData.category === "custom" && !productData.categoryName.trim()) {
+        setUploadError("Please enter a category name");
+        setIsUploading(false);
+        return;
+      }
+
+      // Handle category - create if custom
+      let finalCategoryId = productData.category;
+      let finalCategoryName = productData.categoryName;
+
+      if (productData.category === "custom") {
+        try {
+          const categoryResult = await ensureCategoryExists(productData.category, productData.categoryName);
+          finalCategoryId = categoryResult.categoryId;
+          finalCategoryName = categoryResult.categoryName;
+          console.log("Using category:", finalCategoryId, finalCategoryName);
+        } catch (error) {
+          setUploadError(error.message);
+          setIsUploading(false);
+          return;
+        }
+      }
+
+      // Upload images
       let imageUrls = [];
       if (images.length > 0) {
         try {
@@ -300,13 +371,11 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
         ? productData.price
         : `$${productData.price}`;
       
-      // Remove manufacturer and manufacturerInfo from productData
-      // Backend will automatically set these from authenticated manufacturer
       const finalProductData = {
         name: productData.name,
         price: formattedPrice,
-        category: productData.category,
-        categoryName: productData.categoryName,
+        category: finalCategoryId,
+        categoryName: finalCategoryName,
         description: productData.description,
         sizes: productData.sizes,
         features: productData.features,
@@ -316,6 +385,8 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
         reviews: productData.reviews,
         stock: parseInt(productData.stock) || 10,
       };
+      
+      console.log("Submitting product data:", finalProductData);
       
       try {
         const response = await api.post("/products/add", finalProductData, {
@@ -328,7 +399,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
         console.log("Product uploaded successfully:", response.data);
         setUploadSuccess(true);
         
-        // Reset form
         setProductData({
           name: "",
           price: "",
@@ -361,7 +431,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
     }
   };
 
-  // Show loading state
   if (isLoadingManufacturer) {
     return (
       <div className="max-w-5xl mx-auto p-6 bg-white rounded-xl shadow-md">
@@ -375,7 +444,6 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
     );
   }
 
-  // Show error if manufacturer not approved
   if (manufacturerError) {
     return (
       <div className="max-w-5xl mx-auto p-6">
@@ -500,6 +568,7 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
               name="name"
               value={productData.name}
               onChange={handleInputChange}
+              onKeyDown={(e) => handleKeyDown(e, null)}
               className="w-full px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm"
               required
             />
@@ -514,6 +583,7 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
               name="price"
               value={productData.price}
               onChange={handleInputChange}
+              onKeyDown={(e) => handleKeyDown(e, null)}
               placeholder="299"
               className="w-full px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm"
               required
@@ -534,6 +604,7 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
                 name="rating"
                 value={productData.rating}
                 onChange={handleInputChange}
+                onKeyDown={(e) => handleKeyDown(e, null)}
                 min="0"
                 max="5"
                 step="0.1"
@@ -559,6 +630,7 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
               name="stock"
               value={productData.stock}
               onChange={handleInputChange}
+              onKeyDown={(e) => handleKeyDown(e, null)}
               min="0"
               className="w-full px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm"
               required
@@ -596,9 +668,10 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
               
               <div className="grid grid-cols-4 gap-2 mt-3">
                 {categories.slice(0, 8).map((category) => (
-                  <div 
-                    key={category._id} 
-                    className={`py-2 px-3 rounded-lg cursor-pointer text-sm text-center transition-colors ${
+                  <button
+                    key={category._id}
+                    type="button"
+                    className={`py-2 px-3 rounded-lg text-sm text-center transition-colors ${
                       productData.category === category._id 
                         ? 'bg-orange-500 text-white shadow-md' 
                         : 'bg-white hover:bg-orange-100 text-orange-800 border border-orange-200'
@@ -617,7 +690,7 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
                         {categoryCounts[category._id]} {categoryCounts[category._id] === 1 ? 'product' : 'products'}
                       </span>
                     ) : null}
-                  </div>
+                  </button>
                 ))}
               </div>
             </>
@@ -633,10 +706,16 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
                 name="categoryName"
                 value={productData.categoryName}
                 onChange={handleInputChange}
+                onKeyDown={(e) => handleKeyDown(e, null)}
                 placeholder="Enter new category name"
                 className="w-full px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white"
                 required
               />
+              <p className="text-xs text-orange-600 mt-1">
+                {productData.categoryName.trim() 
+                  ? `Will create category: "${productData.categoryName.trim()}"` 
+                  : 'Please enter a category name'}
+              </p>
             </div>
           )}
         </div>
@@ -666,6 +745,7 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
               type="text"
               value={newSize}
               onChange={(e) => setNewSize(e.target.value)}
+              onKeyDown={(e) => handleKeyDown(e, addSize)}
               className="flex-1 px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm"
               placeholder="Enter size (e.g., 8x6 ft)"
             />
@@ -708,6 +788,7 @@ const ProductUploadForm = ({ onSubmitSuccess }) => {
                 type="text"
                 value={feature}
                 onChange={(e) => updateFeature(index, e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, null)}
                 className="flex-1 px-4 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm"
                 placeholder="Enter a product feature"
               />

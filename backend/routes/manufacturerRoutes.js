@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 import adminAuth from '../middleware/adminAuth.js';
-import flexibleAuth from '../middleware/flexibleAuth.js'; // NEW IMPORT
+import flexibleAuth from '../middleware/flexibleAuth.js';
 import {
   getMyManufacturer,
   registerManufacturer,

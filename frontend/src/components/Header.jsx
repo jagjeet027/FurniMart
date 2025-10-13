@@ -21,7 +21,6 @@ import {
   Edit,
   Search,
   Loader2,
-  Lightbulb,
   Plus
 } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -30,38 +29,38 @@ import api from '../axios/axiosInstance';
 
 const menuSections = [
   {
-    icon: <User className="h-5 w-5 text-indigo-600" />,
+    icon: <User className="h-5 w-5 text-orange-600" />,
     text: 'Profile',
-    link: '/profile'
+    link: '/user-profile'
   },
   {
-    icon: <Factory className="h-5 w-5 text-emerald-600" />,
+    icon: <Factory className="h-5 w-5 text-orange-600" />,
     text: 'Manufacturer Dashboard',
     link: '/manufacturer/dashboard',
     showOnlyForManufacturer: true
   },
   {
-    icon: <ShoppingCart className="h-5 w-5 text-amber-600" />,
+    icon: <ShoppingCart className="h-5 w-5 text-orange-600" />,
     text: 'Orders',
     link: '/orders'
   },
   {
-    icon: <Clipboard className="h-5 w-5 text-blue-600" />,
+    icon: <Clipboard className="h-5 w-5 text-orange-600" />,
     text: 'My Quotes',
     link: '/quotes'
   },
   {
-    icon: <MessageCircle className="h-5 w-5 text-violet-600" />,
+    icon: <MessageCircle className="h-5 w-5 text-orange-600" />,
     text: 'Chat History',
     link: '/chat-history'
   },
   {
-    icon: <Heart className="h-5 w-5 text-rose-600" />,
+    icon: <Heart className="h-5 w-5 text-orange-600" />,
     text: 'My Wishlist',
     link: '/wishlist'
   },
   {
-    icon: <HelpCircle className="h-5 w-5 text-teal-600" />,
+    icon: <HelpCircle className="h-5 w-5 text-orange-600" />,
     text: 'Support',
     link: '/chatsupport'
   },
@@ -71,17 +70,17 @@ const menuSections = [
     link: '/user-guide'
   },
   {
-    icon: <Settings className="h-5 w-5 text-gray-600" />,
+    icon: <Settings className="h-5 w-5 text-orange-600" />,
     text: 'Settings',
     link: '/settings'
   },
   {
-    icon: <Shield className="h-5 w-5 text-green-600" />,
+    icon: <Shield className="h-5 w-5 text-orange-600" />,
     text: 'Policies',
     link: '/policies'
   },
   {
-    icon: <FileText className="h-5 w-5 text-slate-600" />,
+    icon: <FileText className="h-5 w-5 text-orange-600" />,
     text: 'Terms & Conditions',
     link: '/terms'
   }
@@ -123,17 +122,17 @@ const ProfileMenu = ({ user, handleLogout }) => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl z-50 border">
-          <div className="px-4 py-3 bg-gradient-to-r from-orange-50 to-orange-100 rounded-t-xl">
+        <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl z-50 border border-orange-100">
+          <div className="px-4 py-3 bg-gradient-to-r from-orange-500 to-amber-500 rounded-t-xl">
             <div className="flex items-center">
-              <div className="p-2 bg-orange-200 rounded-full">
-                <User className="h-6 w-6 text-orange-600" />
+              <div className="p-2 bg-white bg-opacity-20 rounded-full">
+                <User className="h-6 w-6 text-white" />
               </div>
               <div className="ml-3">
-                <p className="text-sm font-semibold text-gray-800">{user?.name || 'Guest'}</p>
-                <p className="text-xs text-gray-500">{user?.email || 'No email'}</p>
+                <p className="text-sm font-semibold text-white">{user?.name || 'Guest'}</p>
+                <p className="text-xs text-orange-100">{user?.email || 'No email'}</p>
                 {user?.isManufacturer && (
-                  <span className="inline-block px-2 py-1 mt-1 text-xs font-medium text-emerald-700 bg-emerald-100 rounded-full">
+                  <span className="inline-block px-2 py-1 mt-1 text-xs font-medium text-orange-700 bg-white rounded-full">
                     Manufacturer
                   </span>
                 )}
@@ -155,7 +154,7 @@ const ProfileMenu = ({ user, handleLogout }) => {
             ))}
           </div>
 
-          <div className="border-t py-1">
+          <div className="border-t border-orange-100 py-1">
             <button
               onClick={() => {
                 handleLogout();
@@ -213,19 +212,19 @@ const NotificationsDropdown = () => {
       >
         <Bell className="h-6 w-6 text-gray-700" />
         {notificationCount > 0 && (
-          <span className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+          <span className="absolute top-0 right-0 bg-orange-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
             {notificationCount}
           </span>
         )}
       </button>
       
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl z-50 border">
-          <div className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-orange-50 to-orange-100 rounded-t-xl">
-            <h3 className="font-medium">Notifications</h3>
+        <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl z-50 border border-orange-100">
+          <div className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 rounded-t-xl">
+            <h3 className="font-medium text-white">Notifications</h3>
             <button 
               onClick={markAllAsRead}
-              className="text-xs text-orange-600 hover:text-orange-800"
+              className="text-xs text-white hover:text-orange-100"
             >
               Mark all as read
             </button>
@@ -287,7 +286,6 @@ const SearchComponent = ({ isAuthenticated }) => {
     try {
       setIsSearching(true);
       
-      // First check if query matches a category
       const matchedCategory = categories.find(
         cat => cat.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
@@ -299,11 +297,9 @@ const SearchComponent = ({ isAuthenticated }) => {
         return;
       }
       
-      // Search for products
       const response = await api.get(`/products?search=${encodeURIComponent(searchQuery)}`);
       const products = Array.isArray(response.data) ? response.data : (response.data.products || []);
       
-      // Navigate to search results page regardless of results
       if (products.length > 0) {
         navigate(`/search-results?q=${encodeURIComponent(searchQuery)}`);
       } else {
@@ -315,7 +311,6 @@ const SearchComponent = ({ isAuthenticated }) => {
       
     } catch (err) {
       console.error('Search error:', err);
-      // Navigate to search results page with error flag
       navigate(`/search-results?q=${encodeURIComponent(searchQuery)}&no-results=true`);
       setSearchQuery('');
       setIsExpanded(false);
@@ -323,6 +318,7 @@ const SearchComponent = ({ isAuthenticated }) => {
       setIsSearching(false);
     }
   };
+
   if (isExpanded) {
     return (
       <div className="fixed inset-0 bg-white z-50 md:relative md:bg-transparent md:inset-auto">
@@ -347,7 +343,7 @@ const SearchComponent = ({ isAuthenticated }) => {
                 <button 
                   type="submit"
                   disabled={isSearching || !searchQuery.trim()} 
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-orange-500 to-orange-600 p-2 rounded-full text-white disabled:opacity-50"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-orange-500 to-amber-500 p-2 rounded-full text-white disabled:opacity-50"
                 >
                   {isSearching ? (
                     <Loader2 size={20} className="animate-spin" />
@@ -396,7 +392,7 @@ const SearchComponent = ({ isAuthenticated }) => {
           <button 
             type="submit"
             disabled={isSearching || !searchQuery.trim()} 
-            className="absolute right-1 md:right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-orange-500 to-orange-600 p-1.5 md:p-2 rounded-full text-white disabled:opacity-50"
+            className="absolute right-1 md:right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-orange-500 to-amber-500 p-1.5 md:p-2 rounded-full text-white disabled:opacity-50"
           >
             {isSearching ? (
               <Loader2 size={16} className="md:w-5 md:h-5 animate-spin" />
@@ -428,17 +424,15 @@ const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
 
   return (
     <div className="fixed inset-0 bg-white z-50 md:hidden flex flex-col">
-      {/* Header - Fixed */}
-      <div className="flex-shrink-0 bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+      <div className="flex-shrink-0 bg-gradient-to-r from-orange-500 to-amber-500 text-white">
         <div className="p-4">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-bold">Profile</h1>
-            <button onClick={onClose} className="p-2 hover:bg-orange-700 rounded-full transition-colors">
+            <button onClick={onClose} className="p-2 hover:bg-orange-600 rounded-full transition-colors">
               <X className="h-6 w-6" />
             </button>
           </div>
           
-          {/* User Info */}
           <div className="flex items-center">
             <div className="p-3 bg-white bg-opacity-20 rounded-full">
               <User className="h-8 w-8" />
@@ -447,7 +441,7 @@ const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
               <h2 className="text-lg font-semibold">{user?.name || 'Guest'}</h2>
               <p className="text-orange-100 text-sm">{user?.email || 'No email'}</p>
               {user?.isManufacturer && (
-                <span className="inline-block px-3 py-1 mt-2 text-xs font-medium text-emerald-700 bg-white rounded-full">
+                <span className="inline-block px-3 py-1 mt-2 text-xs font-medium text-orange-700 bg-white rounded-full">
                   Manufacturer
                 </span>
               )}
@@ -456,14 +450,12 @@ const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
         </div>
       </div>
 
-      {/* Content - Scrollable */}
       <div className="flex-1 overflow-y-auto p-4 pb-6">
-        {/* Quick Actions */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-3">Quick Actions</h3>
           <div className="grid grid-cols-2 gap-3">
             <button 
-              onClick={() => handleNavigation('/profile')}
+              onClick={() => handleNavigation('/user-profile')}
               className="flex items-center justify-center p-4 bg-orange-50 rounded-lg border border-orange-200 hover:bg-orange-100 transition-colors"
             >
               <Edit className="h-5 w-5 text-orange-600 mr-2" />
@@ -473,9 +465,9 @@ const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
             {user?.isManufacturer && (
               <button 
                 onClick={() => handleNavigation('/manufacturer/dashboard')}
-                className="flex items-center justify-center p-4 bg-emerald-50 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition-colors"
+                className="flex items-center justify-center p-4 bg-orange-50 rounded-lg border border-orange-200 hover:bg-orange-100 transition-colors"
               >
-                <Factory className="h-5 w-5 text-emerald-600 mr-2" />
+                <Factory className="h-5 w-5 text-orange-600 mr-2" />
                 <span className="text-sm font-medium text-gray-700">Dashboard</span>
               </button>
             )}
@@ -483,16 +475,15 @@ const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
             {!user?.isManufacturer && (
               <button 
                 onClick={() => handleNavigation('/manufacturer/register')}
-                className="flex items-center justify-center p-4 bg-purple-50 rounded-lg border border-purple-200 hover:bg-purple-100 transition-colors"
+                className="flex items-center justify-center p-4 bg-orange-50 rounded-lg border border-orange-200 hover:bg-orange-100 transition-colors"
               >
-                <Factory className="h-5 w-5 text-purple-600 mr-2" />
+                <Factory className="h-5 w-5 text-orange-600 mr-2" />
                 <span className="text-sm font-medium text-gray-700">Become Seller</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Menu Items */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-3">Menu</h3>
           <div className="space-y-1">
@@ -500,7 +491,7 @@ const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
               <button
                 key={index}
                 onClick={() => handleNavigation(item.link)}
-                className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200 active:scale-95"
+                className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-orange-50 transition-colors duration-200 active:scale-95"
               >
                 <div className="flex items-center">
                   {item.icon}
@@ -512,7 +503,6 @@ const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
           </div>
         </div>
 
-        {/* Logout Button */}
         <div className="pt-4 border-t">
           <button
             onClick={() => {
@@ -532,7 +522,7 @@ const MobileProfilePage = ({ isOpen, onClose, user, handleLogout }) => {
 
 const MobileFooter = ({ isAuthenticated, onProfileClick, wishlistCount }) => {
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden z-40 shadow-lg safe-area-bottom">
+    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-orange-100 md:hidden z-40 shadow-lg safe-area-bottom">
       <div className="grid grid-cols-5 h-16">
         <Link to="/" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600 transition-colors active:scale-95">
           <Home className="h-6 w-6" />
@@ -547,7 +537,7 @@ const MobileFooter = ({ isAuthenticated, onProfileClick, wishlistCount }) => {
         <Link to="/wishlist" className="flex flex-col items-center justify-center text-gray-600 hover:text-orange-600 transition-colors relative active:scale-95">
           <Heart className="h-6 w-6" />
           {wishlistCount > 0 && (
-            <span className="absolute top-1 right-1/4 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+            <span className="absolute top-1 right-1/4 bg-orange-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
               {wishlistCount}
             </span>
           )}
@@ -652,22 +642,20 @@ const Header = () => {
     <>
       <header className="bg-gradient-to-r from-white to-orange-50 shadow-sm sticky top-0 z-40 w-full border-b border-orange-100">
         <div className="w-full px-4 py-3">
-          {/* Mobile Header */}
           <div className="md:hidden flex items-center justify-between">
             <Link
               to="/"
-              className="text-xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 text-transparent bg-clip-text"
+              className="text-xl font-bold bg-gradient-to-r from-orange-500 to-amber-500 text-transparent bg-clip-text"
             >
               FurniMart
             </Link>
             <SearchComponent isAuthenticated={isAuthenticated} />
           </div>
 
-          {/* Desktop Header */}
           <div className="hidden md:flex items-center justify-between">
             <Link
               to="/"
-              className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 text-transparent bg-clip-text"
+              className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-amber-500 text-transparent bg-clip-text"
             > 
               FurniMart
             </Link>
@@ -675,21 +663,10 @@ const Header = () => {
             <SearchComponent isAuthenticated={isAuthenticated} />
             
             <div className="flex items-center space-x-4"> 
-              {/* Submit New Idea Button - Only show when authenticated */}
-              {isAuthenticated && (
-                <Link
-                  to="/new-idea"
-                  className="px-4 py-2 text-white bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300 flex items-center space-x-2"
-                >
-                  <Lightbulb className="h-4 w-4" />
-                  <span className="text-sm">Submit New Idea</span>
-                </Link>
-              )}
-
               {isAuthenticated && user?.isManufacturer && (
                 <Link
                   to="/manufacturer/dashboard"
-                  className="px-4 py-2 text-white bg-emerald-600 rounded-xl shadow-md hover:bg-emerald-700 hover:scale-105 transition-all duration-300"
+                  className="px-4 py-2 text-white bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300"
                 >
                   Dashboard
                 </Link>
@@ -698,7 +675,7 @@ const Header = () => {
               {isAuthenticated && !user?.isManufacturer && (
                 <Link
                   to="/manufacturer/register"
-                  className="px-4 py-2 text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300"
+                  className="px-4 py-2 text-white bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300"
                 >
                   Become a Manufacturer
                 </Link>
@@ -707,9 +684,9 @@ const Header = () => {
               {isAuthenticated && (
                 <>
                   <Link to="/wishlist" className="relative p-2 hover:bg-orange-100 rounded-full transition-colors duration-200">
-                    <Heart className={`h-6 w-6 text-rose-600 ${wishlistAnimation ? 'animate-pulse scale-110' : ''}`} />
+                    <Heart className={`h-6 w-6 text-orange-600 ${wishlistAnimation ? 'animate-pulse scale-110' : ''}`} />
                     {wishlistCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                         {wishlistCount}
                       </span>
                     )}
@@ -723,13 +700,13 @@ const Header = () => {
                 <>
                   <Link
                     to="/login"
-                    className="px-4 py-2 text-white bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"  
+                    className="px-4 py-2 text-white bg-gradient-to-r from-orange-500 to-amber-500 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"  
                   >
                     Login
                   </Link>
                   <Link
                     to="/signup"
-                    className="px-4 py-2 text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+                    className="px-4 py-2 text-white bg-gradient-to-r from-orange-500 to-amber-500 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
                   >
                     Sign Up
                   </Link> 

@@ -11,8 +11,6 @@ import { Server } from 'socket.io';
 import fs from 'fs';
 import cookieParser from 'cookie-parser';
 import connectDB from './db/db.js';
-import { setupSocket } from './config/socketConfig.js';
-import { predefinedIssues } from './data/issues.js';
 
 import adminRoutes from './routes/adminRoutes.js';
 // Routes
@@ -216,22 +214,13 @@ app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/issues', issueRoutes);
-app.use('/api/chat', chatRoutes);
+app.use('/api/chats', chatRoutes);
 app.use('/api/careers', career);
 app.use('/api/registration', registerIndividual );
 app.use('/api/organizations', organizationRoutes);
-app.use('/api', postRoutes);
+app.use('/api/posts', postRoutes);
 
-// Simple chatbot endpoint for predefined issues
-app.post('/api/chatbot', (req, res) => {
-  const { userInput } = req.body;
-  
-  if (!userInput) {
-    return res.status(400).json({
-      status: 'error',
-      message: 'User input is required'
-    });
-  }
+
 
   app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
@@ -241,24 +230,7 @@ app.post('/api/chatbot', (req, res) => {
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-  
-  // Simple matching algorithm - can be enhanced with fuzzy search
-  const matchedIssue = predefinedIssues.find(item => 
-    item.issue.toLowerCase().includes(userInput.toLowerCase())
-  );
-  
-  if (matchedIssue) {
-    res.json({ 
-      status: 'success',
-      response: matchedIssue.response 
-    });
-  } else {
-    res.json({ 
-      status: 'success',
-      response: "I'm sorry, I couldn't find a matching solution. Please try rephrasing or contact support for further assistance."
-    });
-  }
-});
+
 
 // Global Error Handler
 app.use((err, req, res, next) => {

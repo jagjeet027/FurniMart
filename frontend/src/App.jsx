@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import Header from './components/Header';
 import FurnitureMarketplace from './FurnitureMarketplace';
+import FurniturePlatform from './furniGlobalHub.jsx';
+import ProfilePage from '../src/post/Profilepage.jsx';
 import LoginPage from './components/LoginPage';
 import './index.css';
 import Footer from './components/Footer';
@@ -15,11 +17,9 @@ import ManufacturerRegistration from './components/manufacturer/ManufacturerRegi
 import PremiumFeatures from './components/manufacturer/PremiumFeatures'
 import IssuesPage from './components/manufacturer/IdeaPage.jsx';
 import IssueDetailPage from './components/manufacturer/IdeaDetailPage.jsx';
-import Profile from './components/manufacturer/Profile';
 import Faq from './components/Faqsection/Faq.jsx'
 import Orders from './orderpages/CheckoutPage.jsx'
 import OrderTrackingPage from './orderpages/OrderTrackingPage.jsx';
-import ChatScreen from './components/userDashBoard/ChatScreen.jsx';
 import ProductManagement from './components/manufacturer/ProductManagement';
 import EditProduct from './components/manufacturer/EditProduct.jsx';
 import CheckoutPage from './orderpages/CheckoutPage.jsx';
@@ -31,6 +31,13 @@ import IdeaSharingPlatform from './components/userDashBoard/IdeaSharingPlatform.
 import ForgotPasswordPage from './components/userDashBoard/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './components/userDashBoard/ResetPasswordPage.jsx';
 import SearchResultsPage from './components/userDashBoard/SearchResultsPage.jsx';
+
+import StaffHiring from './career/StaffHiring.jsx';
+import JobApplicationForm from './career/JobApplicationForm.jsx';
+import RegisterIndividuals from './career/RegisterIndividuals.jsx';
+import OrganizationRegister from './career/OrganizationRegister.jsx';
+import NotFoundPage from './components/NotFound';
+import ChatHistory from './components/userDashBoard/ChatHistory.jsx';
 
 const App = () => {
   const location = useLocation();
@@ -53,8 +60,8 @@ const App = () => {
     '/manufacturer/faqsection',
     '/products/management',
     '/categories/management',
-
-    '/new-idea'
+    '/new-idea',
+    '/user-profile'
   ];
 
   // Improved check for paths that should hide header/footer
@@ -85,27 +92,23 @@ const App = () => {
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage/>} />
           <Route path="/reset-password/:token" element={<ResetPasswordPage/>} />
+
+          <Route path="/user-profile" element={<ProfilePage/>}/>
           <Route path="/search-results" element={<SearchResultsPage />} />
           <Route path="/checkout" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
           <Route path="/wishlist" element={<PrivateRoute><WishlistPage /></PrivateRoute>} />
           <Route path="/order-tracking" element={<PrivateRoute><OrderTrackingPage /></PrivateRoute>} />
-          
-          {/* CHAT AND SUPPORT ROUTES */}
-          <Route path="/chatsupport" element={<Navigate to="/chat" />} />
-          <Route path="/chat" element={<ChatScreen />} />
+          <Route path="/chat-history" element={<ChatHistory />} />
           
           {/* HOME PAGE ROUTE */}
           <Route path="/" element={
             <div className="space-y-0">
-              <FurnitureMarketplace />
-              <ProductCard />
+              <FurniturePlatform />
+              
             </div>
           } />
-          
-          {/* PROFILE ROUTES */}
-          <Route path="/profile" element={<PrivateRoute><Profile/></PrivateRoute>} />
+          <Route path='/products' element={<ProductCard />}  />
           <Route path ="/new-idea" element={<PrivateRoute><IdeaSharingPlatform/></PrivateRoute>} />
-          {/* PRODUCT MANAGEMENT ROUTES - Before dynamic product routes */}
           <Route path="/products/management" element={<PrivateRoute><ProductManagement /></PrivateRoute>} />
           
           {/* CATEGORIES ROUTES */}
@@ -134,6 +137,16 @@ const App = () => {
           <Route path="/products" element={<ProductManagement />} />
           <Route path="/products/:id/edit" element={<PrivateRoute><EditProduct /></PrivateRoute>} />
           <Route path="/products/:id" element={<ProductDetailPage />} />
+
+          {/* CAREER ROUTES */}
+          <Route path="/staff-hiring" element={<StaffHiring />} /> 
+          <Route path="/careers" element={<StaffHiring />} />
+          <Route path="/jobs/:jobId/apply" element={<JobApplicationForm />} />
+          <Route path="/register/individual-applicant" element={<RegisterIndividuals/>}/>
+          <Route path="register/organization-applicant" element={<OrganizationRegister/>} />
+
+          {/* 404 NOT FOUND ROUTE - Must be LAST */}
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
 

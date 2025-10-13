@@ -49,6 +49,14 @@ pnpm dev
 ```
 
 
+
+
 ```
-**Step 6: Run the application**
+**Step 6: open another terminal for the admin access..
+
+=>  cd admin 
+=>  npm run dev
+
+admin acess {password: jasusA80@}, {secret code: 947229}
+
 ```

@@ -39,7 +39,6 @@ const productSchema = new mongoose.Schema(
       required: true,
       index: true // For faster queries
     },
-    // NEW: Track which user uploaded this product
     uploadedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

@@ -154,7 +154,6 @@ const loginUser = asyncHandler(async (req, res) => {
 
     res.cookie('refreshToken', refreshToken, cookieOptions);
 
-    console.log(`✅ User logged in successfully: ${email}`);
 
     // Respond with tokens and user data
     res.status(200).json({
@@ -173,7 +172,6 @@ const loginUser = asyncHandler(async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Login error:', error);
     res.status(500).json({ 
       success: false,
       message: 'Login failed',

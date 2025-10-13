@@ -1,26 +1,39 @@
 // routes/postRoutes.js
 import express from 'express';
-import  authenticate  from '../middleware/auth.js';
-import PostController from '../controllers/postController.js';
-import CommentController from '../controllers/commentController.js';
+import { auth, requireManufacturer } from '../middleware/authMiddleware.js';
+import {
+  createPost,
+  getAllPosts,
+  getMyPosts,
+  getPostById,
+  updatePost,
+  deletePost,
+  getPostQuotations
+} from '../controllers/postController.js';
+import {
+  createQuotation,
+  getMyQuotations,
+  updateQuotationStatus,
+  deleteQuotation
+} from '../controllers/quotationController.js';
 
 const router = express.Router();
 
 // Post routes
-router.post('/posts', authenticate, PostController.createPost);
-router.get('/posts', PostController.getAllPosts); // Public
-router.get('/posts/my-posts', authenticate, PostController.getMyPosts);
-router.get('/posts/:id', PostController.getPostById);
-router.put('/posts/:id', authenticate, PostController.updatePost);
-router.delete('/posts/:id', authenticate, PostController.deletePost);
-router.post('/posts/:id/like', authenticate, PostController.toggleLike);
-router.post('/posts/:id/dislike', authenticate, PostController.toggleDislike);
+router.post('/', auth, createPost);
+router.get('/', getAllPosts);
+router.get('/my-posts', auth, getMyPosts);
+router.get('/:id', getPostById);
+router.patch('/:id', auth, updatePost);
+router.delete('/:id', auth, deletePost);
+  
+// Quotation routes for posts
+router.get('/:id/quotations', auth, getPostQuotations);
+router.post('/:id/quotations', auth, requireManufacturer, createQuotation);
 
-// Comment routes
-router.post('/posts/:postId/comments', authenticate, CommentController.addComment);
-router.get('/posts/:postId/comments', CommentController.getComments);
-router.put('/comments/:id', authenticate, CommentController.updateComment);
-router.delete('/comments/:id', authenticate, CommentController.deleteComment);
-router.post('/comments/:id/like', authenticate, CommentController.toggleCommentLike);
+// Quotation management routes
+router.get('/quotations/my-quotations', auth, requireManufacturer, getMyQuotations);
+router.patch('/quotations/:id/status', auth, updateQuotationStatus);
+router.delete('/quotations/:id', auth, deleteQuotation);
 
 export default router;
