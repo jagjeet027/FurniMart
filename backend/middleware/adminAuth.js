@@ -104,4 +104,56 @@ const adminAuth = asyncHandler(async (req, res, next) => {
   }
 });
 
+export const protectAdmin = async (req, res, next) => {
+  try {
+    let token;
+
+    // Get token from header
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    } else if (req.cookies.adminToken) {
+      token = req.cookies.adminToken;
+    }
+
+    // Check if token exists
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized to access this route',
+      });
+    }
+
+    try {
+      // Verify token
+      const decoded = jwt.verify(token, JWT_SECRET);
+      
+      // Check if admin exists
+      const admin = await Admin.findById(decoded.adminId);
+      if (!admin) {
+        return res.status(401).json({
+          success: false,
+          message: 'Admin not found',
+        });
+      }
+
+      // Attach admin info to request
+      req.adminId = decoded.adminId;
+      req.admin = admin;
+      
+      next();
+    } catch (error) {
+      console.error('Token verification error:', error);
+      return res.status(401).json({
+        success: false,
+        message: 'Token is not valid',
+      });
+    }
+  } catch (error) {
+    res.status(401).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 export default adminAuth;

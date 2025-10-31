@@ -1,9 +1,9 @@
-// axiosInstance.js - Replace with this improved version:
+// axiosInstance.js
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL:'http://localhost:5000/api',
-  timeout: 15000, // 15 seconds timeout
+  baseURL: 'http://localhost:5000/api',
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -13,12 +13,15 @@ const api = axios.create({
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
+    // ✅ FIXED: Look for 'adminToken' instead of 'token'
+    const token = localStorage.getItem('adminToken');
+    
+    if (token && token !== 'undefined' && token !== 'null') {
       config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      console.warn('⚠️ No valid token found for request:', config.url);
     }
     
-    console.log(`Making ${config.method?.toUpperCase()} request to:`, config.url);
     return config;
   },
   (error) => {
@@ -27,47 +30,45 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor with better error handling
+// Response interceptor
 api.interceptors.response.use(
   (response) => {
-    console.log(`Response from ${response.config.url}:`, response.status);
+    console.log(`✅ Response from ${response.config.url}:`, response.status);
     return response;
   },
   (error) => {
-    console.error('Response error:', {
-      url: error.config?.url,
+    const url = error.config?.url;
+    const status = error.response?.status;
+    
+    console.error('❌ Response error:', {
+      url,
       method: error.config?.method,
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message
+      status,
+      data: error.response?.data
     });
 
-    // Create a more user-friendly error object
-    const customError = {
-      message: 'Network Error',
-      originalError: error,
-      status: error.response?.status,
-      data: error.response?.data
-    };
-
-    if (error.response) {
-      // Server responded with error status
-      customError.message = error.response.data?.message || 
-                            `Server error: ${error.response.status}`;
+    // Handle 401 errors
+    if (status === 401) {
+      localStorage.removeItem('adminToken');
       
-      if (error.response.status === 401) {
-        customError.message = 'Authentication failed';
-        localStorage.removeItem('token');
-        // Don't redirect here, let components handle it
-      }
-    } else if (error.request) {
-      // Network error
-      customError.message = 'Unable to connect to the server. Please check your internet connection.';
-    } else {
-      // Other error
-      customError.message = error.message || 'An unexpected error occurred';
+      // Optional: Trigger logout in your app
+      window.dispatchEvent(new CustomEvent('admin-unauthorized'));
     }
 
+    // Create user-friendly error
+    const customError = new Error();
+    
+    if (error.response) {
+      customError.message = error.response.data?.message || 
+                           `Server error: ${status}`;
+      customError.status = status;
+    } else if (error.request) {
+      customError.message = 'Unable to connect to server. Please check your connection.';
+    } else {
+      customError.message = error.message || 'An unexpected error occurred';
+    }
+    
+    customError.response = error.response;
     return Promise.reject(customError);
   }
 );

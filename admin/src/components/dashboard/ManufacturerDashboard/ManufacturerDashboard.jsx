@@ -5,7 +5,6 @@ import { Bell, Building, Users, Briefcase } from 'lucide-react';
 import Sidebar from '../ManufacturerDashboard/Sidebar';
 import MobileMenuButton from '../ManufacturerDashboard/MobileMenuButton';
 import DashboardSection from '../ManufacturerDashboard/DashboardSection';
-import RevenueSection from '../ManufacturerDashboard/RevenueSection';
 import InnovationsSection from '../ManufacturerDashboard/InnovationsSection';
 import ManufacturersSection from '../ManufacturerDashboard/ManufacturersSection';
 import NotificationsPanel from '../ManufacturerDashboard/NotificationsPanel';
@@ -13,9 +12,7 @@ import AdminJobDashboard from './career/AdminJobDashboard';
 import IdeaDetailsPage from './IdeaPage';
 import { mockApi } from '../../../services/api';
 import OrganizationSection from './career/OrganizationSection';
-// Import your existing Organization and Individuals components
-
-// import IndividualsSection from './IndividualsSection';
+import CargoDashboard from './cargo_insurance/CargoDashboard';
 
 const ManufacturerDashboard = () => {
   const [manufacturers, setManufacturers] = useState([]);
@@ -97,8 +94,8 @@ const ManufacturerDashboard = () => {
         return <DashboardSection manufacturers={manufacturers} />;
       case 'manufacturers':
         return <ManufacturersSection manufacturers={manufacturers} notifications={notifications} />;
-      case 'revenue':
-        return <RevenueSection manufacturers={manufacturers} />;
+      case 'cargo_insurance':
+        return <CargoDashboard />;
       case 'innovations':
         return <InnovationsSection />;
       

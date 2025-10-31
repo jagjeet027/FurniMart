@@ -213,59 +213,47 @@ export const AuthProvider = ({ children }) => {
     console.log('✅ Admin logout complete, all tokens cleared');
   }, []);
 
-  // FIXED: Check registration status endpoint
   const checkRegistrationStatus = useCallback(async () => {
-    // Prevent multiple simultaneous calls
-    if (checkingRef.current) {
-      console.log('Registration check already in progress, skipping...');
-      return;
-    }
+  // Prevent duplicate calls
+  if (checkingRef.current) return;
+  
+  checkingRef.current = true;
+  setCheckingRegistration(true);
+  
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     
-    checkingRef.current = true;
-    setCheckingRegistration(true);
-    
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
-      const timestamp = Date.now();
-      // FIXED: Use the correct endpoint
-      const response = await fetch(`${API_BASE}/check-registration-status?t=${timestamp}`, {
+    const response = await fetch(
+      `${API_BASE}/check-registration-status?t=${Date.now()}`,
+      {
         method: 'GET',
-        headers: { 
+        headers: {
           'X-Requested-With': 'XMLHttpRequest',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
+          'Cache-Control': 'no-cache'
         },
         signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+    );
+    
+    clearTimeout(timeoutId);
+    
+    if (response.ok) {
       const data = await response.json();
-      setIsRegistered(data.isRegistered);
+      setIsRegistered(data.isRegistered ?? false);
       console.log('✅ Registration status checked:', data.isRegistered);
-      
-    } catch (error) {
-      console.error('Error checking registration:', error);
-      
-      // Only show user-friendly error for network issues
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        console.warn('Server appears to be offline. Using default settings.');
-      }
-      
-      // Set default values on error
+    } else {
+      console.warn('Registration check returned status:', response.status);
       setIsRegistered(false);
-    } finally {
-      setCheckingRegistration(false);
-      checkingRef.current = false;
     }
-  }, [API_BASE]);
+  } catch (error) {
+    console.warn('Registration check error:', error.message);
+    setIsRegistered(false);
+  } finally {
+    setCheckingRegistration(false);
+    checkingRef.current = false;
+  }
+}, [API_BASE]);
 
   // Enhanced token refresh with proper localStorage sync
   const refreshToken = useCallback(async () => {
@@ -386,84 +374,61 @@ export const AuthProvider = ({ children }) => {
     };
   })(), []);
 
-  // FIXED: Initialize with proper token restoration
   useEffect(() => {
-    if (initializedRef.current) return; // Prevent re-initialization
-    initializedRef.current = true;
+  if (initializedRef.current) return;
+  initializedRef.current = true;
+  
+  const initializeAuth = async () => {
+    console.log('Initializing admin auth context...');
     
-    const initializeAuth = async () => {
-      console.log('Initializing admin auth context...');
-      
-      // FIXED: First check localStorage for admin token
+    try {
+      // Check localStorage for token
       const storedToken = localStorage.getItem('adminToken');
       
       if (storedToken && storedToken !== 'undefined' && storedToken !== 'null') {
-        console.log('Found stored admin token, attempting to restore session...');
+        console.log('Found stored token, attempting to validate...');
         
-        // Try to validate the token by making a test request
         try {
-          const testResponse = await fetch(`${API_BASE}/refresh-token`, {
-            method: 'POST',
+          const response = await fetch(`${API_BASE}/profile`, {
+            method: 'GET',
             headers: {
               'Authorization': `Bearer ${storedToken}`,
               'Content-Type': 'application/json'
             }
           });
           
-          if (testResponse.ok) {
-            const tokenData = await testResponse.json();
-            
-            // Update with fresh token
-            localStorage.setItem('adminToken', tokenData.token);
-            setToken(tokenData.token);
-            setUser(tokenData.admin);
+          if (response.ok) {
+            const data = await response.json();
+            setToken(storedToken);
+            setUser(data.data);
             setLastActivity(Date.now());
             setSessionExpiry(Date.now() + (24 * 60 * 60 * 1000));
-            
-            console.log('✅ Admin session restored with fresh token');
-          } else {
-            // Token is invalid, clear it
-            console.log('Stored admin token is invalid, clearing...');
+            console.log('✅ Session restored from stored token');
+          } else if (response.status === 401) {
+            console.log('Stored token is invalid, clearing...');
             localStorage.removeItem('adminToken');
           }
-        } catch (error) {
-          console.error('Error validating stored admin token:', error);
+        } catch (validationError) {
+          console.warn('Token validation failed:', validationError.message);
           localStorage.removeItem('adminToken');
         }
+      } else {
+        console.log('No stored token found');
       }
-      
-      // Restore from session storage as fallback
-      try {
-        const sessionData = sessionStorage.getItem('admin_session');
-        if (sessionData && !token) {
-          const parsed = JSON.parse(sessionData);
-          const now = Date.now();
-          
-          // Check if session is still valid
-          if (parsed.expiryTime && now < parsed.expiryTime && parsed.token) {
-            localStorage.setItem('adminToken', parsed.token);
-            setToken(parsed.token);
-            setUser(parsed.user);
-            setLastActivity(now);
-            setSessionExpiry(parsed.expiryTime);
-            console.log('✅ Admin session restored from sessionStorage');
-          } else {
-            // Session expired, clean up
-            sessionStorage.removeItem('admin_session');
-            console.log('Admin session expired, cleaned up');
-          }
-        }
-      } catch (error) {
-        console.error('Session restoration failed:', error);
-        sessionStorage.removeItem('admin_session');
-      }
-      
-      // Then check registration status
-      await checkRegistrationStatus();
-    };
+    } catch (error) {
+      console.error('Auth initialization error:', error);
+    } finally {
+      // Check registration status - separate from token check
+      setTimeout(() => {
+        checkRegistrationStatus().catch(err => 
+          console.warn('Registration check failed:', err.message)
+        );
+      }, 500);
+    }
+  };
 
-    initializeAuth();
-  }, []); // Empty dependency array - only run once
+  initializeAuth();
+}, []);
 
   // Session management with better refresh timing
   useEffect(() => {

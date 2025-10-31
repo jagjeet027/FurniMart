@@ -100,14 +100,9 @@ export const registerAdmin = async (req, res) => {
 // Login admin
 export const loginAdmin = async (req, res) => {
   try {
-    const { adminId, password, secretCode } = req.body;
-    
-    console.log('=== ADMIN LOGIN ATTEMPT ===');
-    console.log('Admin ID:', adminId);
-    
+    const { adminId, password, secretCode } = req.body;    
     const admin = await Admin.findOne({ adminId: "ADmin820" });
     if (!admin) {
-      console.log('❌ Admin not found');
       return res.status(404).json({ 
         message: "Admin not found" 
       });
@@ -115,7 +110,6 @@ export const loginAdmin = async (req, res) => {
     
     const isPasswordValid = await admin.comparePassword(password);
     if (!isPasswordValid) {
-      console.log('❌ Invalid password');
       return res.status(401).json({ 
         message: "Invalid credentials" 
       });
@@ -131,7 +125,6 @@ export const loginAdmin = async (req, res) => {
     
     const token = generateToken(admin._id);
     
-    console.log('✅ Admin login successful:', admin.email);
     
     res.json({
       message: "Login successful",
@@ -154,10 +147,7 @@ export const loginAdmin = async (req, res) => {
 
 // Get admin profile (NEW)
 export const getAdminProfile = async (req, res) => {
-  try {
-    console.log('=== GET ADMIN PROFILE ===');
-    console.log('Admin ID from middleware:', req.adminId);
-    
+  try {    
     const admin = await Admin.findById(req.adminId).select('-password -secretCode');
     
     if (!admin) {
@@ -167,8 +157,6 @@ export const getAdminProfile = async (req, res) => {
         message: 'Admin not found'
       });
     }
-    
-    console.log('✅ Admin profile retrieved:', admin.email);
     
     res.json({
       success: true,

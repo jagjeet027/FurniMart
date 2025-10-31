@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import Header from './components/Header';
-import FurnitureMarketplace from './FurnitureMarketplace';
+import SurakshitSafar from './cargo/Surakshitsafar.jsx'
 import FurniturePlatform from './furniGlobalHub.jsx';
 import ProfilePage from '../src/post/Profilepage.jsx';
 import LoginPage from './components/LoginPage';
@@ -54,6 +54,7 @@ const App = () => {
     '/manufacturer/register',
     '/manufacturer/dashboard',
     '/manufactdetails',
+    '/cargo-insurance',
     '/inventory',
     '/order',
     '/premium',
@@ -103,10 +104,11 @@ const App = () => {
           {/* HOME PAGE ROUTE */}
           <Route path="/" element={
             <div className="space-y-0">
-              <FurniturePlatform />
-              
+              <FurniturePlatform />              
             </div>
           } />
+          <Route path="/cargo-insurance" element={<SurakshitSafar />} />
+
           <Route path='/products' element={<ProductCard />}  />
           <Route path ="/new-idea" element={<PrivateRoute><IdeaSharingPlatform/></PrivateRoute>} />
           <Route path="/products/management" element={<PrivateRoute><ProductManagement /></PrivateRoute>} />

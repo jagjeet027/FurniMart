@@ -3,11 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Home, Building2, TrendingUp, Lightbulb, Package, FileText, 
   BarChart3, Settings, UserCheck, X, Clock, LogOut,
-  ChevronRight, Users, Briefcase, Building, Menu
+  ChevronRight, Users, Briefcase, Building
 } from 'lucide-react';
-
-// Import your AuthContext
-// import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext.jsx';
 
 // Custom CSS for scrollbar
 const customScrollbarStyles = `
@@ -45,30 +43,13 @@ const customScrollbarStyles = `
   }
 `;
 
-// Sidebar Component with Backend Integration
 const Sidebar = ({ isOpen, onClose, activeSection, onSectionChange }) => {
   const navigate = useNavigate();
-  // IMPORTANT: Uncomment this and remove the mock when integrating
-  // const { user, logout, isAuthenticated } = useAuth();
-  
-  // Mock for demonstration - REMOVE THIS when integrating
-  const mockAuth = {
-    user: {
-      email: 'admin@furnimart.com',
-      adminId: 'ADmin820',
-      id: '123'
-    },
-    logout: () => {
-      console.log('Logout called');
-      // Add your logout logic here
-    },
-    isAuthenticated: true
-  };
-  
-  const { user, logout, isAuthenticated } = mockAuth;
+  const { user, logout, isAuthenticated, loading } = useAuth();
   
   const [expandedItems, setExpandedItems] = useState({});
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -83,7 +64,7 @@ const Sidebar = ({ isOpen, onClose, activeSection, onSectionChange }) => {
         { id: 'jobBoard', label: 'Job Board', icon: Briefcase }
       ]
     },
-    { id: 'revenue', label: 'Revenue Analysis', icon: TrendingUp },
+    { id: 'cargo_insurance', label: 'Cargo Insurance', icon: TrendingUp },
     { id: 'innovations', label: 'Innovations List', icon: Lightbulb },
     { id: 'products', label: 'Logistic', icon: Package },
     { id: 'reports', label: 'Reports', icon: FileText },
@@ -100,28 +81,36 @@ const Sidebar = ({ isOpen, onClose, activeSection, onSectionChange }) => {
       return;
     }
 
-    if (item.route) {
-      navigate(item.route);
-    } else {
-      onSectionChange(item.id);
-    }
+    onSectionChange(item.id);
     
-    if (window.innerWidth < 1024) onClose();
+    if (window.innerWidth < 1024) {
+      onClose();
+    }
   };
 
   const handleSubItemClick = (parentId, subItem) => {
     onSectionChange(subItem.id);
-    if (window.innerWidth < 1024) onClose();
+    if (window.innerWidth < 1024) {
+      onClose();
+    }
   };
 
   const handleLogout = () => {
     setShowLogoutConfirm(true);
   };
 
-  const confirmLogout = () => {
-    logout();
-    setShowLogoutConfirm(false);
-    navigate('/admin/login'); // Adjust route as needed
+  const confirmLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      setShowLogoutConfirm(false);
+      navigate('/admin/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      alert('Error logging out. Please try again.');
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   useEffect(() => {
@@ -137,8 +126,23 @@ const Sidebar = ({ isOpen, onClose, activeSection, onSectionChange }) => {
   // Get display name from email
   const getDisplayName = () => {
     if (!user?.email) return 'Admin User';
-    return user.email.split('@')[0];
+    return user.email.split('@')[0].charAt(0).toUpperCase() + user.email.split('@')[0].slice(1);
   };
+
+  // Show loading state while auth is checking
+  if (loading) {
+    return (
+      <div className="fixed top-0 left-0 h-screen w-60 bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-4 border-cyan-400/30 border-t-cyan-400"></div>
+      </div>
+    );
+  }
+
+  // Redirect to login if not authenticated
+  if (!isAuthenticated) {
+    navigate('/admin/login');
+    return null;
+  }
 
   return (
     <>
@@ -159,6 +163,7 @@ const Sidebar = ({ isOpen, onClose, activeSection, onSectionChange }) => {
         lg:translate-x-0
         before:absolute before:inset-0 before:bg-gradient-to-br before:from-cyan-500/5 before:via-transparent before:to-purple-500/5 before:pointer-events-none
       `}>
+        {/* Header */}
         <div className="p-5 border-b border-gradient-to-r from-cyan-400/20 via-purple-400/20 to-pink-400/20 bg-gradient-to-r from-slate-900/50 to-slate-800/50 backdrop-blur-md">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -179,6 +184,7 @@ const Sidebar = ({ isOpen, onClose, activeSection, onSectionChange }) => {
           </div>
         </div>
         
+        {/* Navigation Menu */}
         <div className="flex-1 overflow-y-auto py-3 custom-scrollbar">
           <nav className="px-3 space-y-0.5">
             {menuItems.map((item) => {
@@ -279,10 +285,11 @@ const Sidebar = ({ isOpen, onClose, activeSection, onSectionChange }) => {
           {/* Logout Button */}
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-red-500/10 to-red-600/10 hover:from-red-500/20 hover:to-red-600/20 text-red-400 hover:text-red-300 rounded-lg text-sm font-medium transition-all duration-300 border border-red-500/20 hover:border-red-400/30 hover:shadow-lg hover:shadow-red-500/10"
+            disabled={isLoggingOut}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-red-500/10 to-red-600/10 hover:from-red-500/20 hover:to-red-600/20 text-red-400 hover:text-red-300 rounded-lg text-sm font-medium transition-all duration-300 border border-red-500/20 hover:border-red-400/30 hover:shadow-lg hover:shadow-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <LogOut className="h-4 w-4" />
-            <span>Logout</span>
+            <span>{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
           </button>
         </div>
       </aside>
@@ -303,15 +310,17 @@ const Sidebar = ({ isOpen, onClose, activeSection, onSectionChange }) => {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-medium transition-all duration-300 border border-white/10"
+                disabled={isLoggingOut}
+                className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-medium transition-all duration-300 border border-white/10 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmLogout}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg text-sm font-medium transition-all duration-300 shadow-lg shadow-red-500/30"
+                disabled={isLoggingOut}
+                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg text-sm font-medium transition-all duration-300 shadow-lg shadow-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Logout
+                {isLoggingOut ? 'Logging out...' : 'Logout'}
               </button>
             </div>
           </div>

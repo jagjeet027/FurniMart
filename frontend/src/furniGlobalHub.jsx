@@ -145,6 +145,12 @@ const FurniGlobalHub = () => {
       navigate('/staff-hiring');
       return;
     }
+
+    // Navigate to cargo insurance page
+    if (view === 'cargo') {
+      navigate('/cargo-insurance');
+      return;
+    }
   };
 
   const handleFileSelect = (e) => {
@@ -392,13 +398,12 @@ const FurniGlobalHub = () => {
   };
 
   const sidebarItems = [
-    { icon: FileText, label: 'Post Your Idea / Requirement', view: 'feed' },
-    { icon: ShoppingCart, label: 'Global E-Commerce Platform', view: 'ecommerce' },
-    { icon: Users, label: 'Hire Skilled Manpower', view: 'manpower' },
-    { icon: DollarSign, label: 'Funding Schemes', view: 'funding' },
-    { icon: Package, label: 'Cargo & Insurance', view: 'cargo' },
-    { icon: HelpCircle, label: 'Support / Help Center', view: 'support' },
-    { icon: Settings, label: 'Settings', view: 'settings' }
+    { icon: FileText, label: 'Post Your Idea / Requirement', view: 'feed', color: 'from-blue-400 to-blue-600', bgLight: 'bg-blue-50', textColor: 'text-blue-700' },
+    { icon: ShoppingCart, label: 'Global E-Commerce Platform', view: 'ecommerce', color: 'from-green-400 to-green-600', bgLight: 'bg-green-50', textColor: 'text-green-700' },
+    { icon: Users, label: 'Hire Skilled Manpower', view: 'manpower', color: 'from-purple-400 to-purple-600', bgLight: 'bg-purple-50', textColor: 'text-purple-700' },
+    { icon: DollarSign, label: 'Funding Schemes', view: 'funding', color: 'from-pink-400 to-pink-600', bgLight: 'bg-pink-50', textColor: 'text-pink-700' },
+    { icon: Package, label: 'Cargo & Insurance', view: 'cargo', color: 'from-orange-400 to-red-600', bgLight: 'bg-orange-50', textColor: 'text-orange-700' },
+    { icon: HelpCircle, label: 'Support / Help Center', view: 'support', color: 'from-cyan-400 to-cyan-600', bgLight: 'bg-cyan-50', textColor: 'text-cyan-700' },
   ];
 
   const EcommerceView = () => (
@@ -448,26 +453,6 @@ const FurniGlobalHub = () => {
           <h3 className="font-bold text-base md:text-lg mb-2">Government Subsidies</h3>
           <p className="text-sm md:text-base text-gray-600 mb-3">Special schemes for furniture manufacturers</p>
           <button className="bg-pink-600 text-white px-4 md:px-6 py-2 rounded-lg text-sm md:text-base">Learn More</button>
-        </div>
-      </div>
-    </motion.div>
-  );
-
-  const CargoView = () => (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-xl shadow-md p-4 md:p-8">
-      <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4">Cargo & Insurance</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-        <div className="border-2 border-gray-200 rounded-lg p-4 md:p-6">
-          <Package className="text-orange-600 mb-4" size={32} />
-          <h3 className="font-bold text-base md:text-lg mb-2">Shipping Services</h3>
-          <p className="text-sm md:text-base text-gray-600 mb-3">Reliable cargo services worldwide</p>
-          <button className="bg-orange-500 text-white px-4 md:px-6 py-2 rounded-lg text-sm md:text-base">Get Quote</button>
-        </div>
-        <div className="border-2 border-gray-200 rounded-lg p-4 md:p-6">
-          <Shield className="text-blue-600 mb-4" size={32} />
-          <h3 className="font-bold text-base md:text-lg mb-2">Insurance Coverage</h3>
-          <p className="text-sm md:text-base text-gray-600 mb-3">Protect your shipments</p>
-          <button className="bg-blue-600 text-white px-4 md:px-6 py-2 rounded-lg text-sm md:text-base">Get Insured</button>
         </div>
       </div>
     </motion.div>
@@ -752,34 +737,121 @@ const FurniGlobalHub = () => {
       </div>
 
       <div className="flex">
-        <aside className="hidden lg:block w-64 bg-white border-r border-gray-200 sticky top-0 h-screen overflow-y-auto z-30 shadow-sm">
-          <nav className="p-4 space-y-2">
-            {sidebarItems.map((item, index) => (
-              <button key={index} onClick={() => handleSidebarItemClick(item.view)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition text-left text-sm ${activeView === item.view ? 'bg-orange-100 text-orange-700' : 'hover:bg-orange-50'}`}>
-                <item.icon size={18} className={activeView === item.view ? 'text-orange-600' : 'text-gray-600'} />
-                <span className={`text-sm ${activeView === item.view ? 'text-orange-700 font-semibold' : 'text-gray-700'}`}>{item.label}</span>
-              </button>
-            ))}
-          </nav>
+        <aside className="hidden lg:block w-72 bg-gradient-to-b from-white via-blue-50 to-white border-r border-gray-200 sticky top-0 h-screen overflow-y-auto z-30 shadow-lg">
+          <div className="p-6">
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent mb-8">FurniHub Menu</h2>
+            <nav className="space-y-3">
+              {sidebarItems.map((item, index) => (
+                <motion.button
+                  key={index}
+                  whileHover={{ scale: 1.05, x: 5 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleSidebarItemClick(item.view)}
+                  className={`w-full group relative overflow-hidden rounded-xl transition-all duration-300 ${
+                    activeView === item.view
+                      ? `bg-gradient-to-r ${item.color} text-white shadow-lg shadow-blue-500/50 scale-105`
+                      : `${item.bgLight} hover:shadow-md border-2 border-transparent hover:border-gray-300`
+                  }`}
+                >
+                  <div className={`absolute inset-0 bg-gradient-to-r ${item.color} opacity-0 group-hover:opacity-10 transition-opacity duration-300`} />
+                  
+                  <div className="relative p-4 flex items-center gap-4">
+                    <div className={`p-3 rounded-lg transition-all duration-300 ${
+                      activeView === item.view
+                        ? 'bg-white/20 text-white'
+                        : `${item.bgLight} ${item.textColor}`
+                    }`}>
+                      <item.icon size={24} />
+                    </div>
+                    
+                    <div className="flex-1 text-left">
+                      <p className={`font-bold text-sm transition-all ${
+                        activeView === item.view
+                          ? 'text-white'
+                          : item.textColor
+                      }`}>
+                        {item.label}
+                      </p>
+                    </div>
+
+                    {activeView === item.view && (
+                      <motion.div
+                        layoutId="activeIndicator"
+                        className="absolute right-4 w-2 h-2 rounded-full bg-white"
+                        animate={{ scale: [1, 1.5, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      />
+                    )}
+                  </div>
+
+                  {activeView === item.view && (
+                    <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${item.color}`} />
+                  )}
+                </motion.button>
+              ))}
+            </nav>
+          </div>
         </aside>
 
         <AnimatePresence>
           {showMobileSidebar && (
             <>
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowMobileSidebar(false)} className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40" />
-              <motion.aside initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className="lg:hidden fixed left-0 top-0 bottom-0 w-64 bg-white z-50 overflow-y-auto shadow-xl">
-                <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                  <h2 className="text-lg font-bold text-orange-600">Menu</h2>
-                  <button onClick={() => setShowMobileSidebar(false)} className="p-2 hover:bg-gray-100 rounded-lg">
-                    <X size={20} />
+              <motion.aside initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className="lg:hidden fixed left-0 top-0 bottom-0 w-72 bg-gradient-to-b from-white via-blue-50 to-white z-50 overflow-y-auto shadow-2xl">
+                <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-orange-500 to-red-500">
+                  <h2 className="text-lg font-bold text-white">🎨 Menu</h2>
+                  <button onClick={() => setShowMobileSidebar(false)} className="p-2 hover:bg-white/20 rounded-lg transition">
+                    <X size={20} className="text-white" />
                   </button>
                 </div>
-                <nav className="p-4 space-y-2">
+                <nav className="p-4 space-y-3">
                   {sidebarItems.map((item, index) => (
-                    <button key={index} onClick={() => handleSidebarItemClick(item.view)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition text-left text-sm ${activeView === item.view ? 'bg-orange-100 text-orange-700' : 'hover:bg-orange-50'}`}>
-                      <item.icon size={18} className={activeView === item.view ? 'text-orange-600' : 'text-gray-600'} />
-                      <span className={`text-sm ${activeView === item.view ? 'text-orange-700 font-semibold' : 'text-gray-700'}`}>{item.label}</span>
-                    </button>
+                    <motion.button
+                      key={index}
+                      whileHover={{ scale: 1.05, x: 5 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleSidebarItemClick(item.view)}
+                      className={`w-full group relative overflow-hidden rounded-xl transition-all duration-300 ${
+                        activeView === item.view
+                          ? `bg-gradient-to-r ${item.color} text-white shadow-lg`
+                          : `${item.bgLight} hover:shadow-md border-2 border-transparent hover:border-gray-300`
+                      }`}
+                    >
+                      <div className={`absolute inset-0 bg-gradient-to-r ${item.color} opacity-0 group-hover:opacity-10 transition-opacity duration-300`} />
+                      
+                      <div className="relative p-4 flex items-center gap-3">
+                        <div className={`p-3 rounded-lg transition-all duration-300 ${
+                          activeView === item.view
+                            ? 'bg-white/20 text-white'
+                            : `${item.bgLight} ${item.textColor}`
+                        }`}>
+                          <item.icon size={20} />
+                        </div>
+                        
+                        <div className="flex-1 text-left">
+                          <p className={`font-bold text-xs transition-all ${
+                            activeView === item.view
+                              ? 'text-white'
+                              : item.textColor
+                          }`}>
+                            {item.label}
+                          </p>
+                        </div>
+
+                        {activeView === item.view && (
+                          <motion.div
+                            layoutId="mobileActiveIndicator"
+                            className="w-2 h-2 rounded-full bg-white"
+                            animate={{ scale: [1, 1.5, 1] }}
+                            transition={{ duration: 2, repeat: Infinity }}
+                          />
+                        )}
+                      </div>
+
+                      {activeView === item.view && (
+                        <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${item.color}`} />
+                      )}
+                    </motion.button>
                   ))}
                 </nav>
               </motion.aside>
@@ -796,7 +868,6 @@ const FurniGlobalHub = () => {
                   {activeView === 'ecommerce' && <EcommerceView key="ecommerce" />}
                   {activeView === 'manpower' && <ManpowerView key="manpower" />}
                   {activeView === 'funding' && <FundingView key="funding" />}
-                  {activeView === 'cargo' && <CargoView key="cargo" />}
                   {activeView === 'support' && <SupportView key="support" />}
                   {activeView === 'settings' && <SettingsView key="settings" />}
                   {activeView === 'products' && <ProductsView key="products" />}
@@ -982,12 +1053,6 @@ const FurniGlobalHub = () => {
                 )}
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-800 mb-2">Your Message <span className="text-red-500">*</span></label>
-                  <textarea value={quotationForm.message} onChange={(e) => setQuotationForm({ ...quotationForm, message: e.target.value })} placeholder="Describe your quotation, terms, and conditions..." rows={6} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm resize-none" required />
-                  <p className="text-xs text-gray-500 mt-1">{quotationForm.message.length} characters</p>
-                </div>
-
-                <div>
                   <label className="block text-sm font-semibold text-gray-800 mb-2">Price (Optional)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">₹</span>
@@ -1118,4 +1183,4 @@ const FurniGlobalHub = () => {
   );
 };
 
-export default FurniGlobalHub; 
+export default FurniGlobalHub;
