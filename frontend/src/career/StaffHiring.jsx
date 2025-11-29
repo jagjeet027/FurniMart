@@ -438,7 +438,7 @@ const ModernStaffHiring = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex flex-col">
       {/* Hero Section */}
       <div className="relative overflow-hidden bg-gradient-to-r from-amber-800 via-orange-700 to-amber-900">
         {/* Animated background */}

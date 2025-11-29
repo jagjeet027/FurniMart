@@ -7,6 +7,7 @@ import {
   Zap, ArrowUpRight, ArrowLeft, User, Loader
 } from 'lucide-react';
 import { cargoAPI } from '../services/cargoApi.js';
+import { loadRazorpay } from '../utils/razorpayLoader.js';
 
 const countryPortData = {
   "India": ["Mumbai (JNPT)", "Chennai", "Kolkata", "Mundra", "Cochin", "Visakhapatnam", "Kandla", "Tuticorin", "Hazira", "Pipavav"],
@@ -61,6 +62,7 @@ function SurakshitSafar() {
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showLoanProviders, setShowLoanProviders] = useState(false);
 
   // Form state
   const initialFormState = {
@@ -76,6 +78,20 @@ function SurakshitSafar() {
   const [formStep, setFormStep] = useState(1);
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+// Razorpay initialization
+useEffect(() => {
+  console.log('🚀 SurakshitSafar component mounted');
+  console.log('🔄 Initializing Razorpay SDK...');
+  
+  loadRazorpay()
+    .then(() => {
+      console.log('✅ Razorpay SDK initialized successfully');
+    })
+    .catch(err => {
+      console.warn('⚠️ Razorpay initialization warning:', err.message);
+    });
+}, []);
 
   // ========== USEEFFECT HOOKS ==========
   useEffect(() => {
@@ -125,6 +141,18 @@ function SurakshitSafar() {
       setLoading(false);
     }
   };
+
+  const handleShowLoanProviders = () => {
+  setShowLoanProviders(!showLoanProviders);
+  setCompanies([]);
+  setShowResults(false);
+  setDepartureCountry("");
+  setArrivalCountry("");
+  setDeparturePort("");
+  setArrivalPort("");
+  setSelectedCargoType("");
+  setSelectedShipmentType("");
+}; 
 
   const handleNewSearch = () => {
     setShowResults(false);
@@ -223,90 +251,259 @@ function SurakshitSafar() {
   const handlePrevStep = () => {
     setFormStep(prev => prev - 1);
   };
+const handleAddCompany = async (e) => {
+  e.preventDefault();
+  const finalErrors = validateStep(3);
+  if (Object.keys(finalErrors).length > 0) {
+    setFormErrors(finalErrors);
+    return;
+  }
+  
+  setIsSubmitting(true);
 
-  // ========== COMPANY REGISTRATION & PAYMENT ==========
-  const handleAddCompany = async (e) => {
-    e.preventDefault();
-    const finalErrors = validateStep(3);
-    if (Object.keys(finalErrors).length > 0) {
-      setFormErrors(finalErrors);
+  try {
+    console.log('📋 Step 1: Registering company...');
+    
+    // Step 1: Register company
+    const companyResponse = await cargoAPI.companies.register({
+      name: companyForm.name,
+      email: companyForm.email,
+      phone: companyForm.contact,
+      website: companyForm.website,
+      established: companyForm.established,
+      coverage: companyForm.coverage,
+      maxCoverageAmount: companyForm.maxCoverageAmount,
+      maxCoverageCurrency: companyForm.maxCoverageCurrency,
+      routes: companyForm.routes,
+      shipmentTypes: companyForm.shipmentTypes,
+      cargoTypes: companyForm.cargoTypes,
+      submitterName: companyForm.submitterName,
+      submitterEmail: companyForm.submitterEmail,
+      submitterPhone: companyForm.submitterPhone,
+      submitterDesignation: companyForm.submitterDesignation,
+      description: companyForm.description,
+    });
+
+    console.log('✅ Company registered:', companyResponse.data.data._id);
+    const companyId = companyResponse.data.data._id;
+
+    console.log('💳 Step 2: Creating payment order...');
+    
+    // Step 2: Create payment order
+    const orderResponse = await cargoAPI.payments.createOrder(companyId, 'insurance');
+    
+    console.log('✅ Order created:', orderResponse.data.data.orderId);
+
+    // Check if Razorpay is loaded
+    if (!window.Razorpay) {
+      console.error('❌ Razorpay SDK not available');
+      alert('❌ Payment system is not loaded. Please:\n\n1. Refresh the page\n2. Check your internet connection\n3. Disable ad blockers\n4. Try again');
+      setIsSubmitting(false);
       return;
     }
-    
-    setIsSubmitting(true);
 
-    try {
-      // Step 1: Register company
-      const companyResponse = await cargoAPI.companies.register({
-        name: companyForm.name,
-        email: companyForm.email,
-        phone: companyForm.contact,
-        website: companyForm.website,
-        established: companyForm.established,
-        coverage: companyForm.coverage,
-        maxCoverageAmount: companyForm.maxCoverageAmount,
-        maxCoverageCurrency: companyForm.maxCoverageCurrency,
-        routes: companyForm.routes,
-        shipmentTypes: companyForm.shipmentTypes,
-        cargoTypes: companyForm.cargoTypes,
-        submitterName: companyForm.submitterName,
-        submitterEmail: companyForm.submitterEmail,
-        submitterPhone: companyForm.submitterPhone,
-        submitterDesignation: companyForm.submitterDesignation,
-        description: companyForm.description,
-      });
+    console.log('🎯 Step 3: Opening Razorpay checkout...');
 
-      const companyId = companyResponse.data.data._id;
-
-      // Step 2: Create payment order
-      const orderResponse = await cargoAPI.payments.createOrder(companyId);
+    const options = {
+      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+      amount: orderResponse.data.data.amount,
+      currency: orderResponse.data.data.currency,
+      name: companyForm.name,
+      description: 'Insurance Company Listing Fee - ₹15,000',
+      order_id: orderResponse.data.data.orderId,
       
-      const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-        amount: orderResponse.data.data.amount,
-        currency: orderResponse.data.data.currency,
-        name: companyForm.name,
-        description: 'Company Listing Fee - ₹15,000',
-        order_id: orderResponse.data.data.id,
-        handler: async (response) => {
-          try {
-            // Step 3: Verify payment
-            await cargoAPI.payments.verifyPayment({
-              orderId: response.razorpay_order_id,
-              paymentId: response.razorpay_payment_id,
-              signature: response.razorpay_signature,
-              companyId: companyId,
-            });
+      // ✅ FIXED: Payment success handler
+      handler: async (response) => {
+        try {
+          console.log('🔄 Step 4: Verifying payment...');
+          console.log('Razorpay response keys:', Object.keys(response));
+          console.log('Payment ID:', response.razorpay_payment_id);
+          console.log('Order ID:', response.razorpay_order_id);
+          
+          // ✅ FIX: Send with exact Razorpay field names
+          const verifyData = {
+            companyId: companyId,
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+            type: 'insurance'
+          };
 
-            alert('✅ Company registered successfully! Your application is awaiting admin approval.');
+          console.log('📤 Verification data keys:', Object.keys(verifyData));
+
+          const verifyResponse = await cargoAPI.payments.verifyPayment(verifyData);
+
+          console.log('✅ Payment verified:', verifyResponse.data);
+          
+          if (verifyResponse.data.success) {
+            alert('✅ Company registered successfully!\n\nYour application is awaiting admin approval.\n\nYou will receive an email update shortly.');
+            
+            // Reset form
             setShowAddCompanyForm(false);
             setCompanyForm(initialFormState);
             setFormStep(1);
             setFormErrors({});
-          } catch (err) {
-            alert('❌ Payment verification failed. Please contact support.');
-            console.error('Verification error:', err);
           }
-        },
-        prefill: {
-          name: companyForm.submitterName,
-          email: companyForm.submitterEmail,
-          contact: companyForm.submitterPhone,
-        },
-        theme: { color: "#3B82F6" }
-      };
+          
+        } catch (err) {
+          console.error('❌ Verification error:', err);
+          console.error('Error data:', err.response?.data);
+          console.error('Error status:', err.response?.status);
+          
+          alert('❌ Payment verification failed:\n\n' + (err.response?.data?.message || err.message || 'Unknown error'));
+        } finally {
+          setIsSubmitting(false);
+        }
+      },
+      
+      // Payment error handler
+      onError: (err) => {
+        console.error('❌ Payment failed:', err);
+        setIsSubmitting(false);
+        alert('❌ Payment failed:\n\n' + (err.description || 'Unknown error. Please try again.'));
+      },
+      
+      prefill: {
+        name: companyForm.submitterName,
+        email: companyForm.submitterEmail,
+        contact: companyForm.submitterPhone,
+      },
+      theme: { 
+        color: "#3B82F6" 
+      },
+      retry: { 
+        enabled: true, 
+        max: 3 
+      }
+    };
 
-      const razorpayWindow = new window.Razorpay(options);
-      razorpayWindow.open();
-    } catch (error) {
-      alert(`❌ Registration failed: ${error.response?.data?.message || error.message}`);
-      console.error('Registration error:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    console.log('📊 Opening Razorpay checkout with order:', options.order_id);
 
-  // ========== COMPONENTS ==========
+    // Open Razorpay checkout
+    const razorpayWindow = new window.Razorpay(options);
+    razorpayWindow.open();
+    
+  } catch (error) {
+    console.error('❌ Registration error:', error);
+    setIsSubmitting(false);
+    
+    const errorMsg = error.response?.data?.message || error.message || 'Registration failed';
+    alert(`❌ Registration failed:\n\n${errorMsg}\n\nPlease try again.`);
+  }
+};
+const handleSearchLoanProviders = async () => {
+  setLoading(true);
+  setError(null);
+  try {
+    const response = await cargoAPI.loanProviders.getApproved();
+    
+    setCompanies(response.data.data);
+    setShowResults(true);
+    setShowLoanProviders(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (err) {
+    setError(err.response?.data?.message || 'Failed to fetch loan providers');
+    console.error('Search error:', err);
+  } finally {
+    setLoading(false);
+  }
+};
+
+const LoanProviderCard = ({ provider, index }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: index * 0.1 }}
+    whileHover={{ scale: 1.02, y: -5 }}
+    onClick={() => handleCompanyClick(provider._id)}
+    className="rounded-xl shadow-2xl border-2 overflow-hidden cursor-pointer transition-all bg-gray-900 border-gray-700 hover:border-green-500"
+  >
+    <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-6">
+      <div className="flex items-center space-x-3">
+        <DollarSign className="h-7 w-7 text-white" />
+        <div>
+          <h3 className="font-bold text-xl text-white">{provider.name}</h3>
+          <div className="flex items-center space-x-2 text-white/90">
+            <Clock className="h-4 w-4" />
+            <span className="text-sm">{provider.approvalTime} Approval</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div className="p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-1">
+          {[...Array(5)].map((_, i) => (
+            <Star 
+              key={i} 
+              className={`h-4 w-4 ${i < Math.floor(provider.rating || 0) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-600'}`} 
+            />
+          ))}
+          <span className="text-sm text-gray-300 ml-2">{(provider.rating || 0).toFixed(1)}/5</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-gray-800 p-3 rounded-lg">
+          <div className="flex items-center space-x-2 mb-1">
+            <Zap className="h-4 w-4 text-green-400" />
+            <span className="text-xs text-gray-400">Approval Rate</span>
+          </div>
+          <p className="text-sm font-bold text-white">{provider.approvalRate}%</p>
+        </div>
+        <div className="bg-gray-800 p-3 rounded-lg">
+          <div className="flex items-center space-x-2 mb-1">
+            <Clock className="h-4 w-4 text-blue-400" />
+            <span className="text-xs text-gray-400">Disburse</span>
+          </div>
+          <p className="text-sm font-bold text-white">{provider.disburseTime}</p>
+        </div>
+      </div>
+
+      <div className="bg-gray-800 p-3 rounded-lg">
+        <p className="text-sm text-gray-300 line-clamp-2">{provider.description || 'Quick loan provider'}</p>
+      </div>
+
+      <div className="space-y-2">
+        {provider.loanProducts?.slice(0, 2).map((product, idx) => (
+          <div key={idx} className="text-xs bg-gray-700 p-2 rounded">
+            <p className="font-medium text-white">{product.name}</p>
+            <p className="text-gray-300">₹{product.minAmount/100000}L - ₹{product.maxAmount/100000}L @ {product.interestRate}%</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 pt-2">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            window.open(provider.website, '_blank');
+          }}
+          className="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg text-sm font-medium"
+        >
+          <ExternalLink className="h-4 w-4 inline mr-1" />
+          Visit
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedCompany(provider);
+          }}
+          className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg text-sm font-bold"
+        >
+          Apply Now
+        </motion.button>
+      </div>
+    </div>
+  </motion.div>
+);
+
+
   const PortSelector = ({ label, country, setCountry, selectedPort, setSelectedPort, showPorts, setShowPorts }) => (
     <div className="space-y-3">
       <label className="block text-sm font-semibold text-gray-300">{label}</label>

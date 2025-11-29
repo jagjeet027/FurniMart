@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import Header from './components/Header';
 import SurakshitSafar from './cargo/Surakshitsafar.jsx'
-import FurniturePlatform from './furniGlobalHub.jsx';
+import FurniturePlatform from './furniGlobalHub.jsx'
 import ProfilePage from '../src/post/Profilepage.jsx';
 import LoginPage from './components/LoginPage';
 import './index.css';
 import Footer from './components/Footer';
 import SignupPage from './components/SignUpPage';
 import { AuthProvider } from './contexts/AuthContext';
+import { LoanProvider } from './contexts/LoanContext'; // Add this import
 import Dashboard from './components/manufacturer/Dashboard';    
 import PrivateRoute from './components/PrivateRoute';
 import ProductCard from './components/ProductCardDetails.jsx';
@@ -39,6 +40,17 @@ import OrganizationRegister from './career/OrganizationRegister.jsx';
 import NotFoundPage from './components/NotFound';
 import ChatHistory from './components/userDashBoard/ChatHistory.jsx';
 
+// finance imports
+import HomePage from '.././src/finance/pages/HomePage';
+import SearchPage from '.././src/finance/pages/SearchPage';
+import ComparePage from '.././src/finance/pages/ComparePage';
+import LoanDetailsPage from '.././src/finance/pages/LoanDetailsPage';
+import EligibilityPage from '.././src/finance/pages/EligibilityPage';
+import AddOrganizationPage from '.././src/finance/pages/AddOrganizationPage';
+import OrganizationManagementPage from '.././src/finance/pages/OrganizationManagementPage';
+import AdminPanel from '../src/finance/components/AdminPanel';
+
+
 const App = () => {
   const location = useLocation();
 
@@ -62,7 +74,22 @@ const App = () => {
     '/products/management',
     '/categories/management',
     '/new-idea',
-    '/user-profile'
+    '/user-profile',
+    '/staff-hiring',
+    '/careers',
+    '/jobs/:jobId/apply',
+    '/register/individual-applicant',
+    '/register/organization-applicant',
+
+    '/finance',
+    '/search',
+    '/compare',
+    '/loan/:id',
+    '/eligibility',
+    '/add-organization',
+    '/admin/organizations',
+    '/admin',
+    
   ];
 
   // Improved check for paths that should hide header/footer
@@ -108,6 +135,17 @@ const App = () => {
             </div>
           } />
           <Route path="/cargo-insurance" element={<SurakshitSafar />} />
+          {/* finance route */}
+
+          <Route path="/finance" element={<HomePage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/compare" element={<ComparePage />} />
+          <Route path="/loan/:id" element={<LoanDetailsPage />} />
+          <Route path="/eligibility" element={<EligibilityPage />} />
+          <Route path="/add-organization" element={<AddOrganizationPage />} />
+          <Route path="/admin/organizations" element={<OrganizationManagementPage />} />
+          <Route path="/admin" element={<AdminPanel />} />
+
 
           <Route path='/products' element={<ProductCard />}  />
           <Route path ="/new-idea" element={<PrivateRoute><IdeaSharingPlatform/></PrivateRoute>} />
@@ -161,7 +199,9 @@ const App = () => {
 const AppWrapper = () => (
   <Router>
     <AuthProvider>
+      <LoanProvider>
         <App />
+      </LoanProvider>
     </AuthProvider>
   </Router>
 );

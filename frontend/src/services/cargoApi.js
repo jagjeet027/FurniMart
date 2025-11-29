@@ -1,4 +1,4 @@
- import api from '../axios/axiosInstance.js';
+import api from '../axios/axiosInstance.js';
 
 export const cargoAPI = {
   // Company APIs
@@ -10,6 +10,17 @@ export const cargoAPI = {
     update: (id, data) => api.put(`/cargo/companies/${id}`, data),
     delete: (id) => api.delete(`/cargo/companies/${id}`),
     trackClick: (id) => api.post(`/cargo/companies/${id}/track-click`),
+  },
+
+  // Loan Provider APIs - NEW
+  loanProviders: {
+    getAll: (filters) => api.get('/cargo/loan-providers', { params: filters }),
+    getApproved: () => api.get('/cargo/loan-providers/approved'),
+    register: (data) => api.post('/cargo/loan-providers/register', data),
+    getById: (id) => api.get(`/cargo/loan-providers/${id}`),
+    update: (id, data) => api.put(`/cargo/loan-providers/${id}`, data),
+    delete: (id) => api.delete(`/cargo/loan-providers/${id}`),
+    trackClick: (id) => api.post(`/cargo/loan-providers/${id}/track-click`),
   },
 
   // Shipment APIs
@@ -27,9 +38,25 @@ export const cargoAPI = {
     reject: (id) => api.put(`/cargo/quotes/${id}/reject`),
   },
 
-  // Payment APIs
   payments: {
-    createOrder: (companyId) => api.post('/cargo/payments/create-listing-order', { companyId }),
-    verifyPayment: (data) => api.post('/cargo/payments/verify-payment', data),
+    // Create order - NO AUTH required (uses signature verification)
+    createOrder: (companyId, type = 'insurance') => 
+      api.post('/cargo/payments/create-listing-order', { companyId, type }),
+    
+    // Verify payment - NO AUTH required (uses signature verification)
+    verifyPayment: (data) => 
+      api.post('/cargo/payments/verify-payment', data),
+    
+    // Get payment history - REQUIRES AUTH
+    getHistory: (companyId) => 
+      api.get(`/cargo/payments/company/${companyId}`),
+    
+    // Get payment by order ID - REQUIRES AUTH
+    getByOrderId: (orderId) => 
+      api.get(`/cargo/payments/order/${orderId}`),
+    
+    // Refund payment - ADMIN ONLY
+    refund: (paymentId, amount, reason) =>
+      api.post('/cargo/payments/refund', { paymentId, amount, reason }),
   },
 };

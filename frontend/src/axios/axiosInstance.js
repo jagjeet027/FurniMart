@@ -1,6 +1,8 @@
+// ============================================
+// FIXED: axiosInstance.js
+// ============================================
 import axios from "axios";
 
-// Create axios instance
 const api = axios.create({
   baseURL: `${import.meta.env.VITE_BACKEND_URL || "http://localhost:5000"}/api`,
   headers: {
@@ -25,17 +27,18 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-// Helper to check if token is expired or about to expire
+// ⚡ FIXED: Token expiry check - only check if truly expired
 const isTokenExpired = (token) => {
   if (!token) return true;
   
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
-    const exp = payload.exp * 1000; // Convert to milliseconds
+    const exp = payload.exp * 1000;
     const now = Date.now();
     
-    // Token is expired or will expire in next 30 seconds
-    return exp < (now + 30000);
+    // ✅ FIXED: Only consider expired if ACTUALLY expired (no buffer)
+    // This prevents unnecessary refresh calls
+    return exp < now;
   } catch (error) {
     console.error('Error parsing token:', error);
     return true;
@@ -70,7 +73,7 @@ const refreshAccessToken = async () => {
   }
 };
 
-// Helper function to handle authentication failure
+// Handle auth failure
 const handleAuthFailure = () => {
   console.log('🚪 Logging out user due to auth failure...');
   
@@ -87,7 +90,7 @@ const handleAuthFailure = () => {
   }
 };
 
-// Request interceptor - Check token before each request
+// ⚡ FIXED: Request interceptor - NO preemptive refresh
 api.interceptors.request.use(
   async (config) => {
     // Skip token check for refresh-token endpoint
@@ -95,36 +98,10 @@ api.interceptors.request.use(
       return config;
     }
 
-    let currentToken = localStorage.getItem("accessToken");
+    const currentToken = localStorage.getItem("accessToken");
     
-    // Check if token is expired or about to expire
-    if (currentToken && isTokenExpired(currentToken)) {
-      console.log('⚠️ Token expired or expiring soon, refreshing before request...');
-      
-      if (!isRefreshing) {
-        isRefreshing = true;
-        
-        try {
-          currentToken = await refreshAccessToken();
-          isRefreshing = false;
-          processQueue(null, currentToken);
-        } catch (error) {
-          isRefreshing = false;
-          processQueue(error, null);
-          handleAuthFailure();
-          return Promise.reject(error);
-        }
-      } else {
-        // Wait for the ongoing refresh
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        }).then(token => {
-          config.headers.Authorization = `Bearer ${token}`;
-          return config;
-        });
-      }
-    }
-    
+    // ✅ FIXED: Only add token, don't check expiry here
+    // Let the server handle token validation
     if (currentToken) {
       config.headers.Authorization = `Bearer ${currentToken}`;
     }
@@ -136,7 +113,7 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor - Handle 401 errors
+// ⚡ FIXED: Response interceptor - Only refresh on 401
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -151,10 +128,10 @@ api.interceptors.response.use(
       });
     }
 
-    // Handle 401 errors (Unauthorized)
+    // ✅ FIXED: Only handle 401 errors from server
     if (error.response.status === 401 && !originalRequest._retry) {
       
-      // If this is a refresh token request that failed, logout
+      // If refresh token endpoint failed, logout
       if (originalRequest.url.includes('/refresh-token')) {
         console.error('Refresh token invalid or expired - logging out');
         handleAuthFailure();
@@ -163,8 +140,8 @@ api.interceptors.response.use(
 
       originalRequest._retry = true;
 
+      // Queue requests while refreshing
       if (isRefreshing) {
-        // Queue this request
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
@@ -182,17 +159,12 @@ api.interceptors.response.use(
       try {
         const newAccessToken = await refreshAccessToken();
         
-        // Update default header
         api.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
-        
-        // Update the failed request's header
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         
-        // Process queued requests
         processQueue(null, newAccessToken);
         isRefreshing = false;
         
-        // Retry the original request
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
@@ -200,22 +172,6 @@ api.interceptors.response.use(
         handleAuthFailure();
         return Promise.reject(refreshError);
       }
-    }
-
-    // Handle other status codes
-    switch (error.response.status) {
-      case 403:
-        console.error("Access forbidden");
-        break;
-      case 404:
-        console.error("Resource not found");
-        break;
-      case 429:
-        console.error("Too many requests");
-        break;
-      case 500:
-        console.error("Server error");
-        break;
     }
 
     return Promise.reject(error);

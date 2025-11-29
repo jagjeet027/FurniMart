@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Bell, MessageSquare, User, Image, FileText, MoreHorizontal, X, Settings, ShoppingCart, Users, DollarSign, HelpCircle, Package, TrendingUp, Bookmark, Upload, Grid, Heart, Shield, Send, Loader, AlertCircle, CheckCircle, Menu, Eye } from 'lucide-react';
+import { Search, Bell, MessageSquare, User, Image, FileText, MoreHorizontal, X, Settings, ShoppingCart, Users, DollarSign, HelpCircle, Package, TrendingUp, Bookmark, Upload, Grid, Heart, Shield, Send, Loader, AlertCircle, CheckCircle, Menu, Eye, Download, ZoomIn, Maximize2, Lightbulb } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
+import api from './axios/axiosInstance';
 
 const FurniGlobalHub = () => {
   const navigate = useNavigate();
@@ -13,7 +14,7 @@ const FurniGlobalHub = () => {
   const [postTitle, setPostTitle] = useState('');
   const [postDescription, setPostDescription] = useState('');
   const [postCategory, setPostCategory] = useState('idea');
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [activeView, setActiveView] = useState('feed');
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -41,6 +42,11 @@ const FurniGlobalHub = () => {
   const [viewingQuotations, setViewingQuotations] = useState([]);
   const [quotationsLoading, setQuotationsLoading] = useState(false);
 
+  // Post detail modal (zoom)
+  const [showPostDetail, setShowPostDetail] = useState(false);
+  const [detailPost, setDetailPost] = useState(null);
+  const [savedPosts, setSavedPosts] = useState([]);
+
   const API_BASE_URL = 'http://localhost:5000/api';
 
   const getRoleBadge = (user) => {
@@ -55,6 +61,7 @@ const FurniGlobalHub = () => {
   useEffect(() => {
     fetchCategories();
     fetchPosts();
+    loadSavedPosts();
   }, []);
 
   const fetchCategories = async () => {
@@ -76,24 +83,19 @@ const FurniGlobalHub = () => {
   const fetchPosts = async () => {
     try {
       setPostsLoading(true);
-      const response = await fetch(`${API_BASE_URL}/posts`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const response = await api.get('/posts?page=1&limit=10');
       
-      if (!response.ok) throw new Error('Failed to fetch posts');
-      const data = await response.json();
-      
-      if (data.success && Array.isArray(data.posts)) {
-        setPosts(data.posts);
-      } else if (Array.isArray(data)) {
-        setPosts(data);
+      if (response.data.success && Array.isArray(response.data.posts)) {
+        setPosts(response.data.posts);
+      } else if (Array.isArray(response.data)) {
+        setPosts(response.data);
       } else {
         setPosts([]);
       }
     } catch (error) {
       console.error('Error fetching posts:', error);
       setPosts([]);
+      setError('Failed to load posts');
     } finally {
       setPostsLoading(false);
     }
@@ -146,18 +148,39 @@ const FurniGlobalHub = () => {
       return;
     }
 
-    // Navigate to cargo insurance page
     if (view === 'cargo') {
       navigate('/cargo-insurance');
       return;
     }
+
+    if (view === 'funding') {
+    navigate('/finance');
+    return;
+  }
   };
 
   const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-    }
+    const files = Array.from(e.target.files);
+    const validFiles = [];
+
+    files.forEach(file => {
+      if (file.size > 5 * 1024 * 1024) {
+        setError(`${file.name} exceeds 5MB limit`);
+        return;
+      }
+
+      const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      const validDocTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      
+      if (!validImageTypes.includes(file.type) && !validDocTypes.includes(file.type)) {
+        setError(`${file.name} has invalid file type`);
+        return;
+      }
+
+      validFiles.push(file);
+    });
+
+    setSelectedFiles(prev => [...prev, ...validFiles]);
   };
 
   const fileToBase64 = (file) => {
@@ -165,40 +188,34 @@ const FurniGlobalHub = () => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result);
-      reader.onerror = error => reject(error);
+      reader.onerror = () => reject(new Error('Failed to read file'));
     });
   };
 
-  const handleSubmitPost = async () => {
+  const handleSubmitPost = async (e) => {
+    e.preventDefault();
+    
+    if (!postTitle.trim()) {
+      setError('Title is required');
+      return;
+    }
+
+    if (!postDescription.trim() || postDescription.trim().length < 10) {
+      setError('Description must be at least 10 characters');
+      return;
+    }
+
     try {
-      const token = localStorage.getItem('accessToken');
-      
-      if (!token || !isAuthenticated) {
-        setError('Please login to create a post');
-        return;
-      }
-
-      if (!postTitle.trim()) {
-        setError('Title is required');
-        return;
-      }
-
-      if (!postDescription.trim() || postDescription.trim().length < 10) {
-        setError('Description must be at least 10 characters long');
-        return;
-      }
-
-      const filesData = [];
-      if (selectedFile) {
-        const base64 = await fileToBase64(selectedFile);
-        filesData.push({
-          url: base64,
-          filename: selectedFile.name,
-          mimetype: selectedFile.type,
-          size: selectedFile.size,
-          fileType: selectedFile.type.startsWith('image/') ? 'image' : 'document'
-        });
-      }
+      setQuotationLoading(true);
+      const filesData = await Promise.all(
+        selectedFiles.map(async (file) => ({
+          url: await fileToBase64(file),
+          filename: file.name,
+          mimetype: file.type,
+          size: file.size,
+          fileType: file.type.startsWith('image/') ? 'image' : 'document'
+        }))
+      );
 
       const postData = {
         title: postTitle.trim(),
@@ -208,34 +225,25 @@ const FurniGlobalHub = () => {
         files: filesData
       };
 
-      const response = await fetch(`${API_BASE_URL}/posts`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(postData)
-      });
+      const response = await api.post('/posts', postData);
 
-      if (!response.ok) throw new Error('Failed to create post');
-      const data = await response.json();
-      
-      if (data.success) {
+      if (response.data.success) {
         setSuccess('Post created successfully!');
         setShowPostModal(false);
-        setPostType('');
         setPostTitle('');
         setPostDescription('');
         setPostCategory('idea');
-        setSelectedFile(null);
+        setSelectedFiles([]);
         fetchPosts();
         setTimeout(() => setSuccess(''), 3000);
       } else {
-        setError(data.message || 'Failed to create post');
+        setError(response.data.message || 'Failed to create post');
       }
-    } catch (error) {
-      console.error('Error creating post:', error);
-      setError('Failed to create post. Please try again.');
+    } catch (err) {
+      console.error('Error creating post:', err);
+      setError(err.response?.data?.message || 'Failed to create post');
+    } finally {
+      setQuotationLoading(false);
     }
   };
 
@@ -296,18 +304,9 @@ const FurniGlobalHub = () => {
         deliveryTime: quotationForm.deliveryTime.trim() || undefined
       };
 
-      const response = await fetch(`${API_BASE_URL}/posts/${selectedPost._id}/quotations`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(quotationData)
-      });
+      const response = await api.post(`/posts/${selectedPost._id}/quotations`, quotationData);
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (response.data.success) {
         setSuccess('Quotation submitted successfully!');
         setShowQuotationModal(false);
         setSelectedPost(null);
@@ -319,11 +318,11 @@ const FurniGlobalHub = () => {
         fetchPosts();
         setTimeout(() => setSuccess(''), 3000);
       } else {
-        setError(data.message || 'Failed to submit quotation');
+        setError(response.data.message || 'Failed to submit quotation');
       }
     } catch (error) {
       console.error('Error submitting quotation:', error);
-      setError('Failed to submit quotation. Please try again.');
+      setError(error.response?.data?.message || 'Failed to submit quotation');
     } finally {
       setQuotationLoading(false);
     }
@@ -352,18 +351,10 @@ const FurniGlobalHub = () => {
       setSelectedPost(post);
       setShowQuotationsModal(true);
 
-      const response = await fetch(`${API_BASE_URL}/posts/${post._id}/quotations`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await api.get(`/posts/${post._id}/quotations`);
 
-      const data = await response.json();
-
-      if (data.success && Array.isArray(data.quotations)) {
-        setViewingQuotations(data.quotations);
+      if (response.data.success && Array.isArray(response.data.quotations)) {
+        setViewingQuotations(response.data.quotations);
       } else {
         setViewingQuotations([]);
       }
@@ -376,6 +367,30 @@ const FurniGlobalHub = () => {
     }
   };
 
+  const handleViewPostDetail = (post) => {
+    setDetailPost(post);
+    setShowPostDetail(true);
+  };
+
+  const handleSavePost = (postId) => {
+    setSavedPosts(prev => 
+      prev.includes(postId) 
+        ? prev.filter(id => id !== postId)
+        : [...prev, postId]
+    );
+    setSuccess(savedPosts.includes(postId) ? 'Post removed from saved' : 'Post saved!');
+    setTimeout(() => setSuccess(''), 2000);
+  };
+
+  const loadSavedPosts = () => {
+    const saved = localStorage.getItem('savedPosts');
+    if (saved) setSavedPosts(JSON.parse(saved));
+  };
+
+  useEffect(() => {
+    localStorage.setItem('savedPosts', JSON.stringify(savedPosts));
+  }, [savedPosts]);
+
   const openPostModal = (type) => {
     const token = localStorage.getItem('accessToken');
     
@@ -387,6 +402,10 @@ const FurniGlobalHub = () => {
 
     setPostType(type);
     setShowPostModal(true);
+  };
+
+  const removeFile = (index) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleViewProduct = (productId) => {
@@ -632,50 +651,57 @@ const FurniGlobalHub = () => {
           const postOwnerId = postUser._id || postUser.id;
           const currentUserId = authUser?._id || authUser?.id;
           const isOwnPost = postOwnerId === currentUserId;
+          const isSaved = savedPosts.includes(post._id);
           
           return (
             <article key={post._id} className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200 hover:shadow-lg transition-shadow">
               <div className="p-4 md:p-5">
-                <div className="flex items-start justify-between mb-3 md:mb-4">
-                  <div className="flex items-start gap-2 md:gap-3">
+                <div className="flex items-start justify-between mb-3 md:mb-4 gap-2">
+                  <div className="flex items-start gap-2 md:gap-3 flex-1 min-w-0">
                     <img src={postUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${postUser.name || 'User'}`} className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-orange-200 flex-shrink-0" alt={postUser.name || 'User'} />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-0.5">
                         <h3 className="font-semibold text-gray-900 text-xs md:text-sm truncate">{postUser.name || 'Anonymous User'}</h3>
-                        {postUser.verified && (
-                          <svg className="w-3 h-3 md:w-4 md:h-4 text-orange-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
-                          </svg>
-                        )}
+                        {postUser.isAdmin && <Shield className="w-4 h-4 text-red-500 flex-shrink-0" />}
                       </div>
                       <p className="text-xs text-gray-500">
-                        {postUser.isAdmin ? 'Admin' : postUser.isManufacturer ? 'Manufacturer' : 'User'}
+                        {postUser.isManufacturer ? '🏭 Manufacturer' : '👤 User'} • {new Date(post.createdAt).toLocaleDateString()}
                       </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-gray-400">
-                          {new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </span>
-                        {postUser.address && (
-                          <>
-                            <span className="text-xs text-gray-300">•</span>
-                            <span className="text-xs text-gray-400 truncate">{postUser.address}</span>
-                          </>
-                        )}
-                      </div>
                     </div>
                   </div>
-                  <button className="p-1.5 md:p-2 hover:bg-gray-100 rounded-lg transition flex-shrink-0">
-                    <MoreHorizontal size={16} className="text-gray-400 md:w-5 md:h-5" />
+                  <button 
+                    onClick={() => handleSavePost(post._id)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition flex-shrink-0"
+                  >
+                    <Bookmark 
+                      size={18} 
+                      className={isSaved ? 'text-orange-500 fill-orange-500' : 'text-gray-400'} 
+                    />
                   </button>
                 </div>
 
-                <div className="mb-2 md:mb-3">
-                  <h4 className="font-bold text-gray-900 mb-1 text-sm md:text-base">{post.title}</h4>
-                  {post.category && <p className="text-xs text-orange-600 font-medium">{post.category}</p>}
+                <div className="mb-2">
+                  <h4 className="font-bold text-gray-900 text-sm mb-1">{post.title}</h4>
+                  <div className="flex gap-2 flex-wrap">
+                    {post.type && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        post.type === 'idea' 
+                          ? 'bg-purple-100 text-purple-700' 
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {post.type}
+                      </span>
+                    )}
+                    {post.category && (
+                      <span className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full font-medium">
+                        {post.category}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <p className="text-xs md:text-sm text-gray-700 leading-relaxed mb-3 md:mb-4 whitespace-pre-line line-clamp-3 md:line-clamp-none">
-                  {post.content || post.description}
+                <p className="text-xs md:text-sm text-gray-700 leading-relaxed mb-3 md:mb-4 line-clamp-3 md:line-clamp-none">
+                  {post.description}
                 </p>
 
                 {imageFiles.length > 0 && (
@@ -685,25 +711,35 @@ const FurniGlobalHub = () => {
                 )}
 
                 <div className="flex items-center justify-between py-2 md:py-3 border-y border-gray-200 mb-2 md:mb-3">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare size={16} className="text-orange-500 md:w-5 md:h-5" />
-                    <span className="text-xs md:text-sm text-gray-600">{post.quotationsCount || 0} quotations</span>
+                  <div className="flex items-center gap-2 md:gap-3">
+                    <div className="flex items-center gap-1">
+                      <MessageSquare size={16} className="text-orange-500 md:w-5 md:h-5" />
+                      <span className="text-xs md:text-sm text-gray-600">{post.quotationsCount || 0}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Eye size={16} className="text-gray-500 md:w-5 md:h-5" />
+                      <span className="text-xs md:text-sm text-gray-600">{post.views || 0}</span>
+                    </div>
                   </div>
-                  <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full font-medium">
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                    post.status === 'open' 
+                      ? 'bg-green-100 text-green-700' 
+                      : 'bg-gray-100 text-gray-600'
+                  }`}>
                     {post.status === 'open' ? 'Open' : post.status}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2 md:gap-3">
+                <div className="flex items-center gap-2">
                   {isOwnPost ? (
                     <button onClick={() => handleViewQuotations(post)} className="flex-1 flex items-center justify-center gap-1.5 md:gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white transition text-xs md:text-sm font-semibold py-2 md:py-3 px-3 md:px-4 rounded-lg hover:from-blue-600 hover:to-indigo-600 shadow-md">
                       <Eye size={14} className="md:w-5 md:h-5" />
-                      <span>View Quotations</span>
+                      <span>View ({post.quotationsCount || 0})</span>
                     </button>
                   ) : authUser?.isManufacturer ? (
                     <button onClick={() => handleSendQuotation(post)} className="flex-1 flex items-center justify-center gap-1.5 md:gap-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white transition text-xs md:text-sm font-semibold py-2 md:py-3 px-3 md:px-4 rounded-lg hover:from-orange-600 hover:to-amber-600 shadow-md">
                       <Send size={14} className="md:w-5 md:h-5" />
-                      <span>Send Quotation</span>
+                      <span>Send Quote</span>
                     </button>
                   ) : (
                     <button disabled className="flex-1 flex items-center justify-center gap-1.5 md:gap-2 bg-gray-200 text-gray-400 cursor-not-allowed text-xs md:text-sm font-semibold py-2 md:py-3 px-3 md:px-4 rounded-lg">
@@ -711,9 +747,12 @@ const FurniGlobalHub = () => {
                       <span>Manufacturers Only</span>
                     </button>
                   )}
-                  <button className="flex items-center justify-center gap-1.5 md:gap-2 text-gray-600 hover:text-orange-600 transition text-xs md:text-sm font-medium py-2 md:py-3 px-3 md:px-4 rounded-lg hover:bg-orange-50 border border-gray-300">
-                    <Bookmark size={14} className="md:w-5 md:h-5" />
-                    <span className="hidden sm:inline">Save</span>
+                  <button 
+                    onClick={() => handleViewPostDetail(post)}
+                    className="p-2 border border-gray-300 text-gray-600 hover:text-orange-600 hover:border-orange-500 rounded-lg transition"
+                    title="View Details"
+                  >
+                    <Maximize2 size={16} />
                   </button>
                 </div>
               </div>
@@ -730,7 +769,7 @@ const FurniGlobalHub = () => {
         <button onClick={() => setShowMobileSidebar(!showMobileSidebar)} className="p-2 hover:bg-gray-100 rounded-lg">
           <Menu size={24} className="text-gray-700" />
         </button>
-        <h1 className="text-lg font-bold text-orange-600">FurniGlobal</h1>
+        <h1 className="text-lg font-bold text-orange-600">FurniHub</h1>
         <button onClick={() => setShowMobileCategories(!showMobileCategories)} className="p-2 hover:bg-gray-100 rounded-lg">
           <Grid size={24} className="text-gray-700" />
         </button>
@@ -914,7 +953,7 @@ const FurniGlobalHub = () => {
                     <div className="space-y-1">
                       {categories.length > 0 ? (
                         categories.map((category) => (
-                          <button key={category._id} onClick={() => handleCategoryClick(category)} className={`w-full flex items-center justify-between p-2 rounded-lg transition text-left ${selectedCategory?._id === category._id ? 'bg-orange-100' : 'hover:bg-orange-50'}`}>
+                          <button key={category._id} onClick={() => handleCategoryClick(category)} className={`w-full flex items-center justify-between p-2 rounded-lg transition text-left text-xs md:text-sm ${selectedCategory?._id === category._id ? 'bg-orange-100' : 'hover:bg-orange-50'}`}>
                             <div className="flex items-center gap-2">
                               <span className="text-lg">{category.icon || '📦'}</span>
                               <span className="text-xs text-gray-700 font-medium">{category.name}</span>
@@ -955,7 +994,7 @@ const FurniGlobalHub = () => {
                 <div className="p-4 space-y-1">
                   {categories.length > 0 ? (
                     categories.map((category) => (
-                      <button key={category._id} onClick={() => handleCategoryClick(category)} className={`w-full flex items-center justify-between p-3 rounded-lg transition text-left ${selectedCategory?._id === category._id ? 'bg-orange-100' : 'hover:bg-orange-50'}`}>
+                      <button key={category._id} onClick={() => handleCategoryClick(category)} className={`w-full flex items-center justify-between p-3 rounded-lg transition text-left text-sm ${selectedCategory?._id === category._id ? 'bg-orange-100' : 'hover:bg-orange-50'}`}>
                         <div className="flex items-center gap-2">
                           <span className="text-xl">{category.icon || '📦'}</span>
                           <span className="text-sm text-gray-700 font-medium">{category.name}</span>
@@ -975,7 +1014,7 @@ const FurniGlobalHub = () => {
         </AnimatePresence>
       </div>
 
-      {/* Post Modal */}
+      {/* POST MODAL - NEW VERSION */}
       <AnimatePresence>
         {showPostModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center md:justify-end z-50 p-4" onClick={() => setShowPostModal(false)}>
@@ -991,36 +1030,152 @@ const FurniGlobalHub = () => {
               </div>
 
               <div className="p-4 md:p-8 space-y-4 md:space-y-6">
+                {/* Title */}
                 <div>
-                  <label className="block text-sm font-bold text-gray-800 mb-3 md:mb-4 flex items-center gap-2">
-                    <span className="w-6 h-6 md:w-8 md:h-8 bg-gradient-to-br from-orange-400 to-amber-500 rounded-lg flex items-center justify-center text-white text-xs md:text-sm">4</span>
-                    {postType === 'photo' ? 'Upload Photo' : postType === 'document' ? 'Upload Document' : 'Upload File (Optional)'}
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    Title <span className="text-red-500">*</span>
                   </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 md:p-8 text-center hover:border-orange-400 hover:bg-orange-50 transition-all duration-300 bg-white">
-                    <input type="file" id="file-upload" onChange={handleFileSelect} accept={postType === 'photo' ? 'image/*' : postType === 'document' ? '.pdf,.doc,.docx' : '*'} className="hidden" />
-                    <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center">
-                      <div className="w-12 h-12 md:w-16 md:h-16 bg-gradient-to-br from-orange-100 to-amber-100 rounded-full flex items-center justify-center mb-3">
-                        <Upload size={20} className="text-orange-600 md:w-7 md:h-7" />
-                      </div>
-                      {selectedFile ? (
-                        <div className="text-sm text-gray-700">
-                          <div className="font-semibold text-orange-600 mb-1">✓ File Selected</div>
-                          <div className="text-gray-600 text-xs md:text-sm truncate max-w-[200px]">{selectedFile.name}</div>
-                        </div>
-                      ) : (
-                        <>
-                          <p className="text-xs md:text-sm text-gray-700 font-semibold mb-1">Click to upload or drag and drop</p>
-                          <p className="text-xs text-gray-500">{postType === 'photo' ? 'PNG, JPG, GIF up to 10MB' : postType === 'document' ? 'PDF, DOC, DOCX up to 10MB' : 'Any file up to 10MB'}</p>
-                        </>
-                      )}
-                    </label>
+                  <input
+                    type="text"
+                    value={postTitle}
+                    onChange={(e) => setPostTitle(e.target.value)}
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+                    placeholder="Enter post title"
+                    maxLength="200"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">{postTitle.length}/200 characters</p>
+                </div>
+
+                {/* Type Selection */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-800 mb-3">
+                    Type <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setPostCategory('idea')}
+                      className={`p-4 border-2 rounded-lg transition-all ${
+                        postCategory === 'idea'
+                          ? 'border-orange-500 bg-orange-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <Lightbulb className={`w-6 h-6 mx-auto mb-2 ${postCategory === 'idea' ? 'text-orange-500' : 'text-gray-400'}`} />
+                      <span className={`text-sm font-semibold ${postCategory === 'idea' ? 'text-orange-700' : 'text-gray-700'}`}>
+                        Idea
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPostCategory('requirement')}
+                      className={`p-4 border-2 rounded-lg transition-all ${
+                        postCategory === 'requirement'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <FileText className={`w-6 h-6 mx-auto mb-2 ${postCategory === 'requirement' ? 'text-blue-500' : 'text-gray-400'}`} />
+                      <span className={`text-sm font-semibold ${postCategory === 'requirement' ? 'text-blue-700' : 'text-gray-700'}`}>
+                        Requirement
+                      </span>
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex gap-3 md:gap-4 pt-4 md:pt-6">
-                  <button onClick={() => setShowPostModal(false)} className="flex-1 py-3 md:py-4 px-4 md:px-6 border-2 border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition text-sm md:text-base">Cancel</button>
-                  <button onClick={handleSubmitPost} disabled={!postTitle || !postDescription} className={`flex-1 py-3 md:py-4 px-4 md:px-6 rounded-xl font-bold transition-all duration-300 text-sm md:text-base ${postTitle && postDescription ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 shadow-lg hover:shadow-xl' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
-                    {postTitle && postDescription ? '🚀 Submit Post' : 'Fill Required Fields'}
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    Description <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={postDescription}
+                    onChange={(e) => setPostDescription(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none text-sm"
+                    placeholder="Describe your idea or requirement in detail..."
+                    rows="6"
+                    maxLength="5000"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">{postDescription.length}/5000 characters</p>
+                </div>
+
+                {/* File Upload */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    Attachments (Optional)
+                  </label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-500 transition-colors">
+                    <input
+                      type="file"
+                      id="file-upload"
+                      multiple
+                      accept="image/*,.pdf,.doc,.docx"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center">
+                      <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600 font-semibold">Click to upload</p>
+                      <p className="text-xs text-gray-500 mt-1">Images or Documents (Max 5MB each)</p>
+                    </label>
+                  </div>
+
+                  {/* Selected Files List */}
+                  {selectedFiles.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {selectedFiles.map((file, idx) => (
+                        <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                          {file.type.startsWith('image/') ? (
+                            <Image className="w-5 h-5 text-orange-500 flex-shrink-0" />
+                          ) : (
+                            <FileText className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                            <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(2)} KB</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeFile(idx)}
+                            className="p-1 hover:bg-gray-200 rounded flex-shrink-0"
+                          >
+                            <X className="w-4 h-4 text-red-500" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Submit Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPostModal(false);
+                      setPostTitle('');
+                      setPostDescription('');
+                      setPostCategory('idea');
+                      setSelectedFiles([]);
+                    }}
+                    className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors text-sm"
+                    disabled={quotationLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSubmitPost}
+                    disabled={quotationLoading || !postTitle.trim() || !postDescription.trim()}
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg font-semibold hover:from-orange-600 hover:to-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                  >
+                    {quotationLoading ? (
+                      <>
+                        <Loader className="w-4 h-4 animate-spin" />
+                        <span>Creating...</span>
+                      </>
+                    ) : (
+                      '🚀 Create Post'
+                    )}
                   </button>
                 </div>
               </div>
@@ -1029,18 +1184,18 @@ const FurniGlobalHub = () => {
         )}
       </AnimatePresence>
 
-      {/* Quotation Modal */}
+      {/* QUOTATION MODAL - UPDATED */}
       <AnimatePresence>
         {showQuotationModal && selectedPost && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowQuotationModal(false)}>
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="sticky top-0 bg-gradient-to-r from-orange-500 to-amber-500 p-4 md:p-6 flex items-center justify-between z-10 rounded-t-2xl">
                 <div>
-                  <h2 className="text-lg md:text-xl font-bold text-white mb-1">Send Quotation</h2>
+                  <h3 className="text-lg md:text-xl font-bold text-white mb-1">Send Quotation</h3>
                   <p className="text-orange-100 text-xs md:text-sm line-clamp-1">{selectedPost.title}</p>
                 </div>
                 <button onClick={() => setShowQuotationModal(false)} className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition">
-                  <X size={20} className="text-white" />
+                  <X className="w-5 h-5 text-white" />
                 </button>
               </div>
 
@@ -1052,22 +1207,69 @@ const FurniGlobalHub = () => {
                   </div>
                 )}
 
+                {/* Message */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-800 mb-2">Price (Optional)</label>
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    Your Message <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={quotationForm.message}
+                    onChange={(e) => setQuotationForm({ ...quotationForm, message: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none text-sm"
+                    rows="5"
+                    placeholder="Describe your quotation offer..."
+                    maxLength="2000"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">{quotationForm.message.length}/2000 characters</p>
+                </div>
+
+                {/* Price */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    Price (Optional)
+                  </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">₹</span>
-                    <input type="number" value={quotationForm.price} onChange={(e) => setQuotationForm({ ...quotationForm, price: e.target.value })} placeholder="Enter price" min="0" step="0.01" className="w-full pl-8 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm" />
+                    <input
+                      type="number"
+                      value={quotationForm.price}
+                      onChange={(e) => setQuotationForm({ ...quotationForm, price: e.target.value })}
+                      placeholder="0"
+                      min="0"
+                      step="0.01"
+                      className="w-full pl-8 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+                    />
                   </div>
                 </div>
 
+                {/* Delivery Time */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-800 mb-2">Delivery Time (Optional)</label>
-                  <input type="text" value={quotationForm.deliveryTime} onChange={(e) => setQuotationForm({ ...quotationForm, deliveryTime: e.target.value })} placeholder="e.g., 15 days, 2 weeks, 1 month" className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm" />
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    Delivery Time (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={quotationForm.deliveryTime}
+                    onChange={(e) => setQuotationForm({ ...quotationForm, deliveryTime: e.target.value })}
+                    placeholder="e.g., 15 days, 2 weeks, 1 month"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+                  />
                 </div>
 
-                <div className="flex gap-3 pt-4">
-                  <button onClick={() => setShowQuotationModal(false)} disabled={quotationLoading} className="flex-1 py-3 px-4 border-2 border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition disabled:opacity-50 text-sm md:text-base">Cancel</button>
-                  <button onClick={handleSubmitQuotation} disabled={!quotationForm.message.trim() || quotationLoading} className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 text-sm md:text-base ${quotationForm.message.trim() && !quotationLoading ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 shadow-md' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => setShowQuotationModal(false)}
+                    disabled={quotationLoading}
+                    className="flex-1 py-3 px-4 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSubmitQuotation}
+                    disabled={!quotationForm.message.trim() || quotationLoading}
+                    className="flex-1 py-3 px-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg font-semibold hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+                  >
                     {quotationLoading ? (
                       <>
                         <Loader className="w-4 h-4 animate-spin" />
@@ -1087,15 +1289,168 @@ const FurniGlobalHub = () => {
         )}
       </AnimatePresence>
 
-      {/* View Quotations Modal */}
+      {/* POST DETAIL MODAL - NEW (ZOOM VIEW) */}
+      <AnimatePresence>
+        {showPostDetail && detailPost && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowPostDetail(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+            >
+              <div className="sticky top-0 bg-gradient-to-r from-orange-500 to-amber-500 p-4 md:p-6 flex items-center justify-between rounded-t-2xl">
+                <h2 className="text-lg md:text-xl font-bold text-white truncate">{detailPost.title}</h2>
+                <button 
+                  onClick={() => setShowPostDetail(false)}
+                  className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition flex-shrink-0"
+                >
+                  <X size={20} className="text-white" />
+                </button>
+              </div>
+
+              <div className="p-4 md:p-6">
+                {/* Author Info */}
+                <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-200">
+                  <img 
+                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${detailPost.userId?.name || 'User'}`}
+                    className="w-12 h-12 rounded-full border-2 border-orange-200"
+                    alt="Author"
+                  />
+                  <div className="flex-1">
+                    <h3 className="font-bold text-gray-900 text-sm">{detailPost.userId?.name || 'Anonymous'}</h3>
+                    <p className="text-xs text-gray-500">
+                      {detailPost.userId?.isManufacturer ? '🏭 Manufacturer' : '👤 User'} • {new Date(detailPost.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Category & Status */}
+                <div className="flex gap-2 mb-4 flex-wrap">
+                  {detailPost.type && (
+                    <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+                      detailPost.type === 'idea' 
+                        ? 'bg-purple-100 text-purple-700' 
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {detailPost.type}
+                    </span>
+                  )}
+                  {detailPost.category && (
+                    <span className="text-xs px-3 py-1 bg-orange-100 text-orange-700 rounded-full font-medium">
+                      {detailPost.category}
+                    </span>
+                  )}
+                  <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+                    detailPost.status === 'open' 
+                      ? 'bg-green-100 text-green-700' 
+                      : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {detailPost.status}
+                  </span>
+                </div>
+
+                {/* Description */}
+                <p className="text-sm text-gray-700 leading-relaxed mb-4 whitespace-pre-wrap">
+                  {detailPost.description}
+                </p>
+
+                {/* Images */}
+                {detailPost.files?.filter(f => f.fileType === 'image').length > 0 && (
+                  <div className="mb-4">
+                    <div className="grid gap-2">
+                      {detailPost.files.filter(f => f.fileType === 'image').map((image, idx) => (
+                        <img 
+                          key={idx}
+                          src={image.url} 
+                          alt={`Post ${idx}`}
+                          className="w-full rounded-lg max-h-96 object-cover"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Documents */}
+                {detailPost.files?.filter(f => f.fileType === 'document').length > 0 && (
+                  <div className="mb-4 space-y-2">
+                    {detailPost.files.filter(f => f.fileType === 'document').map((doc, idx) => (
+                      <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                        <FileText className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                        <span className="text-sm text-gray-700 flex-1 truncate">{doc.filename}</span>
+                        <a 
+                          href={doc.url}
+                          download={doc.filename}
+                          className="p-2 hover:bg-gray-200 rounded flex-shrink-0"
+                        >
+                          <Download className="w-4 h-4 text-gray-600" />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Stats */}
+                <div className="flex items-center gap-6 text-xs text-gray-600 py-4 border-t border-gray-200 mb-4">
+                  <div className="flex items-center gap-1">
+                    <MessageSquare size={16} className="text-orange-500" />
+                    <span>{detailPost.quotationsCount || 0} Quotations</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Eye size={16} className="text-gray-500" />
+                    <span>{detailPost.views || 0} Views</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => handleSavePost(detailPost._id)}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-semibold transition text-sm ${
+                      savedPosts.includes(detailPost._id)
+                        ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Bookmark size={16} />
+                    <span>{savedPosts.includes(detailPost._id) ? 'Saved' : 'Save'}</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (authUser?.isManufacturer) {
+                        handleSendQuotation(detailPost);
+                        setShowPostDetail(false);
+                      }
+                    }}
+                    disabled={!authUser?.isManufacturer}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg font-semibold hover:from-orange-600 hover:to-amber-600 transition disabled:opacity-50 text-sm"
+                  >
+                    <Send size={16} />
+                    <span>Send Quote</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* VIEW QUOTATIONS MODAL */}
       <AnimatePresence>
         {showQuotationsModal && selectedPost && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowQuotationsModal(false)}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowQuotationsModal(false)}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
               <div className="sticky top-0 bg-gradient-to-r from-blue-500 to-indigo-500 p-4 md:p-6 flex items-center justify-between z-10 rounded-t-2xl">
                 <div>
-                  <h2 className="text-lg md:text-xl font-bold text-white mb-1">Quotations Received</h2>
-                  <p className="text-blue-100 text-xs md:text-sm line-clamp-1">{selectedPost.title}</p>
+                  <h2 className="text-lg md:text-xl font-bold text-white">Quotations Received</h2>
+                  <p className="text-blue-100 text-xs md:text-sm line-clamp-1 mt-1">{selectedPost.title}</p>
                 </div>
                 <button onClick={() => setShowQuotationsModal(false)} className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition">
                   <X size={20} className="text-white" />
@@ -1104,74 +1459,71 @@ const FurniGlobalHub = () => {
 
               <div className="p-4 md:p-6">
                 {quotationsLoading ? (
-                  <div className="flex items-center justify-center py-20">
-                    <Loader className="w-12 h-12 text-blue-500 animate-spin" />
+                  <div className="flex items-center justify-center py-12">
+                    <Loader className="w-8 h-8 text-blue-500 animate-spin" />
                   </div>
                 ) : viewingQuotations.length === 0 ? (
                   <div className="text-center py-12">
-                    <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">No Quotations Yet</h3>
-                    <p className="text-sm text-gray-600">Wait for manufacturers to send quotations</p>
+                    <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <h3 className="text-lg font-semibold text-gray-800">No Quotations Yet</h3>
+                    <p className="text-sm text-gray-600 mt-1">Manufacturers will submit quotations soon</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {viewingQuotations.map((quotation) => {
-                      const manufacturer = quotation.manufacturerId || quotation.manufacturer || {};
-                      return (
-                        <div key={quotation._id} className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl p-4 md:p-6 border border-gray-200 hover:shadow-md transition">
-                          <div className="flex items-start gap-3 mb-4">
-                            <img src={manufacturer.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${manufacturer.name || 'Manufacturer'}`} className="w-12 h-12 rounded-full border-2 border-blue-300" alt={manufacturer.name || 'Manufacturer'} />
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h4 className="font-bold text-gray-900">{manufacturer.name || 'Anonymous Manufacturer'}</h4>
-                                <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full">Manufacturer</span>
-                              </div>
-                              <p className="text-xs text-gray-500">{manufacturer.email}</p>
-                              {manufacturer.phone && <p className="text-xs text-gray-500">📞 {manufacturer.phone}</p>}
-                              {manufacturer.address && <p className="text-xs text-gray-500">📍 {manufacturer.address}</p>}
-                            </div>
-                            <span className="text-xs text-gray-400">
-                              {new Date(quotation.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                            </span>
+                    {viewingQuotations.map((quotation) => (
+                      <div key={quotation._id} className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl p-4 border border-gray-200 hover:shadow-md transition">
+                        <div className="flex items-start gap-3 mb-3">
+                          <img 
+                            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${quotation.manufacturer?.name || 'Manufacturer'}`}
+                            className="w-12 h-12 rounded-full border-2 border-blue-300 flex-shrink-0"
+                            alt="Manufacturer"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-bold text-gray-900 text-sm">{quotation.manufacturer?.name || 'Manufacturer'}</h4>
+                            <p className="text-xs text-gray-500 break-all">{quotation.manufacturer?.email}</p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {new Date(quotation.createdAt).toLocaleDateString()}
+                            </p>
                           </div>
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap flex-shrink-0 ${
+                            quotation.status === 'pending' 
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : quotation.status === 'accepted'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}>
+                            {quotation.status}
+                          </span>
+                        </div>
 
-                          <div className="bg-white rounded-lg p-4 mb-3">
-                            <p className="text-sm text-gray-700 whitespace-pre-line">{quotation.message}</p>
-                          </div>
+                        <div className="bg-white rounded-lg p-3 mb-3">
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{quotation.message}</p>
+                        </div>
 
-                          <div className="flex items-center gap-4 flex-wrap">
+                        {(quotation.price || quotation.deliveryTime) && (
+                          <div className="flex flex-wrap gap-3 text-xs bg-white p-3 rounded-lg mb-3">
                             {quotation.price && (
-                              <div className="flex items-center gap-2">
-                                <DollarSign className="w-4 h-4 text-green-600" />
-                                <span className="font-bold text-green-600">₹{quotation.price.toLocaleString()}</span>
+                              <div>
+                                <span className="text-gray-600">Price:</span>
+                                <span className="font-bold text-green-600 ml-1">₹{quotation.price.toLocaleString()}</span>
                               </div>
                             )}
                             {quotation.deliveryTime && (
-                              <div className="flex items-center gap-2">
-                                <Package className="w-4 h-4 text-blue-600" />
-                                <span className="text-sm text-gray-700">{quotation.deliveryTime}</span>
+                              <div>
+                                <span className="text-gray-600">Delivery:</span>
+                                <span className="font-bold text-blue-600 ml-1">{quotation.deliveryTime}</span>
                               </div>
                             )}
-                            <div className="ml-auto">
-                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                quotation.status === 'accepted' ? 'bg-green-100 text-green-700' :
-                                quotation.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                'bg-yellow-100 text-yellow-700'
-                              }`}>
-                                {quotation.status || 'pending'}
-                              </span>
-                            </div>
                           </div>
+                        )}
 
-                          {quotation.status === 'pending' && (
-                            <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200">
-                              <button className="flex-1 py-2 px-4 bg-green-500 text-white rounded-lg hover:bg-green-600 transition text-sm font-semibold">Accept</button>
-                              <button className="flex-1 py-2 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm font-semibold">Reject</button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                        {quotation.manufacturer?.phone && (
+                          <div className="text-xs text-gray-600 pt-3 border-t border-gray-200">
+                            <span className="font-semibold">Contact:</span> {quotation.manufacturer.phone}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

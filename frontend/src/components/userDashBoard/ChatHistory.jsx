@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   MessageCircle, Package, Trash2, Loader2, Search,
   Building2, AlertCircle, User as UserIcon, Clock,
   CheckCheck, RefreshCw, X, Send
 } from 'lucide-react';
-import api from '../../axios/axiosInstance'; // Import axios instance
+import api from '../../axios/axiosInstance';
 
 const ChatHistory = () => {
   const [chats, setChats] = useState([]);
@@ -17,6 +17,7 @@ const ChatHistory = () => {
   const [error, setError] = useState('');
   const [user, setUser] = useState(null);
 
+  // FIXED: Use useCallback directly (already imported)
   const loadUserData = useCallback(() => {
     try {
       const userData = localStorage.getItem('userData');
@@ -349,14 +350,18 @@ const ChatHistory = () => {
   );
 };
 
+// ============================================================================
+// CHAT MODAL WRAPPER FOR CHAT HISTORY
+// ============================================================================
 const ChatModalWrapper = ({ chat, onClose, isManufacturer }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const messagesEndRef = React.useRef(null);
+  const messagesEndRef = useRef(null);
 
+  // FIXED: Use useCallback directly (already imported)
   const loadMessages = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
@@ -439,17 +444,31 @@ const ChatModalWrapper = ({ chat, onClose, isManufacturer }) => {
             </div>
           ) : (
             messages.map((msg, idx) => {
-              const isMine = msg.senderId === currentUserId || msg.senderId?._id === currentUserId;
+              // FIXED: Check if message sender matches current user ID
+              // Check multiple possible ID formats from backend
+              const msgSenderId = msg.senderId?._id || msg.senderId;
+              const isMine = String(msgSenderId) === String(currentUserId);
+              
+              console.log('Message Debug:', {
+                msgSenderId: msgSenderId,
+                currentUserId: currentUserId,
+                isMine: isMine,
+                senderName: msg.senderName
+              });
+              
               return (
                 <div key={idx} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-xs px-3 py-2 rounded-lg ${
                     isMine ? 'bg-blue-600 text-white' : 'bg-white border'
                   }`}>
-                    {!isMine && <div className="text-xs font-medium mb-1">{msg.senderName}</div>}
+                    {!isMine && <div className="text-xs font-medium mb-1 text-gray-700">{msg.senderName}</div>}
                     <p className="text-sm">{msg.message}</p>
-                    <span className="text-xs opacity-75 mt-1 block">
-                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-xs opacity-75">
+                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {isMine && <span className="text-xs ml-2">You</span>}
+                    </div>
                   </div>
                 </div>
               );

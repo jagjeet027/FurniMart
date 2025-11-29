@@ -41,7 +41,6 @@ const UserChatModal = ({ isOpen, onClose, product, currentUserId }) => {
       setLoading(true);
       setError('');
 
-      // Create or get existing chat using axios
       const response = await api.post('/chats', {
         productId: product._id
       });
@@ -127,7 +126,6 @@ const UserChatModal = ({ isOpen, onClose, product, currentUserId }) => {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg h-[600px] flex flex-col overflow-hidden">
-        {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-lg overflow-hidden bg-blue-500/20 flex items-center justify-center">
@@ -159,7 +157,6 @@ const UserChatModal = ({ isOpen, onClose, product, currentUserId }) => {
           </button>
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="bg-red-50 border-l-4 border-red-500 p-3 mx-4 mt-4">
             <div className="flex items-center">
@@ -174,7 +171,6 @@ const UserChatModal = ({ isOpen, onClose, product, currentUserId }) => {
           </div>
         )}
 
-        {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
           {loading ? (
             <div className="flex items-center justify-center h-full">
@@ -193,13 +189,16 @@ const UserChatModal = ({ isOpen, onClose, product, currentUserId }) => {
           ) : (
             <>
               {messages.map((msg, index) => {
-                const isMine = msg.senderId === currentUserId || msg.senderId?._id === currentUserId;
+                // FIXED: Check if message sender matches current user ID
+                const isMine = String(msg.senderId) === String(currentUserId) || 
+                              String(msg.senderId?._id) === String(currentUserId);
+                
                 return (
                   <div
                     key={index}
                     className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
                   >
-                    <div className={`max-w-[75%] ${isMine ? 'order-2' : 'order-1'}`}>
+                    <div className={`max-w-[75%]`}>
                       <div
                         className={`rounded-2xl px-4 py-2.5 ${
                           isMine
@@ -239,7 +238,6 @@ const UserChatModal = ({ isOpen, onClose, product, currentUserId }) => {
           )}
         </div>
 
-        {/* Input */}
         <div className="p-4 bg-white border-t border-gray-200">
           <div className="flex items-center gap-2">
             <input
@@ -275,5 +273,6 @@ const UserChatModal = ({ isOpen, onClose, product, currentUserId }) => {
     </div>
   );
 };
+
 
 export default UserChatModal;
