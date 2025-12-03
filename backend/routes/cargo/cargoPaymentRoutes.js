@@ -1,30 +1,32 @@
-// backend/routes/cargo/cargoPaymentRoutes.js
-
 import express from 'express';
 import {
   createListingOrder,
   verifyCargoPayment,
-  getCompanyPaymentHistory,
-  getAllCargoPayments,
+  getPaymentHistory,
   getPaymentByOrderId,
-  refundCargoPayment, 
-  getPaymentStatistics
+  refundPayment,
 } from '../../controllers/cargoInsurance/cargoPaymentController.js';
+import { protect } from '../../middleware/auth.js';
+import { protectAdmin } from '../../middleware/adminAuth.js';
 
 const router = express.Router();
 
 // ========== PUBLIC ROUTES ==========
+// Create payment order (no auth required for initial order creation)
 router.post('/create-listing-order', createListingOrder);
+
+// Verify payment (no auth required as it uses signature verification)
 router.post('/verify-payment', verifyCargoPayment);
 
-// ========== AUTHENTICATED COMPANY ROUTES ==========
-router.get('/company/:companyId', getCompanyPaymentHistory);
-router.get('/order/:orderId', getPaymentByOrderId);
+// ========== PROTECTED ROUTES (USER) ==========
+// Get payment history for a companya
+router.get('/company/:companyId', protect, getPaymentHistory);
 
-// ========== ADMIN ROUTES ==========
+// Get payment by order ID
+router.get('/order/:orderId', protect, getPaymentByOrderId);
 
-router.get('/admin/all', getAllCargoPayments);
-router.get('/admin/statistics',  getPaymentStatistics);
-router.post('/admin/refund/:paymentId',refundCargoPayment);
+// ========== ADMIN ONLY ROUTES ==========
+// Refund a payment
+router.post('/refund', protectAdmin, refundPayment);
 
 export default router;

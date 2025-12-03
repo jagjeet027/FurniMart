@@ -1,4 +1,3 @@
-// routes/postRoutes.js
 import express from 'express';
 import { auth, requireManufacturer } from '../middleware/authMiddleware.js';
 import {
@@ -19,21 +18,16 @@ import {
 
 const router = express.Router();
 
-// Post routes
+// ⚡ Post routes (Optimized order - most specific first)
+router.get('/my-posts', auth, getMyPosts); // Must be before /:id
+router.get('/', getAllPosts); // Public route - no auth needed
 router.post('/', auth, createPost);
-router.get('/', getAllPosts);
-router.get('/my-posts', auth, getMyPosts);
 router.get('/:id', getPostById);
 router.patch('/:id', auth, updatePost);
 router.delete('/:id', auth, deletePost);
   
-// Quotation routes for posts
+// ⚡ Quotation routes for posts
 router.get('/:id/quotations', auth, getPostQuotations);
 router.post('/:id/quotations', auth, requireManufacturer, createQuotation);
-
-// Quotation management routes
-router.get('/quotations/my-quotations', auth, requireManufacturer, getMyQuotations);
-router.patch('/quotations/:id/status', auth, updateQuotationStatus);
-router.delete('/quotations/:id', auth, deleteQuotation);
 
 export default router;

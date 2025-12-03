@@ -4,7 +4,7 @@ import { Shipment } from '../../models/cargo/Shipment.js';
 import { Quote } from '../../models/cargo/Quote.js';
 import { Payment } from '../../models/cargo/Payment.js';
 import Admin from '../../models/admin.js';
-
+import { LoanProvider } from '../../models/cargo/loanProvider.js';
 // ========== DASHBOARD STATISTICS ==========
 export const getDashboardStats = async (req, res) => {
   try {
@@ -591,6 +591,224 @@ export const exportCompaniesData = async (req, res) => {
     res.send(csv);
   } catch (error) {
     console.error('Export data error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const getPendingLoanProviders = async (req, res) => {
+  try {
+    const { search, sortBy } = req.query;
+    let filter = {
+      status: 'pending',
+      paymentStatus: 'completed',
+    };
+
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    let query = LoanProvider.find(filter);
+
+    if (sortBy === 'newest') {
+      query = query.sort({ createdAt: -1 });
+    } else if (sortBy === 'oldest') {
+      query = query.sort({ createdAt: 1 });
+    } else {
+      query = query.sort({ createdAt: -1 });
+    }
+
+    const providers = await query.exec();
+
+    res.status(200).json({
+      success: true,
+      count: providers.length,
+      data: providers,
+    });
+  } catch (error) {
+    console.error('Pending loan providers error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const getAllLoanProvidersAdmin = async (req, res) => {
+  try {
+    const { status, paymentStatus, search, sortBy, page = 1, limit = 10 } = req.query;
+    let filter = {};
+
+    if (status && status !== 'all') filter.status = status;
+    if (paymentStatus && paymentStatus !== 'all') filter.paymentStatus = paymentStatus;
+
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    let query = LoanProvider.find(filter);
+
+    if (sortBy === 'newest') query = query.sort({ createdAt: -1 });
+    else if (sortBy === 'oldest') query = query.sort({ createdAt: 1 });
+    else if (sortBy === 'rating') query = query.sort({ rating: -1 });
+    else query = query.sort({ createdAt: -1 });
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const providers = await query.skip(skip).limit(parseInt(limit)).exec();
+    const total = await LoanProvider.countDocuments(filter);
+
+    res.status(200).json({
+      success: true,
+      count: providers.length,
+      total,
+      pages: Math.ceil(total / parseInt(limit)),
+      currentPage: parseInt(page),
+      data: providers,
+    });
+  } catch (error) {
+    console.error('All loan providers error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const getLoanProviderDetailsAdmin = async (req, res) => {
+  try {
+    const provider = await LoanProvider.findById(req.params.id);
+
+    if (!provider) {
+      return res.status(404).json({
+        success: false,
+        message: 'Loan provider not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: provider,
+    });
+  } catch (error) {
+    console.error('Get loan provider details error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const approveLoanProvider = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const provider = await LoanProvider.findByIdAndUpdate(
+      id,
+      {
+        status: 'approved',
+        isVerified: true,
+        updatedAt: new Date(),
+      },
+      { new: true }
+    );
+
+    if (!provider) {
+      return res.status(404).json({
+        success: false,
+        message: 'Loan provider not found',
+      });
+    }
+
+    console.log(`✅ Loan provider approved: ${provider.name}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Loan provider approved successfully',
+      data: provider,
+    });
+  } catch (error) {
+    console.error('Approve loan provider error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const rejectLoanProvider = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rejection reason is required',
+      });
+    }
+
+    const provider = await LoanProvider.findByIdAndUpdate(
+      id,
+      {
+        status: 'rejected',
+        rejectionReason: reason,
+        updatedAt: new Date(),
+      },
+      { new: true }
+    );
+
+    if (!provider) {
+      return res.status(404).json({
+        success: false,
+        message: 'Loan provider not found',
+      });
+    }
+
+    console.log(`❌ Loan provider rejected: ${provider.name}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Loan provider rejected successfully',
+      data: provider,
+    });
+  } catch (error) {
+    console.error('Reject loan provider error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const deleteLoanProviderAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const provider = await LoanProvider.findByIdAndDelete(id);
+
+    if (!provider) {
+      return res.status(404).json({
+        success: false,
+        message: 'Loan provider not found',
+      });
+    }
+
+    console.log(`🗑️ Loan provider deleted: ${provider.name}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Loan provider deleted successfully',
+    });
+  } catch (error) {
+    console.error('Delete loan provider error:', error);
     res.status(500).json({
       success: false,
       message: error.message,

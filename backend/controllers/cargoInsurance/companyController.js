@@ -86,11 +86,19 @@ export const registerCompany = async (req, res) => {
       description,
     } = req.body;
 
+    console.log('📥 [REGISTER COMPANY] Request received:', {
+      name,
+      email,
+      maxCoverageAmount,
+      maxCoverageCurrency
+    });
+
     // Validate required fields
     if (!name || !email || !phone || !website || !maxCoverageAmount) {
+      console.error('❌ [REGISTER COMPANY] Missing required fields');
       return res.status(400).json({
         success: false,
-        message: 'Please provide all required fields',
+        message: 'Please provide all required fields: name, email, phone, website, maxCoverageAmount',
       });
     }
 
@@ -100,37 +108,47 @@ export const registerCompany = async (req, res) => {
     });
 
     if (existingCompany) {
+      console.error('❌ [REGISTER COMPANY] Company already exists');
       return res.status(400).json({
         success: false,
         message: 'Company with this email or name already exists',
       });
     }
 
-    // Create new company
-    const company = await Company.create({
+    // ✅ FIX: Send both individual fields and maxCoverage object
+    const companyData = {
       name,
       email,
       phone,
       website,
-      established,
-      coverage,
+      established: established || new Date().getFullYear(),
+      coverage: coverage || 'Global',
+      // ✅ Individual fields (required by model)
+      maxCoverageAmount: parseFloat(maxCoverageAmount),
+      maxCoverageCurrency: maxCoverageCurrency || 'USD',
+      // ✅ Object format (for backward compatibility)
       maxCoverage: {
-        amount: maxCoverageAmount,
-        currency: maxCoverageCurrency,
+        amount: parseFloat(maxCoverageAmount),
+        currency: maxCoverageCurrency || 'USD',
       },
-      routes,
-      shipmentTypes,
-      cargoTypes,
-      submittedBy: {
-        name: submitterName,
-        email: submitterEmail,
-        phone: submitterPhone,
-        designation: submitterDesignation,
-      },
-      description,
+      routes: routes || [],
+      shipmentTypes: shipmentTypes || [],
+      cargoTypes: cargoTypes || [],
+      submitterName,
+      submitterEmail,
+      submitterPhone,
+      submitterDesignation,
+      description: description || '',
       status: 'pending',
       paymentStatus: 'pending',
-    });
+    };
+
+    console.log('📤 [REGISTER COMPANY] Creating company with data:', companyData);
+
+    // Create new company
+    const company = await Company.create(companyData);
+
+    console.log('✅ [REGISTER COMPANY] Company created successfully:', company._id);
 
     res.status(201).json({
       success: true,
@@ -138,9 +156,26 @@ export const registerCompany = async (req, res) => {
       data: company,
     });
   } catch (error) {
+    console.error('❌ [REGISTER COMPANY] Error:', {
+      message: error.message,
+      errors: error.errors,
+      stack: error.stack
+    });
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors)
+        .map(err => err.message)
+        .join(', ');
+      return res.status(400).json({
+        success: false,
+        message: `Validation error: ${messages}`,
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || 'Failed to register company',
     });
   }
 };
@@ -178,6 +213,15 @@ export const updateCompany = async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
+
+    // If updating coverage amount, update both fields
+    if (updateData.maxCoverageAmount) {
+      updateData.maxCoverageCurrency = updateData.maxCoverageCurrency || 'USD';
+      updateData.maxCoverage = {
+        amount: updateData.maxCoverageAmount,
+        currency: updateData.maxCoverageCurrency,
+      };
+    }
 
     const company = await Company.findByIdAndUpdate(id, updateData, {
       new: true,

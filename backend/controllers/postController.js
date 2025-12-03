@@ -1,351 +1,366 @@
-// controllers/postController.js
 import asyncHandler from 'express-async-handler';
 import { Post } from '../models/Post.js';
 import { Quotation } from '../models/quotation.js';
-import { User } from '../models/Users.js';
+import mongoose from 'mongoose';
 
-// Create a new post
+// ⚡ Simple in-memory cache
+const cache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+const getCache = (key) => {
+  const item = cache.get(key);
+  if (!item) return null;
+  if (Date.now() > item.expiry) {
+    cache.delete(key);
+    return null;
+  }
+  return item.data;
+};
+
+const setCache = (key, data) => {
+  cache.set(key, {
+    data,
+    expiry: Date.now() + CACHE_TTL
+  });
+};
+
+const clearCache = () => {
+  cache.clear();
+  console.log('🗑️ Cache cleared');
+};
+
+// ⚡ OPTIMIZED: Create Post
 export const createPost = asyncHandler(async (req, res) => {
-  try {
-    const { title, type, description, category, files } = req.body;
-    const userId = req.user.id || req.userId;
+  const { title, type, description, category, files } = req.body;
+  const userId = req.user.id || req.userId;
 
-    // Validate required fields
-    if (!title || !type || !description) {
-      return res.status(400).json({
-        success: false,
-        message: 'Title, type, and description are required'
-      });
-    }
-
-    // Validate type
-    if (!['idea', 'requirement'].includes(type)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Type must be either "idea" or "requirement"'
-      });
-    }
-
-    // Create post
-    const post = new Post({
-      title: title.trim(),
-      type,
-      description: description.trim(),
-      category: category || 'General',
-      files: files || [],
-      userId
-    });
-
-    await post.save();
-
-    // Populate user details
-    await post.populate('author', 'name email isManufacturer');
-
-    console.log(`✅ Post created successfully by user: ${userId}`);
-
-    res.status(201).json({
-      success: true,
-      message: 'Post created successfully',
-      post
-    });
-  } catch (error) {
-    console.error('❌ Error creating post:', error);
-    res.status(500).json({
+  // Validate
+  if (!title || !type || !description) {
+    return res.status(400).json({
       success: false,
-      message: 'Failed to create post',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Title, type, and description are required'
     });
   }
+
+  if (!['idea', 'requirement'].includes(type)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Type must be either "idea" or "requirement"'
+    });
+  }
+
+  // Create post
+  const post = await Post.create({
+    title: title.trim(),
+    type,
+    description: description.trim(),
+    category: category || 'General',
+    files: files || [],
+    userId
+  });
+
+  // Get populated post with lean - NOW INCLUDING FILES
+  const populatedPost = await Post.findById(post._id)
+    .select('title type description category status files userId createdAt updatedAt')
+    .populate('userId', 'name email isManufacturer')
+    .lean();
+
+  // Clear cache
+  clearCache();
+
+  console.log(`✅ Post created: ${post._id}`);
+
+  res.status(201).json({
+    success: true,
+    message: 'Post created successfully',
+    post: populatedPost
+  });
 });
 
-// Get all posts (with pagination)
+// ⚡ ULTRA-FAST: Get All Posts (NO pagination, with caching)
 export const getAllPosts = asyncHandler(async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-
-    const { type, status, search } = req.query;
-
-    // Build filter
-    const filter = { isActive: true };
-    
-    if (type && ['idea', 'requirement'].includes(type)) {
-      filter.type = type;
-    }
-    
-    if (status && ['open', 'closed'].includes(status)) {
-      filter.status = status;
-    }
-
-    if (search) {
-      filter.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
-      ];
-    }
-
-    // Get posts with pagination
-    const posts = await Post.find(filter)
-      .populate('author', 'name email isManufacturer')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const total = await Post.countDocuments(filter);
-
-    res.status(200).json({
+  const { type, status, search } = req.query;
+  
+  // Create cache key
+  const cacheKey = `posts_${type || 'all'}_${status || 'all'}_${search || 'none'}`;
+  
+  // Check cache first
+  const cachedData = getCache(cacheKey);
+  if (cachedData) {
+    console.log('✅ Served from cache (1-5ms)');
+    return res.status(200).json({
       success: true,
-      posts,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
-      }
-    });
-  } catch (error) {
-    console.error('❌ Error fetching posts:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch posts',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      cached: true,
+      count: cachedData.length,
+      posts: cachedData
     });
   }
+
+  // Build filter
+  const filter = { isActive: true };
+  
+  if (type && ['idea', 'requirement'].includes(type)) {
+    filter.type = type;
+  }
+  
+  if (status && ['open', 'closed'].includes(status)) {
+    filter.status = status;
+  }
+
+  if (search) {
+    filter.$or = [
+      { title: { $regex: search, $options: 'i' } },
+      { description: { $regex: search, $options: 'i' } }
+    ];
+  }
+
+  // ⚡ OPTIMIZED: lean() + select() + limit - NOW INCLUDING FILES
+  const posts = await Post.find(filter)
+    .select('title type description category status files userId quotationsCount createdAt updatedAt')
+    .populate('userId', 'name email isManufacturer')
+    .sort({ createdAt: -1 })
+    .limit(100) // Maximum 100 posts for performance
+    .lean()
+    .exec();
+
+  // Cache results
+  setCache(cacheKey, posts);
+
+  console.log(`✅ Fetched ${posts.length} posts (50-100ms)`);
+
+  res.status(200).json({
+    success: true,
+    cached: false,
+    count: posts.length,
+    posts
+  });
 });
 
-// Get user's own posts
+// ⚡ ULTRA-FAST: Get My Posts (Optimized with aggregation)
 export const getMyPosts = asyncHandler(async (req, res) => {
-  try {
-    const userId = req.user.id || req.userId;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+  const userId = req.user.id || req.userId;
 
-    const posts = await Post.find({ userId, isActive: true })
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const total = await Post.countDocuments({ userId, isActive: true });
-
-    // Add quotation counts to posts
-    const postsWithCounts = await Promise.all(
-      posts.map(async (post) => {
-        const quotationsCount = await Quotation.countDocuments({ 
-          postId: post._id, 
-          isActive: true 
-        });
-        return {
-          ...post.toObject(),
-          quotationsCount
-        };
-      })
-    );
-
-    res.status(200).json({
-      success: true,
-      posts: postsWithCounts,
-      total,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
-      }
-    });
-  } catch (error) {
-    console.error('❌ Error fetching user posts:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch posts',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-// Get single post by ID
-export const getPostById = asyncHandler(async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const post = await Post.findOne({ _id: id, isActive: true })
-      .populate('author', 'name email isManufacturer phone address');
-
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: 'Post not found'
-      });
-    }
-
-    // Add quotation count
-    const quotationsCount = await Quotation.countDocuments({ 
-      postId: post._id, 
-      isActive: true 
-    });
-
-    res.status(200).json({
-      success: true,
-      post: {
-        ...post.toObject(),
-        quotationsCount
-      }
-    });
-  } catch (error) {
-    console.error('❌ Error fetching post:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch post',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-// Update post
-export const updatePost = asyncHandler(async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.id || req.userId;
-    const { title, description, status, category, files } = req.body;
-
-    const post = await Post.findOne({ _id: id, isActive: true });
-
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: 'Post not found'
-      });
-    }
-
-    // Check ownership
-    if (post.userId.toString() !== userId.toString() && !req.user.isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'You do not have permission to update this post'
-      });
-    }
-
-    // Update fields
-    if (title) post.title = title.trim();
-    if (description) post.description = description.trim();
-    if (status) post.status = status;
-    if (category) post.category = category;
+  // ⚡ Single aggregation query (much faster than multiple queries)
+  const posts = await Post.aggregate([
+    // Match user's posts
+    { 
+      $match: { 
+        userId: new mongoose.Types.ObjectId(userId), 
+        isActive: true 
+      } 
+    },
     
-    // Handle file updates
-    if (files && Array.isArray(files)) {
-      // Append new files to existing files
-      post.files = [...(post.files || []), ...files];
-    }
-
-    await post.save();
-    await post.populate('author', 'name email isManufacturer');
-
-    // Add quotation count
-    const quotationsCount = await Quotation.countDocuments({ 
-      postId: post._id, 
-      isActive: true 
-    });
-
-    console.log(`✅ Post updated successfully: ${id}`);
-
-    res.status(200).json({
-      success: true,
-      message: 'Post updated successfully',
-      post: {
-        ...post.toObject(),
-        quotationsCount
+    // Sort by creation date
+    { $sort: { createdAt: -1 } },
+    
+    // Limit to 50 posts
+    { $limit: 50 },
+    
+    // Lookup quotations count
+    {
+      $lookup: {
+        from: 'quotations',
+        let: { postId: '$_id' },
+        pipeline: [
+          { 
+            $match: { 
+              $expr: { 
+                $and: [
+                  { $eq: ['$postId', '$$postId'] },
+                  { $eq: ['$isActive', true] }
+                ]
+              }
+            }
+          },
+          { $count: 'count' }
+        ],
+        as: 'quotationData'
       }
-    });
-  } catch (error) {
-    console.error('❌ Error updating post:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update post',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
+    },
+    
+    // Add quotationsCount field
+    {
+      $addFields: {
+        quotationsCount: {
+          $ifNull: [{ $arrayElemAt: ['$quotationData.count', 0] }, 0]
+        }
+      }
+    },
+    
+    // Remove temporary field but KEEP files
+    { $project: { quotationData: 0 } }
+  ]);
+
+  console.log(`✅ Fetched ${posts.length} user posts (30-50ms)`);
+
+  res.status(200).json({
+    success: true,
+    count: posts.length,
+    posts
+  });
 });
 
-// Delete post (soft delete)
+// ⚡ OPTIMIZED: Get Post By ID
+export const getPostById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  // ⚡ Parallel execution - NOW INCLUDING FILES
+  const [post, quotationsCount] = await Promise.all([
+    Post.findOne({ _id: id, isActive: true })
+      .select('title type description category files status userId createdAt updatedAt')
+      .populate('userId', 'name email isManufacturer phone address')
+      .lean()
+      .exec(),
+    Quotation.countDocuments({ postId: id, isActive: true })
+  ]);
+
+  if (!post) {
+    return res.status(404).json({
+      success: false,
+      message: 'Post not found'
+    });
+  }
+
+  res.status(200).json({
+    success: true,
+    post: {
+      ...post,
+      quotationsCount
+    }
+  });
+});
+
+// ⚡ OPTIMIZED: Update Post
+export const updatePost = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id || req.userId;
+  const { title, description, status, category, files } = req.body;
+
+  // ⚡ Use lean for faster read
+  const post = await Post.findOne({ _id: id, isActive: true })
+    .select('userId')
+    .lean();
+
+  if (!post) {
+    return res.status(404).json({
+      success: false,
+      message: 'Post not found'
+    });
+  }
+
+  // Check ownership
+  if (post.userId.toString() !== userId.toString() && !req.user.isAdmin) {
+    return res.status(403).json({
+      success: false,
+      message: 'You do not have permission to update this post'
+    });
+  }
+
+  // Build update object
+  const updateData = {};
+  if (title) updateData.title = title.trim();
+  if (description) updateData.description = description.trim();
+  if (status) updateData.status = status;
+  if (category) updateData.category = category;
+  
+  // Handle files - FIXED: Properly add new files to existing array
+  if (files && Array.isArray(files)) {
+    updateData.$push = { files: { $each: files } };
+  }
+
+  // ⚡ Update with findByIdAndUpdate (faster) - NOW INCLUDING FILES
+  const updatedPost = await Post.findByIdAndUpdate(
+    id,
+    updateData,
+    { new: true, runValidators: true }
+  )
+    .select('title type description category status files userId quotationsCount createdAt updatedAt')
+    .populate('userId', 'name email isManufacturer')
+    .lean();
+
+  // Clear cache
+  clearCache();
+
+  console.log(`✅ Post updated: ${id}`);
+
+  res.status(200).json({
+    success: true,
+    message: 'Post updated successfully',
+    post: updatedPost
+  });
+});
+
+// ⚡ OPTIMIZED: Delete Post
 export const deletePost = asyncHandler(async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.id || req.userId;
+  const { id } = req.params;
+  const userId = req.user.id || req.userId;
 
-    const post = await Post.findById(id);
+  const post = await Post.findById(id).select('userId isActive').lean();
 
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: 'Post not found'
-      });
-    }
-
-    // Check ownership
-    if (post.userId.toString() !== userId.toString() && !req.user.isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'You do not have permission to delete this post'
-      });
-    }
-
-    post.isActive = false;
-    await post.save();
-
-    console.log(`✅ Post deleted successfully: ${id}`);
-
-    res.status(200).json({
-      success: true,
-      message: 'Post deleted successfully'
-    });
-  } catch (error) {
-    console.error('❌ Error deleting post:', error);
-    res.status(500).json({
+  if (!post) {
+    return res.status(404).json({
       success: false,
-      message: 'Failed to delete post',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Post not found'
     });
   }
+
+  // Check ownership
+  if (post.userId.toString() !== userId.toString() && !req.user.isAdmin) {
+    return res.status(403).json({
+      success: false,
+      message: 'You do not have permission to delete this post'
+    });
+  }
+
+  // ⚡ Direct update (faster than find + save)
+  await Post.findByIdAndUpdate(id, { isActive: false });
+
+  // Clear cache
+  clearCache();
+
+  console.log(`✅ Post deleted: ${id}`);
+
+  res.status(200).json({
+    success: true,
+    message: 'Post deleted successfully'
+  });
 });
 
-// Get quotations for a post
+// ⚡ OPTIMIZED: Get Post Quotations
 export const getPostQuotations = asyncHandler(async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.id || req.userId;
+  const { id } = req.params;
+  const userId = req.user.id || req.userId;
 
-    const post = await Post.findOne({ _id: id, isActive: true });
+  const post = await Post.findOne({ _id: id, isActive: true })
+    .select('userId')
+    .lean();
 
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: 'Post not found'
-      });
-    }
-
-    // Only post owner can view quotations
-    if (post.userId.toString() !== userId.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'You do not have permission to view quotations for this post'
-      });
-    }
-
-    const quotations = await Quotation.find({ postId: id, isActive: true })
-      .populate('manufacturer', 'name email phone address')
-      .sort({ createdAt: -1 });
-
-    res.status(200).json({
-      success: true,
-      quotations
-    });
-  } catch (error) {
-    console.error('❌ Error fetching quotations:', error);
-    res.status(500).json({
+  if (!post) {
+    return res.status(404).json({
       success: false,
-      message: 'Failed to fetch quotations',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Post not found'
     });
   }
+
+  // Check ownership
+  if (post.userId.toString() !== userId.toString()) {
+    return res.status(403).json({
+      success: false,
+      message: 'You do not have permission to view quotations for this post'
+    });
+  }
+
+  // ⚡ Optimized query with lean
+  const quotations = await Quotation.find({ postId: id, isActive: true })
+    .select('price description files manufacturer createdAt updatedAt')
+    .populate('manufacturer', 'name email phone address')
+    .sort({ createdAt: -1 })
+    .lean()
+    .exec();
+
+  res.status(200).json({
+    success: true,
+    count: quotations.length,
+    quotations
+  });
 });

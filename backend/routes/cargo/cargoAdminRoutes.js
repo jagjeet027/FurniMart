@@ -1,4 +1,3 @@
-// routes/cargo/cargoAdminRoutes.js
 import express from 'express';
 import {
   getDashboardStats,
@@ -16,18 +15,22 @@ import {
   updateSystemSettings,
   bulkApproveCompanies,
   exportCompaniesData,
+  // Loan Provider Admin Routes
+  getPendingLoanProviders,
+  getAllLoanProvidersAdmin,
+  approveLoanProvider,
+  rejectLoanProvider,
+  deleteLoanProviderAdmin,
+  getLoanProviderDetailsAdmin,
 } from '../../controllers/cargoInsurance/cargoAdminController.js';
 import { protectAdmin } from '../../middleware/adminAuth.js';
 
 const router = express.Router();
 
-// Apply admin authentication middleware to all routes
 router.use(protectAdmin);
 
-// ========== DASHBOARD ==========
+// ========== INSURANCE COMPANY ROUTES ==========
 router.get('/dashboard/stats', getDashboardStats);
-
-// ========== COMPANY MANAGEMENT ==========
 router.get('/companies/pending', getPendingCompanies);
 router.get('/companies', getAllCompaniesAdmin);
 router.get('/companies/:id', getCompanyDetailsAdmin);
@@ -37,19 +40,21 @@ router.delete('/companies/:id', deleteCompanyAdmin);
 router.post('/companies/bulk/approve', bulkApproveCompanies);
 router.get('/companies/export/data', exportCompaniesData);
 
-// ========== SHIPMENTS ==========
+// ========== LOAN PROVIDER ROUTES - NEW ==========
+router.get('/loan-providers/pending', getPendingLoanProviders);
+router.get('/loan-providers', getAllLoanProvidersAdmin);
+router.get('/loan-providers/:id', getLoanProviderDetailsAdmin);
+router.post('/loan-providers/:id/approve', approveLoanProvider);
+router.post('/loan-providers/:id/reject', rejectLoanProvider);
+router.delete('/loan-providers/:id', deleteLoanProviderAdmin);
+
+// ========== SHIPMENTS, QUOTES, PAYMENTS ==========
 router.get('/shipments', getAllShipments);
-
-// ========== QUOTES ==========
 router.get('/quotes', getAllQuotes);
-
-// ========== PAYMENTS ==========
 router.get('/payments', getAllPayments);
 
-// ========== ANALYTICS ==========
+// ========== ANALYTICS & SETTINGS ==========
 router.get('/analytics/data', getAnalytics);
-
-// ========== SYSTEM SETTINGS ==========
 router.get('/settings', getSystemSettings);
 router.put('/settings', updateSystemSettings);
 

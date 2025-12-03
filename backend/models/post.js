@@ -1,4 +1,3 @@
-// models/Post.js
 import mongoose from 'mongoose';
 
 const postSchema = new mongoose.Schema({
@@ -12,7 +11,8 @@ const postSchema = new mongoose.Schema({
   type: {
     type: String,
     enum: ['idea', 'requirement'],
-    required: [true, 'Type is required']
+    required: [true, 'Type is required'],
+    index: true // Added index
   },
   description: {
     type: String,
@@ -23,52 +23,39 @@ const postSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    default: 'General'
+    default: 'General',
+    index: true // Added index
   },
   files: [{
-    url: {
-      type: String,
-      required: true
-    },
-    filename: {
-      type: String,
-      required: true
-    },
-    mimetype: {
-      type: String,
-      required: true
-    },
-    size: {
-      type: Number,
-      required: true
-    },
+    url: String,
+    filename: String,
+    mimetype: String,
+    size: Number,
     fileType: {
       type: String,
-      enum: ['image', 'document'],
-      required: true
+      enum: ['image', 'document']
     }
   }],
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: true,
+    index: true // Added index
   },
   status: {
     type: String,
     enum: ['open', 'closed'],
-    default: 'open'
+    default: 'open',
+    index: true // Added index
   },
   quotationsCount: {
     type: Number,
     default: 0
   },
-  quotations: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Quotation'
-  }],
   isActive: {
     type: Boolean,
-    default: true
+    default: true,
+    index: true // Added index
   }
 }, {
   timestamps: true,
@@ -76,17 +63,27 @@ const postSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Indexes for better query performance
-postSchema.index({ userId: 1, createdAt: -1 });
-postSchema.index({ status: 1, createdAt: -1 });
-postSchema.index({ type: 1, createdAt: -1 });
+// ⚡ OPTIMIZED COMPOUND INDEXES for faster queries
+postSchema.index({ isActive: 1, createdAt: -1 }); // Most common query
+postSchema.index({ userId: 1, isActive: 1, createdAt: -1 }); // My posts
+postSchema.index({ status: 1, isActive: 1, createdAt: -1 }); // Filter by status
+postSchema.index({ type: 1, status: 1, isActive: 1 }); // Combined filters
+postSchema.index({ title: 'text', description: 'text' }); // Text search
 
-// Virtual populate for user details
+// Virtual populate for author
 postSchema.virtual('author', {
   ref: 'User',
   localField: 'userId',
   foreignField: '_id',
   justOne: true
 });
+
+// Static method to get posts with optimized queries
+postSchema.statics.findActiveWithAuthor = function(filter = {}) {
+  return this.find({ ...filter, isActive: true })
+    .select('title type description category status userId quotationsCount createdAt updatedAt')
+    .populate('userId', 'name email isManufacturer phone')
+    .lean();
+};
 
 export const Post = mongoose.model('Post', postSchema);

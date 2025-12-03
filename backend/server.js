@@ -1,4 +1,3 @@
-// src/server.js
 
 import express from 'express';
 import cors from 'cors';
@@ -37,6 +36,7 @@ import shipmentRoutes from './routes/cargo/shipmentRoutes.js';
 import quoteRoutes from './routes/cargo/quoteRoutes.js';
 import cargoAdminRoutes from './routes/cargo/cargoAdminRoutes.js';
 import cargoPaymentRoutes from './routes/cargo/cargoPaymentRoutes.js';
+import loanProviderRoutes from './routes/cargo/loanProviderRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -207,6 +207,7 @@ app.use('/api/cargo/shipments', shipmentRoutes);
 app.use('/api/cargo/quotes', quoteRoutes);
 app.use('/api/cargo/payments', cargoPaymentRoutes);
 app.use('/api/cargo/admin', cargoAdminRoutes);
+app.use('/api/cargo/loan-providers', loanProviderRoutes);
 
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
