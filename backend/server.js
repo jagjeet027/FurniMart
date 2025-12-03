@@ -38,6 +38,9 @@ import cargoAdminRoutes from './routes/cargo/cargoAdminRoutes.js';
 import cargoPaymentRoutes from './routes/cargo/cargoPaymentRoutes.js';
 import loanProviderRoutes from './routes/cargo/loanProviderRoutes.js';
 
+// import finance routes
+import financeRoutes from './routes/finance/financeRoutes.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -208,6 +211,7 @@ app.use('/api/cargo/quotes', quoteRoutes);
 app.use('/api/cargo/payments', cargoPaymentRoutes);
 app.use('/api/cargo/admin', cargoAdminRoutes);
 app.use('/api/cargo/loan-providers', loanProviderRoutes);
+app.use('/api', financeRoutes);
 
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
