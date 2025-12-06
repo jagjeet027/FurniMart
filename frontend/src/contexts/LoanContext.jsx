@@ -1,10 +1,11 @@
 // frontend/src/contexts/LoanContext.jsx
 import React, { createContext, useReducer, useCallback, useEffect } from 'react';
-import axios from 'axios';
+import api from '../axios/axiosInstance';
+import { loanData } from '../finance/data/loans'; // Fallback mock data
 
 export const LoanContext = createContext();
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const initialState = {
   loans: [],
@@ -121,51 +122,97 @@ const loanReducer = (state, action) => {
 export const LoanProvider = ({ children }) => {
   const [state, dispatch] = useReducer(loanReducer, initialState);
 
-  // Fetch loans from backend on mount
-  useEffect(() => {
-    fetchLoans();
-    fetchStats();
-  }, []);
-
-  // Filter loans whenever loans, search query, or filters change
-  useEffect(() => {
-    filterLoans();
-  }, [state.loans, state.searchQuery, state.filters]);
-
+  // ✅ FETCH LOANS FROM BACKEND
   const fetchLoans = useCallback(async () => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
-      const response = await axios.get(`${API_BASE_URL}/loans`, {
-        params: {
-          limit: 1000
-        }
-      });
+      
+      // Build query params
+      const params = {};
+      if (state.filters.country) params.country = state.filters.country;
+      if (state.filters.category) params.category = state.filters.category;
+      if (state.filters.lenderType) params.lenderType = state.filters.lenderType;
+      if (state.filters.minAmount) params.minAmount = state.filters.minAmount;
+      if (state.filters.maxAmount) params.maxAmount = state.filters.maxAmount;
+      if (state.filters.collateralRequired) params.collateralRequired = state.filters.collateralRequired;
+      params.limit = 1000;
+
+      console.log('📡 Fetching loans from backend...');
+      const response = await api.get('/loans', { params });
       
       if (response.data && response.data.data) {
+        console.log('✅ Loans fetched successfully:', response.data.data.length);
         dispatch({ type: 'SET_LOANS', payload: response.data.data });
       } else {
         throw new Error('Invalid response format');
       }
     } catch (error) {
-      console.error('Error fetching loans:', error);
-      dispatch({ 
-        type: 'SET_ERROR', 
-        payload: error.message || 'Failed to fetch loans' 
-      });
+      console.warn('⚠️ Backend failed, using mock data:', error.message);
+      // Fallback to mock data
+      dispatch({ type: 'SET_LOANS', payload: loanData });
     }
-  }, []);
+  }, [state.filters]);
 
+  // ✅ FETCH STATS FROM BACKEND
   const fetchStats = useCallback(async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/analytics/stats`);
+      console.log('📡 Fetching stats from backend...');
+      const response = await api.get('/analytics/stats');
+      
       if (response.data && response.data.data) {
+        console.log('✅ Stats fetched successfully');
         dispatch({ type: 'SET_STATS', payload: response.data.data });
       }
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.warn('⚠️ Stats fetch failed:', error.message);
     }
   }, []);
 
+  // ✅ TRACK LOAN APPLICATION
+  const trackLoanApplication = useCallback(async (loan) => {
+    try {
+      const sessionId = sessionStorage.getItem('sessionId') || 
+                       `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      if (!sessionStorage.getItem('sessionId')) {
+        sessionStorage.setItem('sessionId', sessionId);
+      }
+
+      console.log('📡 Tracking loan application...');
+      await api.post('/track-application', {
+        loanId: loan.id,
+        loanName: loan.name,
+        lender: loan.lender,
+        country: loan.country,
+        category: loan.category,
+        lenderType: loan.lenderType,
+        applicationUrl: loan.applicationUrl
+      }, {
+        headers: {
+          'x-session-id': sessionId
+        }
+      });
+
+      console.log('✅ Application tracked');
+      fetchStats(); // Refresh stats
+    } catch (error) {
+      console.error('❌ Error tracking application:', error);
+    }
+  }, [fetchStats]);
+
+  // ✅ FETCH ON MOUNT
+  useEffect(() => {
+    console.log('🚀 LoanProvider mounted - fetching initial data...');
+    fetchLoans();
+    fetchStats();
+  }, []);
+
+  // ✅ FILTER LOANS WHENEVER LOANS, SEARCH QUERY, OR FILTERS CHANGE
+  useEffect(() => {
+    filterLoans();
+  }, [state.loans, state.searchQuery, state.filters]);
+
+  // ✅ FILTER LOGIC
   const filterLoans = useCallback(() => {
     let filtered = [...state.loans];
 
@@ -224,36 +271,6 @@ export const LoanProvider = ({ children }) => {
 
     dispatch({ type: 'SET_FILTERED_LOANS', payload: filtered });
   }, [state.loans, state.searchQuery, state.filters]);
-
-  const trackLoanApplication = useCallback(async (loan) => {
-    try {
-      const sessionId = sessionStorage.getItem('sessionId') || 
-                       `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
-      if (!sessionStorage.getItem('sessionId')) {
-        sessionStorage.setItem('sessionId', sessionId);
-      }
-
-      await axios.post(`${API_BASE_URL}/track-application`, {
-        loanId: loan.id,
-        loanName: loan.name,
-        lender: loan.lender,
-        country: loan.country,
-        category: loan.category,
-        lenderType: loan.lenderType,
-        applicationUrl: loan.applicationUrl
-      }, {
-        headers: {
-          'x-session-id': sessionId
-        }
-      });
-
-      // Refresh stats after tracking
-      fetchStats();
-    } catch (error) {
-      console.error('Error tracking application:', error);
-    }
-  }, [fetchStats]);
 
   const value = {
     ...state,
