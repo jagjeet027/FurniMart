@@ -2,17 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Bell, Building, Users, Briefcase } from 'lucide-react';
 
 // Import all components
-import Sidebar from '../ManufacturerDashboard/Sidebar';
-import MobileMenuButton from '../ManufacturerDashboard/MobileMenuButton';
-import DashboardSection from '../ManufacturerDashboard/DashboardSection';
-import InnovationsSection from '../ManufacturerDashboard/InnovationsSection';
-import ManufacturersSection from '../ManufacturerDashboard/ManufacturersSection';
-import NotificationsPanel from '../ManufacturerDashboard/NotificationsPanel';
+import Sidebar from './Sidebar';
+import MobileMenuButton from './MobileMenuButton';
+import DashboardSection from './DashboardSection';
+import InnovationsSection from './InnovationsSection';
+import ManufacturersSection from './ManufacturersSection';
+import NotificationsPanel from './NotificationsPanel';
 import AdminJobDashboard from './career/AdminJobDashboard';
 import IdeaDetailsPage from './IdeaPage';
-import { mockApi } from '../../../services/api';
+import { mockApi } from '../../services/api';
 import OrganizationSection from './career/OrganizationSection';
 import CargoDashboard from './cargo_insurance/CargoDashboard';
+import FundingSchemes from '../dashboard/finance/FundingSchemes';
 
 const ManufacturerDashboard = () => {
   const [manufacturers, setManufacturers] = useState([]);
@@ -98,11 +99,10 @@ const ManufacturerDashboard = () => {
         return <CargoDashboard />;
       case 'innovations':
         return <InnovationsSection />;
-      
+      case 'funding':
+        return <FundingSchemes />;
       case 'organization':
         return <OrganizationSection />;
-      // case 'individuals':
-      //   return <IndividualsSection />;
       case 'jobBoard':
         return <AdminJobDashboard />;
       

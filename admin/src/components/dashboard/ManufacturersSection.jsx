@@ -1,7 +1,7 @@
 // Updated AdminDashboard component with proper API integration
 import React, { useState, useEffect } from 'react';
 import { Bell, Users, DollarSign, CheckCircle, Search, X, Filter, Download, ArrowUpDown, Printer, RefreshCcw, Eye } from 'lucide-react';
-import api from '../../../axios/axiosInstance';
+import api from '../../axios/axiosInstance';
 import { DocumentViewer} from './DocumentViewer';
 
 const AdminDashboard = ({ manufacturer, onClose, onStatusUpdate }) => {

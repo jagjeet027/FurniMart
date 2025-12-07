@@ -5,7 +5,7 @@ import {
   Search, Building, Clock, DollarSign, Activity, BarChart3, PieChart, Settings,
   Bell, Eye, Trash2, ExternalLink, X, TrendingUp, Download
 } from 'lucide-react';
-import api from '../../../../axios/axiosInstance';
+import api from '../../../axios/axiosInstance';
 
 function CargoDashboard() {
   const [adminTab, setAdminTab] = useState("dashboard");

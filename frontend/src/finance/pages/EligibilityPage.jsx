@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle, AlertCircle, X, Zap, TrendingUp, Award, Clock, DollarSign, Target, ArrowRight } from 'lucide-react';
+import { CheckCircle, AlertCircle, X, Zap, TrendingUp, Award, Clock, DollarSign, Target, ArrowRight, Eye } from 'lucide-react';
 
 const EligibilityPage = () => {
   const [showForm, setShowForm] = useState(true);
@@ -33,78 +33,7 @@ const EligibilityPage = () => {
     { value: 'fintech', label: 'FinTech' },
   ];
 
-  const sampleLoans = [
-    {
-      id: 1,
-      name: 'TechStart Fund',
-      lender: 'Digital Finance Co',
-      type: 'bank',
-      interestRate: '8.5%',
-      processingFee: '1.5%',
-      amount: { min: 100000, max: 5000000 },
-      processingTime: '3-5 days',
-      collateral: false,
-      matchScore: 95,
-      description: 'Perfect for technology startups and entrepreneurs',
-      eligibility: { minAge: 21, maxAge: 65, minIncome: 300000 }
-    },
-    {
-      id: 2,
-      name: 'SME Growth Loan',
-      lender: 'Enterprise Bank',
-      type: 'bank',
-      interestRate: '9.2%',
-      processingFee: '2.0%',
-      amount: { min: 500000, max: 10000000 },
-      processingTime: '5-7 days',
-      collateral: true,
-      matchScore: 88,
-      description: 'Ideal for established small and medium enterprises',
-      eligibility: { minAge: 25, maxAge: 60, minIncome: 500000 }
-    },
-    {
-      id: 3,
-      name: 'Quick Business Boost',
-      lender: 'Fintech Plus',
-      type: 'fintech',
-      interestRate: '12.5%',
-      processingFee: '0.5%',
-      amount: { min: 50000, max: 2000000 },
-      processingTime: '1-2 days',
-      collateral: false,
-      matchScore: 92,
-      description: 'Fast approval for immediate business needs',
-      eligibility: { minAge: 18, maxAge: 70, minIncome: 150000 }
-    },
-    {
-      id: 4,
-      name: 'Farmer Gold Loan',
-      lender: 'AgriBank',
-      type: 'government',
-      interestRate: '5.5%',
-      processingFee: '1.0%',
-      amount: { min: 200000, max: 1000000 },
-      processingTime: '7-10 days',
-      collateral: true,
-      matchScore: 75,
-      description: 'Specialized loan scheme for farmers and agricultural business',
-      eligibility: { minAge: 21, maxAge: 65, minIncome: 0 }
-    },
-    {
-      id: 5,
-      name: 'Education Enterprise Loan',
-      lender: 'EduFinance',
-      type: 'bank',
-      interestRate: '7.8%',
-      processingFee: '1.8%',
-      amount: { min: 200000, max: 3000000 },
-      processingTime: '4-6 days',
-      collateral: false,
-      matchScore: 85,
-      description: 'For educational institutions and training centers',
-      eligibility: { minAge: 25, maxAge: 65, minIncome: 400000 }
-    },
-  ];
+  
 
   const formatAmount = (amount) => {
     if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)}Cr`;

@@ -1,14 +1,14 @@
 // frontend/src/contexts/LoanContext.jsx
 import React, { createContext, useReducer, useCallback, useEffect } from 'react';
 import api from '../axios/axiosInstance';
-import { loanData } from '../finance/data/loans'; // Fallback mock data
+import { loanData } from '../finance/data/loans'; // ✅ CORRECT IMPORT PATH
 
 export const LoanContext = createContext();
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const initialState = {
-  loans: [],
+  loans: [], // Start with empty array, will be populated with fallback data
   filteredLoans: [],
   searchQuery: '',
   filters: {
@@ -122,7 +122,7 @@ const loanReducer = (state, action) => {
 export const LoanProvider = ({ children }) => {
   const [state, dispatch] = useReducer(loanReducer, initialState);
 
-  // ✅ FETCH LOANS FROM BACKEND
+  // ✅ FETCH LOANS FROM BACKEND (WITH FALLBACK TO MOCK DATA)
   const fetchLoans = useCallback(async () => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
@@ -140,15 +140,16 @@ export const LoanProvider = ({ children }) => {
       console.log('📡 Fetching loans from backend...');
       const response = await api.get('/loans', { params });
       
-      if (response.data && response.data.data) {
-        console.log('✅ Loans fetched successfully:', response.data.data.length);
+      if (response.data && response.data.data && Array.isArray(response.data.data)) {
+        console.log('✅ Loans fetched successfully from backend:', response.data.data.length);
         dispatch({ type: 'SET_LOANS', payload: response.data.data });
       } else {
-        throw new Error('Invalid response format');
+        throw new Error('Invalid response format from backend');
       }
     } catch (error) {
-      console.warn('⚠️ Backend failed, using mock data:', error.message);
-      // Fallback to mock data
+      console.warn('⚠️ Backend fetch failed, using mock data:', error.message);
+      // ✅ FALLBACK TO MOCK DATA - THIS IS THE KEY FIX
+      console.log('📦 Loading mock loan data, count:', loanData.length);
       dispatch({ type: 'SET_LOANS', payload: loanData });
     }
   }, [state.filters]);
@@ -165,6 +166,7 @@ export const LoanProvider = ({ children }) => {
       }
     } catch (error) {
       console.warn('⚠️ Stats fetch failed:', error.message);
+      // Stats failure is not critical
     }
   }, []);
 
@@ -222,8 +224,8 @@ export const LoanProvider = ({ children }) => {
       filtered = filtered.filter(loan =>
         loan.name.toLowerCase().includes(query) ||
         loan.lender.toLowerCase().includes(query) ||
-        loan.description.toLowerCase().includes(query) ||
-        loan.country.toLowerCase().includes(query)
+        (loan.description && loan.description.toLowerCase().includes(query)) ||
+        (loan.country && loan.country.toLowerCase().includes(query))
       );
     }
 
@@ -245,13 +247,13 @@ export const LoanProvider = ({ children }) => {
     // Min amount filter
     if (state.filters.minAmount) {
       const minAmount = parseFloat(state.filters.minAmount);
-      filtered = filtered.filter(loan => loan.loanAmount.max >= minAmount);
+      filtered = filtered.filter(loan => loan.loanAmount && loan.loanAmount.max >= minAmount);
     }
 
     // Max amount filter
     if (state.filters.maxAmount) {
       const maxAmount = parseFloat(state.filters.maxAmount);
-      filtered = filtered.filter(loan => loan.loanAmount.min <= maxAmount);
+      filtered = filtered.filter(loan => loan.loanAmount && loan.loanAmount.min <= maxAmount);
     }
 
     // Collateral filter
@@ -264,11 +266,13 @@ export const LoanProvider = ({ children }) => {
     if (state.filters.maxInterestRate) {
       const maxRate = parseFloat(state.filters.maxInterestRate);
       filtered = filtered.filter(loan => {
+        if (loan.interestRate === '0%') return true;
         const rate = parseFloat(loan.interestRate.split('-')[0]);
         return rate <= maxRate;
       });
     }
 
+    console.log('🔍 Filtered loans count:', filtered.length);
     dispatch({ type: 'SET_FILTERED_LOANS', payload: filtered });
   }, [state.loans, state.searchQuery, state.filters]);
 

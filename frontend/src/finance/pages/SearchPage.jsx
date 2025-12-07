@@ -1,493 +1,550 @@
-// frontend/src/finance/pages/SearchPage.jsx
-import React, { useEffect, useState, useRef } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Filter, X, Plus, Heart, ExternalLink, Globe, ChevronDown } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Search, Filter, Heart, Plus, ExternalLink, Globe, TrendingUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import api from '../../axios/axiosInstance';
-import { useLoan } from '../../contexts/LoanContext';
-import { categories, lenderTypes, getUniqueCountries } from '../data/loans';
+
+// Mock loan data - replace with actual API call
+const loanData = [
+  {
+    id: "gov-startup-india-1",
+    name: "Startup India Seed Fund Scheme",
+    lender: "Government of India",
+    lenderType: "government",
+    category: "startup",
+    country: "India",
+    interestRate: "0%",
+    loanAmount: { min: 500000, max: 50000000 },
+    processingFee: "0%",
+    collateral: false,
+    description: "Government seed funding for early-stage startups with innovative business ideas",
+    processingTime: "60-90 days",
+    applicationUrl: "https://seedfund.startupindia.gov.in/"
+  },
+  {
+    id: "gov-mudra-1",
+    name: "MUDRA Yojana - Shishu",
+    lender: "MUDRA (Government)",
+    lenderType: "government",
+    category: "sme",
+    country: "India",
+    interestRate: "8.5-12%",
+    loanAmount: { min: 10000, max: 50000 },
+    processingFee: "0%",
+    collateral: false,
+    description: "Micro-credit for small businesses and entrepreneurs",
+    processingTime: "15-30 days",
+    applicationUrl: "https://www.mudra.org.in/"
+  },
+  {
+    id: "bank-sbi-1",
+    name: "SBI SME Business Loan",
+    lender: "State Bank of India",
+    lenderType: "bank",
+    category: "sme",
+    country: "India",
+    interestRate: "11.50-16%",
+    loanAmount: { min: 500000, max: 50000000 },
+    processingFee: "1%",
+    collateral: true,
+    description: "Comprehensive business financing solution for SMEs",
+    processingTime: "7-15 days",
+    applicationUrl: "https://sbi.co.in/business-banking/sme"
+  },
+  {
+    id: "bank-hdfc-1",
+    name: "HDFC Business Loan",
+    lender: "HDFC Bank",
+    lenderType: "bank",
+    category: "sme",
+    country: "India",
+    interestRate: "12-18%",
+    loanAmount: { min: 1000000, max: 75000000 },
+    processingFee: "2%",
+    collateral: true,
+    description: "Customized business loans with digital processing",
+    processingTime: "5-10 days",
+    applicationUrl: "https://www.hdfcbank.com/business/"
+  },
+  {
+    id: "private-lendingkart-1",
+    name: "LendingKart Business Loan",
+    lender: "LendingKart",
+    lenderType: "private",
+    category: "sme",
+    country: "India",
+    interestRate: "16-30%",
+    loanAmount: { min: 200000, max: 10000000 },
+    processingFee: "2-4%",
+    collateral: false,
+    description: "Fast, unsecured business loans with minimal documentation",
+    processingTime: "24-72 hours",
+    applicationUrl: "https://www.lendingkart.com/"
+  },
+  {
+    id: "bank-icici-1",
+    name: "ICICI Bank Startup Loan",
+    lender: "ICICI Bank",
+    lenderType: "bank",
+    category: "startup",
+    country: "India",
+    interestRate: "13-19%",
+    loanAmount: { min: 2000000, max: 100000000 },
+    processingFee: "1.5%",
+    collateral: true,
+    description: "Specialized funding for high-growth startups",
+    processingTime: "10-20 days",
+    applicationUrl: "https://www.icicibank.com/business-banking/loans/startup-loan"
+  },
+  {
+    id: "usa-sba-1",
+    name: "SBA 7(a) Loan Program",
+    lender: "U.S. Small Business Administration",
+    lenderType: "government",
+    category: "sme",
+    country: "United States",
+    interestRate: "5-13%",
+    loanAmount: { min: 500000, max: 500000000 },
+    processingFee: "3%",
+    collateral: true,
+    description: "Government-backed loans for small businesses",
+    processingTime: "30-90 days",
+    applicationUrl: "https://www.sba.gov/funding-programs/loans"
+  },
+  {
+    id: "gov-kisan-1",
+    name: "Kisan Credit Card Scheme",
+    lender: "Government of India",
+    lenderType: "government",
+    category: "agriculture",
+    country: "India",
+    interestRate: "4-7%",
+    loanAmount: { min: 25000, max: 3000000 },
+    processingFee: "0%",
+    collateral: false,
+    description: "Flexible credit facility for farmers' cultivation needs",
+    processingTime: "7-15 days",
+    applicationUrl: "https://pmkisan.gov.in/"
+  }
+];
 
 const SearchPage = () => {
-  const [searchParams] = useSearchParams();
-  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [countries, setCountries] = useState([]);
-  const countryDropdownRef = useRef(null);
-  
-  const {
-    filteredLoans,
-    searchQuery,
-    filters,
-    dispatch,
-    comparisonList,
-    savedLoans,
-    loading,
-    fetchLoans
-  } = useLoan();
+  const [filteredLoans, setFilteredLoans] = useState(loanData);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [savedLoans, setSavedLoans] = useState([]);
+  const [comparisonList, setComparisonList] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // ✅ FETCH COUNTRIES ON MOUNT
+  const [filters, setFilters] = useState({
+    country: '',
+    category: '',
+    lenderType: '',
+    minAmount: '',
+    maxAmount: '',
+    maxInterestRate: '',
+    collateralRequired: ''
+  });
+
+  const categories = [
+    { id: 'startup', name: 'Startup' },
+    { id: 'sme', name: 'SME' },
+    { id: 'agriculture', name: 'Agriculture' },
+    { id: 'education', name: 'Education' }
+  ];
+
+  const lenderTypes = [
+    { id: 'government', name: 'Government' },
+    { id: 'bank', name: 'Bank' },
+    { id: 'private', name: 'Private Lender' }
+  ];
+
+  const countries = ['India', 'United States', 'United Kingdom'];
+
+  // ✅ Apply filters whenever they change
   useEffect(() => {
-    fetchCountries();
-  }, []);
+    applyFilters();
+  }, [filters, searchQuery]);
 
-  // ✅ APPLY CATEGORY/LENDER FROM URL PARAMS
-  useEffect(() => {
-    const category = searchParams.get('category');
-    const lenderType = searchParams.get('lenderType');
-    
-    if (category) {
-      console.log('📍 Setting category from URL:', category);
-      dispatch({ type: 'SET_FILTERS', payload: { category } });
-    }
-    if (lenderType) {
-      console.log('📍 Setting lender type from URL:', lenderType);
-      dispatch({ type: 'SET_FILTERS', payload: { lenderType } });
-    }
-  }, [searchParams, dispatch]);
+  const applyFilters = () => {
+    let filtered = [...loanData];
 
-  // ✅ CLOSE DROPDOWNS ON CLICK OUTSIDE
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (countryDropdownRef.current && !countryDropdownRef.current.contains(event.target)) {
-        setShowCountryDropdown(false);
-        setShowFilterPanel(false);
-      }
-    };
-
-    if (showCountryDropdown || showFilterPanel) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(loan =>
+        loan.name.toLowerCase().includes(query) ||
+        loan.lender.toLowerCase().includes(query) ||
+        loan.description.toLowerCase().includes(query)
+      );
     }
-  }, [showCountryDropdown, showFilterPanel]);
 
-  // ✅ FETCH COUNTRIES FROM BACKEND
-  const fetchCountries = async () => {
-    try {
-      console.log('📡 Fetching countries from backend...');
-      const response = await api.get('/countries');
-      
-      if (response.data?.data) {
-        console.log('✅ Countries fetched:', response.data.data);
-        setCountries(response.data.data);
-      } else {
-        // Fallback to mock countries
-        setCountries(getUniqueCountries());
-      }
-    } catch (error) {
-      console.warn('⚠️ Failed to fetch countries, using mock:', error.message);
-      setCountries(getUniqueCountries());
+    // Country filter
+    if (filters.country) {
+      filtered = filtered.filter(loan => loan.country === filters.country);
     }
+
+    // Category filter
+    if (filters.category) {
+      filtered = filtered.filter(loan => loan.category === filters.category);
+    }
+
+    // Lender type filter
+    if (filters.lenderType) {
+      filtered = filtered.filter(loan => loan.lenderType === filters.lenderType);
+    }
+
+    // Min amount filter
+    if (filters.minAmount) {
+      const minAmt = parseInt(filters.minAmount);
+      filtered = filtered.filter(loan => loan.loanAmount.max >= minAmt);
+    }
+
+    // Max amount filter
+    if (filters.maxAmount) {
+      const maxAmt = parseInt(filters.maxAmount);
+      filtered = filtered.filter(loan => loan.loanAmount.min <= maxAmt);
+    }
+
+    // Collateral filter
+    if (filters.collateralRequired !== '') {
+      const needsCollateral = filters.collateralRequired === 'true';
+      filtered = filtered.filter(loan => loan.collateral === needsCollateral);
+    }
+
+    setFilteredLoans(filtered);
+    console.log('🎯 Filtered:', filtered.length, 'loans');
   };
 
-  // ✅ SEARCH HANDLER
-  const handleSearchChange = (e) => {
-    const query = e.target.value;
-    console.log('🔍 Searching for:', query);
-    dispatch({ type: 'SET_SEARCH_QUERY', payload: query });
-  };
-
-  // ✅ FILTER CHANGE HANDLER
-  const handleFilterChange = (filterName, value) => {
-    console.log(`🔧 Filter changed - ${filterName}:`, value);
-    dispatch({ type: 'SET_FILTERS', payload: { [filterName]: value } });
-  };
-
-  // ✅ CLEAR ALL FILTERS
   const clearFilters = () => {
-    console.log('🧹 Clearing all filters');
-    dispatch({ type: 'RESET_FILTERS' });
-    setShowFilterPanel(false);
+    setFilters({
+      country: '',
+      category: '',
+      lenderType: '',
+      minAmount: '',
+      maxAmount: '',
+      maxInterestRate: '',
+      collateralRequired: ''
+    });
+    setSearchQuery('');
+    setShowFilters(false);
   };
 
-  // ✅ COMPARISON HANDLERS
-  const addToComparison = (loanId) => {
-    if (comparisonList.length < 4 && !comparisonList.includes(loanId)) {
-      console.log('➕ Added to comparison:', loanId);
-      dispatch({ type: 'ADD_TO_COMPARISON', payload: loanId });
-    }
-  };
-
-  const removeFromComparison = (loanId) => {
-    console.log('➖ Removed from comparison:', loanId);
-    dispatch({ type: 'REMOVE_FROM_COMPARISON', payload: loanId });
-  };
-
-  // ✅ SAVE LOAN HANDLER
-  const toggleSaveLoan = (loanId) => {
-    if (savedLoans.includes(loanId)) {
-      console.log('💔 Unsaved loan:', loanId);
-      dispatch({ type: 'REMOVE_SAVED_LOAN', payload: loanId });
-    } else {
-      console.log('❤️ Saved loan:', loanId);
-      dispatch({ type: 'SAVE_LOAN', payload: loanId });
-    }
-  };
-
-  // ✅ FORMAT AMOUNT
   const formatAmount = (amount) => {
     if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)}Cr`;
     if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
     return `₹${amount.toLocaleString()}`;
   };
 
-  // ✅ TRACK APPLICATION
-  const handleApplyClick = async (loan, e) => {
-    console.log('📤 User clicked apply for:', loan.name);
-    // Application tracking happens in context
+  const handleSaveLoan = (loanId) => {
+    setSavedLoans(prev =>
+      prev.includes(loanId) ? prev.filter(id => id !== loanId) : [...prev, loanId]
+    );
   };
 
-  const handleCountrySelect = (country) => {
-    console.log('🌍 Selected country:', country);
-    handleFilterChange('country', country);
-    setShowCountryDropdown(false);
+  const handleAddComparison = (loanId) => {
+    setComparisonList(prev => {
+      if (prev.includes(loanId)) {
+        return prev.filter(id => id !== loanId);
+      } else if (prev.length < 4) {
+        return [...prev, loanId];
+      }
+      return prev;
+    });
   };
 
-  const toggleCountryDropdown = () => {
-    setShowCountryDropdown(!showCountryDropdown);
-    setShowFilterPanel(false);
-  };
-
-  const toggleFilterPanel = () => {
-    setShowFilterPanel(!showFilterPanel);
-    setShowCountryDropdown(false);
-  };
-
-  const getSelectedCountryLabel = () => {
-    return filters.country || 'All Countries';
-  };
-
-  // ✅ RENDER
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search Header */}
-        <motion.div 
-          className="text-center mb-12"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 bg-clip-text text-transparent mb-3">
-            Find Your Perfect Loan
-          </h1>
-          <p className="text-lg text-gray-600">
-            Search and filter through <span className="font-semibold text-blue-600">{filteredLoans.length}</span> loan options
-          </p>
-        </motion.div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 pb-24">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 shadow-lg sticky top-0 z-30"
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <h1 className="text-4xl font-bold text-white mb-2">Find Your Perfect Loan</h1>
+          <p className="text-blue-100">Showing {filteredLoans.length} loans</p>
+        </div>
+      </motion.div>
 
-        {/* Search Controls */}
-        <motion.div 
-          className="space-y-4 mb-8"
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Search & Filters */}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
+          className="mb-8"
         >
-          {/* Main Search Bar */}
-          <div className="flex flex-col sm:flex-row gap-3" ref={countryDropdownRef}>
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            {/* Search Input */}
             <div className="flex-1 relative">
-              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                <Search className="text-gray-400" size={20} />
-              </div>
-              <motion.input
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
                 type="text"
-                placeholder="Search loans by name, lender, or description..."
+                placeholder="Search loans..."
                 value={searchQuery}
-                onChange={handleSearchChange}
-                className="w-full pl-12 pr-4 py-3 rounded-lg border-2 border-gray-200 focus:border-blue-500 focus:outline-none bg-white shadow-sm hover:shadow-md transition-shadow text-gray-700 placeholder-gray-500"
-                whileFocus={{ scale: 1.01 }}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 rounded-lg border-2 border-gray-200 focus:border-blue-500 focus:outline-none bg-white"
               />
             </div>
 
-            {/* Country Button */}
-            <motion.button 
-              onClick={toggleCountryDropdown}
-              className={`px-4 py-3 rounded-lg border-2 font-medium flex items-center gap-2 whitespace-nowrap transition-all ${
-                showCountryDropdown
-                  ? 'bg-blue-50 border-blue-500 text-blue-600'
-                  : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300'
-              }`}
-              whileHover={{ scale: 1.05 }}
+            {/* Country Select */}
+            <select
+              value={filters.country}
+              onChange={(e) => setFilters({ ...filters, country: e.target.value })}
+              className="px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-blue-500 outline-none bg-white font-medium"
             >
-              <Globe size={18} />
-              <span className="hidden sm:inline">{getSelectedCountryLabel()}</span>
-              <motion.div
-                animate={{ rotate: showCountryDropdown ? 180 : 0 }}
-              >
-                <ChevronDown size={16} />
-              </motion.div>
-            </motion.button>
+              <option value="">All Countries</option>
+              {countries.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
 
             {/* Filter Button */}
-            <motion.button 
-              onClick={toggleFilterPanel}
-              className={`px-4 py-3 rounded-lg border-2 font-medium flex items-center gap-2 whitespace-nowrap transition-all ${
-                showFilterPanel
-                  ? 'bg-indigo-50 border-indigo-500 text-indigo-600'
-                  : 'bg-white border-gray-200 text-gray-700 hover:border-indigo-300'
-              }`}
+            <motion.button
               whileHover={{ scale: 1.05 }}
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition-all ${
+                showFilters
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-white border-2 border-gray-200 text-gray-700'
+              }`}
             >
-              <Filter size={18} />
-              <span className="hidden sm:inline">Filters</span>
+              <Filter size={20} />
+              More Filters
             </motion.button>
-
-            {/* Country Dropdown */}
-            <AnimatePresence>
-              {showCountryDropdown && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="absolute top-full left-0 right-0 sm:left-auto sm:w-80 mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 p-4"
-                >
-                  <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
-                    <Globe size={18} className="text-blue-600" />
-                    <span className="font-semibold text-gray-800">Select Country</span>
-                  </div>
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
-                    <motion.button
-                      onClick={() => handleCountrySelect('')}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
-                        !filters.country
-                          ? 'bg-blue-50 text-blue-700 font-medium'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <span className="text-xl">🌍</span>
-                      <span>All Countries</span>
-                    </motion.button>
-                    {countries.map(country => (
-                      <motion.button
-                        key={country}
-                        onClick={() => handleCountrySelect(country)}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
-                          filters.country === country
-                            ? 'bg-blue-50 text-blue-700 font-medium'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <span>{country}</span>
-                      </motion.button>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
 
-          {/* Filter Panel */}
+          {/* Advanced Filters */}
           <AnimatePresence>
-            {showFilterPanel && (
+            {showFilters && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden"
+                className="bg-white rounded-lg shadow-md border border-gray-200 p-6 mb-6"
               >
-                <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                    {[
-                      { label: 'Category', name: 'category', type: 'select', options: categories },
-                      { label: 'Lender Type', name: 'lenderType', type: 'select', options: lenderTypes },
-                      { label: 'Min Amount (₹)', name: 'minAmount', type: 'number' },
-                      { label: 'Max Amount (₹)', name: 'maxAmount', type: 'number' },
-                      { label: 'Max Interest (%)', name: 'maxInterestRate', type: 'number' },
-                      { label: 'Collateral', name: 'collateralRequired', type: 'collateral' }
-                    ].map((filter) => (
-                      <div key={filter.name} className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">{filter.label}</label>
-                        {filter.type === 'select' ? (
-                          <select
-                            value={filters[filter.name]}
-                            onChange={(e) => handleFilterChange(filter.name, e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                          >
-                            <option value="">{filter.name === 'category' ? 'All Categories' : 'All Lenders'}</option>
-                            {filter.options.map(opt => (
-                              <option key={opt.id} value={opt.id}>{opt.name}</option>
-                            ))}
-                          </select>
-                        ) : filter.type === 'collateral' ? (
-                          <select
-                            value={filters.collateralRequired}
-                            onChange={(e) => handleFilterChange('collateralRequired', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                          >
-                            <option value="">Any</option>
-                            <option value="false">No Collateral</option>
-                            <option value="true">Collateral Required</option>
-                          </select>
-                        ) : (
-                          <input
-                            type={filter.type}
-                            value={filters[filter.name]}
-                            onChange={(e) => handleFilterChange(filter.name, e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                          />
-                        )}
-                      </div>
-                    ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-bold mb-2">Category</label>
+                    <select
+                      value={filters.category}
+                      onChange={(e) => setFilters({ ...filters, category: e.target.value })}
+                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 outline-none"
+                    >
+                      <option value="">All</option>
+                      {categories.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
                   </div>
 
-                  <motion.button 
-                    onClick={clearFilters}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors"
-                  >
-                    <X size={16} />
-                    Clear All Filters
-                  </motion.button>
+                  <div>
+                    <label className="block text-sm font-bold mb-2">Lender Type</label>
+                    <select
+                      value={filters.lenderType}
+                      onChange={(e) => setFilters({ ...filters, lenderType: e.target.value })}
+                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 outline-none"
+                    >
+                      <option value="">All</option>
+                      {lenderTypes.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold mb-2">Min Amount (₹)</label>
+                    <input
+                      type="number"
+                      value={filters.minAmount}
+                      onChange={(e) => setFilters({ ...filters, minAmount: e.target.value })}
+                      placeholder="100000"
+                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold mb-2">Max Amount (₹)</label>
+                    <input
+                      type="number"
+                      value={filters.maxAmount}
+                      onChange={(e) => setFilters({ ...filters, maxAmount: e.target.value })}
+                      placeholder="50000000"
+                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold mb-2">Collateral</label>
+                    <select
+                      value={filters.collateralRequired}
+                      onChange={(e) => setFilters({ ...filters, collateralRequired: e.target.value })}
+                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 outline-none"
+                    >
+                      <option value="">Any</option>
+                      <option value="false">No Collateral</option>
+                      <option value="true">Collateral Required</option>
+                    </select>
+                  </div>
                 </div>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  onClick={clearFilters}
+                  className="w-full px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300"
+                >
+                  Clear All Filters
+                </motion.button>
               </motion.div>
             )}
           </AnimatePresence>
         </motion.div>
 
-        {/* Results */}
-        <div className="mb-8">
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin">
-                <Search size={48} className="text-blue-400" />
-              </div>
-              <p className="text-gray-600 mt-4 font-semibold">Loading loans...</p>
-            </div>
-          ) : filteredLoans.length === 0 ? (
-            <motion.div 
-              className="flex flex-col items-center justify-center py-20 bg-white rounded-xl shadow-md border border-gray-100"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
+        {/* Loan Cards Grid */}
+        {filteredLoans.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="bg-white rounded-xl shadow-md p-12 text-center"
+          >
+            <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-2xl font-bold text-gray-800 mb-2">No loans found</h3>
+            <button
+              onClick={clearFilters}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold mt-4"
             >
-              <Filter size={48} className="text-gray-300 mb-4" />
-              <h3 className="text-2xl font-bold text-gray-800 mb-2">No loans found</h3>
-              <p className="text-gray-600 mb-6">Try adjusting your search criteria or filters</p>
-              <motion.button 
-                onClick={clearFilters}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg hover:shadow-lg transition-shadow"
+              Clear Filters
+            </button>
+          </motion.div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          >
+            {filteredLoans.map((loan, idx) => (
+              <motion.div
+                key={loan.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                whileHover={{ y: -8 }}
+                className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden hover:shadow-lg transition-all flex flex-col"
               >
-                Clear All Filters
-              </motion.button>
-            </motion.div>
-          ) : (
-            <motion.div 
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              {filteredLoans.map((loan) => (
-                <motion.div
-                  key={loan.id}
-                  whileHover={{ y: -8 }}
-                  className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden flex flex-col hover:border-blue-200 transition-colors"
-                >
-                  {/* Loan Header */}
-                  <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-                    <div className="flex justify-between items-start gap-3 mb-3">
-                      <div>
-                        <h3 className="text-lg font-bold text-gray-800 mb-1">{loan.name}</h3>
-                        <p className="text-sm text-gray-600">{loan.lender}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <motion.button
-                          onClick={() => toggleSaveLoan(loan.id)}
-                          className={`p-2 rounded-lg transition-all ${
-                            savedLoans.includes(loan.id)
-                              ? 'bg-red-100 text-red-600'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }`}
-                        >
-                          <Heart size={18} fill={savedLoans.includes(loan.id) ? 'currentColor' : 'none'} />
-                        </motion.button>
-                        <motion.button
-                          onClick={() => 
-                            comparisonList.includes(loan.id) 
-                              ? removeFromComparison(loan.id)
-                              : addToComparison(loan.id)
-                          }
-                          disabled={!comparisonList.includes(loan.id) && comparisonList.length >= 4}
-                          className={`p-2 rounded-lg transition-all ${
-                            comparisonList.includes(loan.id)
-                              ? 'bg-blue-100 text-blue-600'
-                              : comparisonList.length >= 4
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }`}
-                        >
-                          <Plus size={18} />
-                        </motion.button>
-                      </div>
+                {/* Header */}
+                <div className="p-5 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100">
+                  <div className="flex justify-between items-start gap-3 mb-3">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-gray-900">{loan.name}</h3>
+                      <p className="text-sm text-gray-600">{loan.lender}</p>
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      onClick={() => handleSaveLoan(loan.id)}
+                      className={`p-2 rounded-lg ${
+                        savedLoans.includes(loan.id)
+                          ? 'bg-red-100 text-red-600'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      <Heart size={18} fill={savedLoans.includes(loan.id) ? 'currentColor' : 'none'} />
+                    </motion.button>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                      {loan.category.toUpperCase()}
+                    </span>
+                    <span className="text-xs font-semibold bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                      {loan.country}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Body */}
+                <div className="p-5 flex-grow space-y-4">
+                  <p className="text-sm text-gray-600 line-clamp-2">{loan.description}</p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-blue-50 rounded-lg p-3">
+                      <p className="text-xs text-gray-600 font-medium">Interest</p>
+                      <p className="text-lg font-bold text-blue-600">{loan.interestRate}</p>
+                    </div>
+                    <div className="bg-green-50 rounded-lg p-3">
+                      <p className="text-xs text-gray-600 font-medium">Processing</p>
+                      <p className="text-sm font-bold text-green-600">{loan.processingTime}</p>
                     </div>
                   </div>
 
-                  {/* Loan Details */}
-                  <div className="p-5 flex-grow space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <p className="text-xs text-gray-600 font-medium">Interest Rate</p>
-                        <p className="text-lg font-bold text-blue-600">{loan.interestRate}</p>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <p className="text-xs text-gray-600 font-medium">Processing</p>
-                        <p className="text-lg font-bold text-indigo-600">{loan.processingTime}</p>
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-700 line-clamp-2">{loan.description}</p>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-xs text-gray-600 font-medium mb-1">Amount</p>
+                    <p className="text-sm font-bold text-gray-800">
+                      {formatAmount(loan.loanAmount.min)} - {formatAmount(loan.loanAmount.max)}
+                    </p>
                   </div>
+                </div>
 
-                  {/* Loan Footer */}
-                  <div className="p-5 border-t border-gray-100 flex gap-3">
-                    <Link 
-                      to={`/loan/${loan.id}`} 
-                      className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:border-gray-400 transition-all text-center"
-                    >
-                      Details
-                    </Link>
-                    <motion.a
-                      href={loan.applicationUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => handleApplyClick(loan, e)}
-                      className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg hover:shadow-lg transition-shadow flex items-center justify-center gap-2"
-                    >
-                      <ExternalLink size={16} />
-                      Apply
-                    </motion.a>
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
-        </div>
+                {/* Footer */}
+                <div className="p-5 border-t border-gray-100 flex gap-3">
+                  <button
+                    onClick={() => alert('Loan details - ' + loan.name)}
+                    className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:border-gray-400"
+                  >
+                    Details
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    onClick={() => handleAddComparison(loan.id)}
+                    disabled={!comparisonList.includes(loan.id) && comparisonList.length >= 4}
+                    className={`flex-1 px-4 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 ${
+                      comparisonList.includes(loan.id)
+                        ? 'bg-blue-600 text-white'
+                        : comparisonList.length >= 4
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Plus size={16} />
+                    {comparisonList.includes(loan.id) ? 'Added' : 'Compare'}
+                  </motion.button>
+                  <motion.a
+                    whileHover={{ scale: 1.05 }}
+                    href={loan.applicationUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+                  >
+                    <ExternalLink size={16} />
+                    Apply
+                  </motion.a>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
 
         {/* Comparison Bar */}
         <AnimatePresence>
           {comparisonList.length > 0 && (
             <motion.div
-              initial={{ opacity: 0, y: 50 }}
+              initial={{ opacity: 0, y: 100 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 50 }}
-              className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-blue-600 shadow-2xl"
+              className="fixed bottom-0 left-0 right-0 bg-white border-t-4 border-blue-600 shadow-2xl"
             >
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <span className="text-gray-800 font-semibold">
-                    {comparisonList.length} loan(s) selected
-                  </span>
-                </div>
+                <span className="text-gray-800 font-semibold">
+                  {comparisonList.length} loans selected
+                </span>
                 <div className="flex gap-3">
-                  <motion.button
-                    onClick={() => dispatch({ type: 'CLEAR_COMPARISON' })}
-                    className="px-4 py-2 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:border-gray-400 transition-all"
+                  <button
+                    onClick={() => setComparisonList([])}
+                    className="px-4 py-2 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg"
                   >
                     Clear
-                  </motion.button>
-                  <Link
-                    to="/compare"
-                    className="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg hover:shadow-lg transition-shadow"
+                  </button>
+                  <button
+                    onClick={() => alert('Compare loans - ' + comparisonList.length)}
+                    className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700"
                   >
-                    Compare
-                  </Link>
+                    Compare Now
+                  </button>
                 </div>
               </div>
             </motion.div>

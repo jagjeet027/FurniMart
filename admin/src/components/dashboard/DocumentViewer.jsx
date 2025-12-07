@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Download, X, FileText, Calendar } from 'lucide-react';
-import api from '../../../axios/axiosInstance';
+import api from '../../axios/axiosInstance';
 
 const DocumentViewer = ({ document: doc, onClose }) => {
   const [isLoading, setIsLoading] = useState(false);

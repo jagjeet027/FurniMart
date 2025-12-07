@@ -5,7 +5,7 @@ import {
   BarChart3, Settings, UserCheck, X, Clock, LogOut,
   ChevronRight, Users, Briefcase, Building
 } from 'lucide-react';
-import { useAuth } from '../../../contexts/AuthContext.jsx';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 
 // Custom CSS for scrollbar
 const customScrollbarStyles = `
@@ -65,11 +65,13 @@ const Sidebar = ({ isOpen, onClose, activeSection, onSectionChange }) => {
       ]
     },
     { id: 'cargo_insurance', label: 'Cargo Insurance', icon: TrendingUp },
+    {id: 'funding', label: 'Funding Schemes', icon: Users },
     { id: 'innovations', label: 'Innovations List', icon: Lightbulb },
     { id: 'products', label: 'Logistic', icon: Package },
     { id: 'reports', label: 'Reports', icon: FileText },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
+
   ];
 
   const handleMenuClick = (item) => {

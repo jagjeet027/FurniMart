@@ -1,6 +1,6 @@
 import React from 'react';
 import { Users, CheckCircle, Clock, DollarSign, Building2 } from 'lucide-react';
-import StatsCard from '../ManufacturerDashboard/StatsCard';
+import StatsCard from './StatsCard';
 
 const DashboardSection = ({ manufacturers }) => {
   const stats = {

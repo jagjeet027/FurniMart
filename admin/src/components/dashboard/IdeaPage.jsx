@@ -5,7 +5,7 @@ import {
   Plus, Search, Filter, AlertCircle, Clock, CheckCircle2,
   XCircle, Eye, Edit3, MessageSquare, Trash2, BarChart3
 } from 'lucide-react';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const IssuesPage = () => {
   const navigate = useNavigate();

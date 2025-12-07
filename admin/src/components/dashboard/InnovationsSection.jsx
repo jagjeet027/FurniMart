@@ -4,8 +4,8 @@ import {
   MessageCircle, Send, Heart, Trash2, Search,
   Eye, AlertCircle, Loader, Crown, Building2, User
 } from 'lucide-react';
-import { useAuth } from '../../../contexts/AuthContext';
-import api from '../../../axios/axiosInstance';
+import { useAuth } from '../../contexts/AuthContext';
+import api from '../../axios/axiosInstance';
 
 const InnovationsSection = () => {
   const { user, isAuthenticated } = useAuth();

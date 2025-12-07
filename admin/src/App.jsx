@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
-import ManufacturerDashboard from './components/dashboard/ManufacturerDashboard/ManufacturerDashboard';
+import ManufacturerDashboard from './components/dashboard/ManufacturerDashboard';
 import AuthProvider, { useAuth } from '../src/contexts/AuthContext.jsx'
 
 // Protected Route Component
