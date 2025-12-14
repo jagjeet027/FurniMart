@@ -1,4 +1,4 @@
-// backend/services/financeService.js
+// backend/services/financeService.js - FIXED VERSION
 import Loan from '../models/finance/loan.js';
 import LoanApplication from '../models/finance/LoanApplication.js';
 import Organization from '../models/finance/financeOrganization.js';
@@ -33,8 +33,12 @@ export class FinanceService {
         data: loans
       };
     } catch (error) {
-      console.error('Error fetching loans:', error);
-      throw error;
+      console.error('❌ Error fetching loans:', error);
+      return {
+        success: false,
+        message: error.message,
+        data: []
+      };
     }
   }
 
@@ -63,8 +67,12 @@ export class FinanceService {
         data: loans
       };
     } catch (error) {
-      console.error('Error searching loans:', error);
-      throw error;
+      console.error('❌ Error searching loans:', error);
+      return {
+        success: false,
+        message: error.message,
+        data: []
+      };
     }
   }
 
@@ -73,13 +81,13 @@ export class FinanceService {
       const loan = await Loan.findOne({ id: loanId }).lean();
       
       if (!loan) {
-        return { success: false, message: 'Loan not found' };
+        return { success: false, message: 'Loan not found', data: null };
       }
       
       return { success: true, data: loan };
     } catch (error) {
-      console.error('Error fetching loan:', error);
-      throw error;
+      console.error('❌ Error fetching loan:', error);
+      return { success: false, message: error.message, data: null };
     }
   }
 
@@ -95,8 +103,12 @@ export class FinanceService {
         data: loans
       };
     } catch (error) {
-      console.error('Error fetching loans by country:', error);
-      throw error;
+      console.error('❌ Error fetching loans by country:', error);
+      return {
+        success: false,
+        message: error.message,
+        data: []
+      };
     }
   }
 
@@ -108,8 +120,12 @@ export class FinanceService {
         data: countries.sort()
       };
     } catch (error) {
-      console.error('Error fetching countries:', error);
-      throw error;
+      console.error('❌ Error fetching countries:', error);
+      return {
+        success: false,
+        message: error.message,
+        data: []
+      };
     }
   }
 
@@ -146,7 +162,7 @@ export class FinanceService {
         data: application
       };
     } catch (error) {
-      console.error('Error tracking application:', error);
+      console.error('❌ Error tracking application:', error);
       return { success: false, message: error.message };
     }
   }
@@ -165,8 +181,12 @@ export class FinanceService {
         }
       };
     } catch (error) {
-      console.error('Error fetching stats:', error);
-      throw error;
+      console.error('❌ Error fetching stats:', error);
+      return {
+        success: false,
+        message: error.message,
+        data: {}
+      };
     }
   }
 
@@ -179,8 +199,12 @@ export class FinanceService {
         data: loans
       };
     } catch (error) {
-      console.error('Error fetching popular loans:', error);
-      throw error;
+      console.error('❌ Error fetching popular loans:', error);
+      return {
+        success: false,
+        message: error.message,
+        data: []
+      };
     }
   }
 
@@ -205,15 +229,23 @@ export class FinanceService {
         }
       };
     } catch (error) {
-      console.error('Error fetching analytics:', error);
-      throw error;
+      console.error('❌ Error fetching analytics:', error);
+      return {
+        success: false,
+        message: error.message,
+        data: [],
+        pagination: {}
+      };
     }
   }
 
   // ===== ORGANIZATION MANAGEMENT =====
   
+  // ✅ FIXED: Submit organization
   async submitOrganization(organizationData) {
     try {
+      console.log('💾 Saving organization to database:', organizationData.organizationName);
+      
       const organization = new Organization({
         organizationName: organizationData.organizationName,
         organizationType: organizationData.organizationType,
@@ -243,15 +275,20 @@ export class FinanceService {
         status: 'pending'
       });
       
-      await organization.save();
+      const savedOrg = await organization.save();
+      console.log('✅ Organization saved successfully:', savedOrg._id);
       
       return {
         success: true,
         message: 'Organization submitted successfully',
-        data: { id: organization._id }
+        data: { 
+          id: savedOrg._id,
+          organizationName: savedOrg.organizationName,
+          status: savedOrg.status
+        }
       };
     } catch (error) {
-      console.error('Error submitting organization:', error);
+      console.error('❌ Error submitting organization:', error);
       return {
         success: false,
         message: error.message,
@@ -260,12 +297,15 @@ export class FinanceService {
     }
   }
 
+  // ✅ Get organizations with filters
   async getOrganizations(filters = {}) {
     try {
       const query = {};
       
       if (filters.status) query.status = filters.status;
       if (filters.organizationType) query.organizationType = filters.organizationType;
+      
+      console.log('🔍 Fetching organizations with filters:', filters);
       
       const organizations = await Organization.find(query)
         .sort({ createdAt: -1 })
@@ -275,6 +315,8 @@ export class FinanceService {
         .lean();
       
       const total = await Organization.countDocuments(query);
+      
+      console.log('✅ Found organizations:', organizations.length);
       
       return {
         success: true,
@@ -286,28 +328,37 @@ export class FinanceService {
         }
       };
     } catch (error) {
-      console.error('Error fetching organizations:', error);
-      throw error;
+      console.error('❌ Error fetching organizations:', error);
+      return {
+        success: false,
+        message: error.message,
+        data: [],
+        pagination: {}
+      };
     }
   }
 
+  // ✅ Get single organization
   async getOrganizationById(organizationId) {
     try {
       const organization = await Organization.findById(organizationId);
       
       if (!organization) {
-        return { success: false, message: 'Organization not found' };
+        return { success: false, message: 'Organization not found', data: null };
       }
       
       return { success: true, data: organization };
     } catch (error) {
-      console.error('Error fetching organization:', error);
-      throw error;
+      console.error('❌ Error fetching organization:', error);
+      return { success: false, message: error.message, data: null };
     }
   }
 
+  // ✅ Review organization (ADMIN)
   async reviewOrganization(organizationId, reviewData) {
     try {
+      console.log('📝 Reviewing organization:', organizationId, 'Status:', reviewData.status);
+      
       const organization = await Organization.findById(organizationId);
       
       if (!organization) {
@@ -320,17 +371,20 @@ export class FinanceService {
         await organization.reject(reviewData.reviewerName, reviewData.reviewNotes);
       }
       
+      console.log('✅ Organization reviewed successfully');
+      
       return {
         success: true,
         message: `Organization ${reviewData.status} successfully`,
         data: organization
       };
     } catch (error) {
-      console.error('Error reviewing organization:', error);
+      console.error('❌ Error reviewing organization:', error);
       return { success: false, message: error.message };
     }
   }
 
+  // ✅ Get organization stats
   async getOrganizationStats() {
     try {
       const stats = await Organization.getStats();
@@ -340,8 +394,12 @@ export class FinanceService {
         data: stats
       };
     } catch (error) {
-      console.error('Error fetching organization stats:', error);
-      throw error;
+      console.error('❌ Error fetching organization stats:', error);
+      return {
+        success: false,
+        message: error.message,
+        data: {}
+      };
     }
   }
 
@@ -384,7 +442,7 @@ export class FinanceService {
         data: loan
       };
     } catch (error) {
-      console.error('Error adding loan:', error);
+      console.error('❌ Error adding loan:', error);
       return { success: false, message: error.message };
     }
   }
@@ -407,7 +465,7 @@ export class FinanceService {
         data: loan
       };
     } catch (error) {
-      console.error('Error updating loan:', error);
+      console.error('❌ Error updating loan:', error);
       return { success: false, message: error.message };
     }
   }
@@ -425,7 +483,7 @@ export class FinanceService {
         message: 'Loan deleted successfully'
       };
     } catch (error) {
-      console.error('Error deleting loan:', error);
+      console.error('❌ Error deleting loan:', error);
       return { success: false, message: error.message };
     }
   }
