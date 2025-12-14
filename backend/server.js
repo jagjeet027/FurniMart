@@ -211,7 +211,7 @@ app.use('/api/cargo/quotes', quoteRoutes);
 app.use('/api/cargo/payments', cargoPaymentRoutes);
 app.use('/api/cargo/admin', cargoAdminRoutes);
 app.use('/api/cargo/loan-providers', loanProviderRoutes);
-app.use('/api', financeRoutes);
+app.use('/api/finance', financeRoutes);
 
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
