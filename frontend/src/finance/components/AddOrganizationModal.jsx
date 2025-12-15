@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, Building, User, MapPin, DollarSign, FileText, CheckCircle, AlertCircle, ArrowLeft, ArrowRight } from 'lucide-react';
-import { submitOrganization } from '../services/apiService';
+import { X, Building, User, MapPin, DollarSign, FileText, CheckCircle, AlertCircle, ArrowLeft, ArrowRight, Loader } from 'lucide-react';
+import api from '../../axios/axiosInstance';
 
 const AddOrganizationModal = ({ isOpen, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -45,9 +45,17 @@ const AddOrganizationModal = ({ isOpen, onClose, onSuccess }) => {
   ];
 
   const loanTypeOptions = [
-    'Personal Loan', 'Business Loan', 'Home Loan', 'Car Loan',
-    'Education Loan', 'Agricultural Loan', 'Microfinance', 'Startup Funding',
-    'Equipment Financing', 'Working Capital', 'Other'
+    'Personal Loan',
+    'Business Loan',
+    'Home Loan',
+    'Car Loan',
+    'Education Loan',
+    'Agricultural Loan',
+    'Microfinance',
+    'Startup Funding',
+    'Equipment Financing',
+    'Working Capital',
+    'Other'
   ];
 
   const formTabs = [
@@ -142,10 +150,14 @@ const AddOrganizationModal = ({ isOpen, onClose, onSuccess }) => {
     setSubmitError(null);
     
     try {
-      console.log('📤 Submitting organization:', formData);
-      const result = await submitOrganization(formData);
+      console.log('📤 Submitting organization to /api/finance/organizations:', formData);
       
-      if (result.success) {
+      // ✅ CORRECT ENDPOINT: /api/finance/organizations
+      const response = await api.post('/finance/organizations', formData);
+      
+      console.log('✅ Response:', response.data);
+      
+      if (response.data?.success) {
         console.log('✅ Submission successful');
         setSubmitSuccess(true);
         
@@ -180,11 +192,27 @@ const AddOrganizationModal = ({ isOpen, onClose, onSuccess }) => {
           onClose();
         }, 2500);
       } else {
-        setSubmitError(result.message || 'Submission failed');
+        throw new Error(response.data?.message || 'Submission failed');
       }
     } catch (error) {
       console.error('❌ Submission error:', error);
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to submit. Please try again.';
+      
+      let errorMsg = 'Failed to submit. Please try again.';
+      
+      if (error.response?.data?.message) {
+        errorMsg = error.response.data.message;
+      } else if (error.response?.status === 400) {
+        errorMsg = 'Invalid data. Please check all fields.';
+      } else if (error.response?.status === 401) {
+        errorMsg = 'Unauthorized. Please login again.';
+      } else if (error.response?.status === 500) {
+        errorMsg = 'Server error. Please try again later.';
+      } else if (error.message === 'Network Error') {
+        errorMsg = 'Network error. Please check your connection.';
+      } else if (!error.response) {
+        errorMsg = 'Unable to connect to server. Please check your internet connection.';
+      }
+      
       setSubmitError(errorMsg);
     } finally {
       setIsSubmitting(false);
@@ -296,7 +324,7 @@ const AddOrganizationModal = ({ isOpen, onClose, onSuccess }) => {
                     onChange={handleInputChange} 
                     className={`w-full px-4 py-3 rounded-xl border-2 transition-all ${
                       errors.organizationType ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-blue-500'
-                    } focus:outline-none`}
+                    } focus:outline-none bg-white`}
                   >
                     <option value="">Select organization type</option>
                     {organizationTypes.map(t => (<option key={t} value={t}>{t}</option>))}
@@ -555,7 +583,7 @@ const AddOrganizationModal = ({ isOpen, onClose, onSuccess }) => {
 
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">Min Loan Amount</label>
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">Min Loan Amount (₹)</label>
                     <input 
                       name="minLoanAmount" 
                       type="number" 
@@ -566,7 +594,7 @@ const AddOrganizationModal = ({ isOpen, onClose, onSuccess }) => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">Max Loan Amount</label>
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">Max Loan Amount (₹)</label>
                     <input 
                       name="maxLoanAmount" 
                       type="number" 
@@ -600,7 +628,7 @@ const AddOrganizationModal = ({ isOpen, onClose, onSuccess }) => {
                     name="description" 
                     value={formData.description} 
                     onChange={handleInputChange} 
-                    placeholder="Brief description..." 
+                    placeholder="Brief description of your organization..." 
                     rows="4" 
                     className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none resize-none" 
                   />
@@ -612,7 +640,7 @@ const AddOrganizationModal = ({ isOpen, onClose, onSuccess }) => {
                     name="specialPrograms" 
                     value={formData.specialPrograms} 
                     onChange={handleInputChange} 
-                    placeholder="Special programs..." 
+                    placeholder="Special programs or schemes offered..." 
                     rows="3" 
                     className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none resize-none" 
                   />
@@ -624,7 +652,7 @@ const AddOrganizationModal = ({ isOpen, onClose, onSuccess }) => {
                     name="eligibilityCriteria" 
                     value={formData.eligibilityCriteria} 
                     onChange={handleInputChange} 
-                    placeholder="Eligibility requirements..." 
+                    placeholder="Eligibility requirements for borrowers..." 
                     rows="3" 
                     className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none resize-none" 
                   />
@@ -633,8 +661,8 @@ const AddOrganizationModal = ({ isOpen, onClose, onSuccess }) => {
             )}
 
             {submitError && (
-              <div className="p-4 rounded-xl bg-red-50 border-2 border-red-200 flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+              <div className="p-4 rounded-xl bg-red-50 border-2 border-red-200 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                 <p className="text-red-700 font-medium">{submitError}</p>
               </div>
             )}
@@ -648,7 +676,17 @@ const AddOrganizationModal = ({ isOpen, onClose, onSuccess }) => {
             onClick={() => activeTab > 0 ? handlePrevious() : onClose()} 
             className="px-6 py-2.5 rounded-lg border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-100 transition-all flex items-center gap-2"
           >
-            {activeTab === 0 ? <><X className="w-4 h-4" /> Close</> : <><ArrowLeft className="w-4 h-4" /> Previous</>}
+            {activeTab === 0 ? (
+              <>
+                <X className="w-4 h-4" />
+                Close
+              </>
+            ) : (
+              <>
+                <ArrowLeft className="w-4 h-4" />
+                Previous
+              </>
+            )}
           </button>
 
           <div className="flex gap-3">
@@ -675,9 +713,18 @@ const AddOrganizationModal = ({ isOpen, onClose, onSuccess }) => {
                 type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="px-8 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all flex items-center gap-2"
+                className="px-8 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? 'Submitting...' : <>Submit <ArrowRight className="w-4 h-4" /></>}
+                {isSubmitting ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    Submit <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
             )}
           </div>
@@ -685,5 +732,6 @@ const AddOrganizationModal = ({ isOpen, onClose, onSuccess }) => {
       </div>
     </div>
   );
-}
+};
+
 export default AddOrganizationModal;

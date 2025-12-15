@@ -1,4 +1,3 @@
-// backend/routes/finance/financeRoutes.js - FIXED VERSION
 import express from 'express';
 import financeService from '../../services/financeService.js';
 import { protect, optionalAuth } from '../../middleware/authMiddleware.js';

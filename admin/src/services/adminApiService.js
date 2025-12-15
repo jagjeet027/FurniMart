@@ -69,7 +69,7 @@ export const getOrganizations = async (filters = {}) => {
     if (filters.skip !== undefined) params.append('skip', filters.skip);
 
     const queryString = params.toString();
-    const url = queryString ? `/organizations?${queryString}` : '/organizations';
+    const url = queryString ? `finance/organizations?${queryString}` : 'finance/organizations';
     
     const response = await adminApiClient.get(url);
     
@@ -91,7 +91,7 @@ export const getOrganizations = async (filters = {}) => {
 export const getOrganizationById = async (organizationId) => {
   try {
     console.log('🔍 [ADMIN] Fetching organization:', organizationId);
-    const response = await adminApiClient.get(`/organizations/${organizationId}`);
+    const response = await adminApiClient.get(`finance/organizations/${organizationId}`);
     
     return {
       success: true,
@@ -109,7 +109,7 @@ export const getOrganizationById = async (organizationId) => {
 export const getOrganizationStats = async () => {
   try {
     console.log('📊 [ADMIN] Fetching organization stats');
-    const response = await adminApiClient.get('/organizations-stats');
+    const response = await adminApiClient.get('finance/organizations-stats');
     
     return {
       success: true,
@@ -147,7 +147,7 @@ export const reviewOrganization = async (organizationId, reviewData) => {
     };
     
     const response = await adminApiClient.put(
-      `/organizations/${organizationId}/review`,
+      `finance/organizations/${organizationId}/review`,
       payload
     );
     
@@ -170,7 +170,7 @@ export const deleteOrganization = async (organizationId) => {
   try {
     console.log('🗑️ [ADMIN] Deleting organization:', organizationId);
     
-    const response = await adminApiClient.delete(`/organizations/${organizationId}`);
+    const response = await adminApiClient.delete(`finance/organizations/${organizationId}`);
     
     console.log('✅ Organization deleted successfully');
     return {
@@ -191,7 +191,7 @@ export const updateOrganization = async (organizationId, updateData) => {
     console.log('✏️ [ADMIN] Updating organization:', organizationId);
     
     const response = await adminApiClient.put(
-      `/organizations/${organizationId}`,
+      `finance/organizations/${organizationId}`,
       updateData
     );
     
