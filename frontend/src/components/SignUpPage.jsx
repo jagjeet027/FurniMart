@@ -1,26 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import api from '../axios/axiosInstance.js'
-import { useNavigate } from 'react-router-dom';
-import { User, Lock, Smartphone, Mail } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import api from "../axios/axiosInstance.js";
+import { useNavigate } from "react-router-dom";
+import { User, Lock, Smartphone, Mail } from "lucide-react";
 
 const SignupPage = () => {
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isOtpVerified, setIsOtpVerified] = useState(false);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [countdown, setCountdown] = useState(0);
   const [remainingAttempts, setRemainingAttempts] = useState(3);
   const navigate = useNavigate();
-  
+
   useEffect(() => {
     let timer;
     if (countdown > 0) {
       timer = setInterval(() => {
-        setCountdown(prev => prev - 1);
+        setCountdown((prev) => prev - 1);
       }, 1000);
     }
     return () => clearInterval(timer);
@@ -28,94 +28,105 @@ const SignupPage = () => {
 
   const handleSendOtp = async () => {
     if (!phone.match(/^\d{10}$/)) {
-      setError('Please enter a valid 10-digit phone number');
+      setError("Please enter a valid 10-digit phone number");
       return;
     }
 
     try {
-      setError('');
+      setError("");
       setRemainingAttempts(3); // Reset attempts
-      const response = await api.post('/api/users/send-otp', { 
-        phone: `+91${phone}` 
+      const response = await api.post("/users/send-otp", {
+        phone: `+91${phone}`,
       });
-      
+
       console.log(response.data);
       setIsOtpSent(true);
-      setCountdown(60); 
+      setCountdown(60);
       if (response.data.developmentOTP) {
         alert(`Development OTP: ${response.data.developmentOTP}`);
       }
     } catch (error) {
-      setError(error.response ? error.response.data.error : 'Failed to send OTP');
+      setError(
+        error.response ? error.response.data.error : "Failed to send OTP"
+      );
       setIsOtpSent(false);
     }
   };
 
   const handleVerifyOtp = async () => {
     if (otp.length !== 6) {
-      setError('OTP must be 6 digits');
+      setError("OTP must be 6 digits");
       return;
     }
-  
+
     try {
-      console.log('Sending OTP:', {
-        phone: `+91${phone}`, 
-        otp: otp
+      console.log("Sending OTP:", {
+        phone: `+91${phone}`,
+        otp: otp,
       });
-  
-      const response = await api.post('/api/users/verify-otp', { 
-        phone: `+91${phone}`, 
-        otp 
+
+      const response = await api.post("/users/verify-otp", {
+        phone: `+91${phone}`,
+        otp,
       });
-      
+
       setIsOtpVerified(true);
     } catch (error) {
-      if (error.response && error.response.data.remainingAttempts !== undefined) {
-        console.log('OTP Verification Error:', error.response.data);
+      if (
+        error.response &&
+        error.response.data.remainingAttempts !== undefined
+      ) {
+        console.log("OTP Verification Error:", error.response.data);
         setRemainingAttempts(error.response.data.remainingAttempts);
-        setError(`Invalid OTP. ${error.response.data.remainingAttempts} attempts remaining.`);
+        setError(
+          `Invalid OTP. ${error.response.data.remainingAttempts} attempts remaining.`
+        );
       } else {
-        setError(error.response ? error.response.data.error : 'OTP verification failed');
+        setError(
+          error.response ? error.response.data.error : "OTP verification failed"
+        );
       }
     }
   };
   const handleRegister = async () => {
     // Additional validations
     if (!name || !email || !password) {
-      setError('Please fill in all fields');
+      setError("Please fill in all fields");
       return;
     }
 
     if (!isOtpVerified) {
-      setError('Please verify OTP first');
+      setError("Please verify OTP first");
       return;
     }
 
     try {
-      setError('');
-      await api.post('/api/users/register', {
+      setError("");
+      await api.post("/api/users/register", {
         name,
         email,
-        phone: `+91${phone}`,
+        phone: `+91${8092769596}`,
         password,
       });
-      
-      alert('Registration successful!');
-      navigate('/login')
+
+      alert("Registration successful!");
+      navigate("/login");
     } catch (error) {
-      setError(error.response ? error.response.data.error : 'Registration failed');
+      setError(
+        error.response ? error.response.data.error : "Registration failed"
+      );
     }
   };
 
   const resetForm = () => {
-    setPhone('');
-    setOtp('');
+    setPhone("");
+    setOtp("");
     setIsOtpSent(false);
     setIsOtpVerified(false);
-    setName('');
-    setEmail('');
-    setPassword('');
-    setError('');
+    setName("");
+    setEmail("");
+    setPassword("");
+    setError("");
     setCountdown(0);
     setRemainingAttempts(3);
   };
@@ -127,7 +138,7 @@ const SignupPage = () => {
           <h2 className="text-4xl font-bold text-white">Create Account</h2>
           <p className="text-white/80 mt-2">Start your manufacturing journey</p>
         </div>
-        
+
         <div className="p-6">
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4 flex items-center">
@@ -145,7 +156,7 @@ const SignupPage = () => {
                   className="w-full pl-10 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 transition"
                   placeholder="Phone Number (10 digits)"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                   disabled={isOtpSent}
                   maxLength={10}
                 />
@@ -168,7 +179,9 @@ const SignupPage = () => {
                       className="w-full pl-10 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 transition"
                       placeholder="Enter 6-digit OTP"
                       value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                      onChange={(e) =>
+                        setOtp(e.target.value.replace(/\D/g, ""))
+                      }
                       maxLength={6}
                     />
                   </div>
@@ -190,7 +203,7 @@ const SignupPage = () => {
                       className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
                       disabled={countdown > 0}
                     >
-                      {countdown > 0 ? `Resend in ${countdown}s` : 'Resend'}
+                      {countdown > 0 ? `Resend in ${countdown}s` : "Resend"}
                     </button>
                   </div>
                 </div>
@@ -242,4 +255,4 @@ const SignupPage = () => {
   );
 };
 
-export default SignupPage
+export default SignupPage;

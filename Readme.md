@@ -17,7 +17,7 @@ npm i -g pnpm
 pnpm i
 
 # go to parent directory
-
+dev
 cd ..
 
 ```
