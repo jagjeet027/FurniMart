@@ -3,10 +3,12 @@ import asyncHandler from 'express-async-handler';
 import { Quotation } from '../models/quotation.js';
 import { Post } from '../models/Post.js';
 
-// Create quotation (manufacturers only)
+// ✅ FIXED: Create quotation (manufacturers only)
 export const createQuotation = asyncHandler(async (req, res) => {
   try {
-    const { postId, message, price, deliveryTime, attachments } = req.body;
+    // ✅ Get postId from route params instead of body
+    const { id: postId } = req.params;
+    const { message, price, deliveryTime, attachments } = req.body;
     const manufacturerId = req.user.id || req.userId;
 
     // Check if user is manufacturer
@@ -18,14 +20,14 @@ export const createQuotation = asyncHandler(async (req, res) => {
     }
 
     // Validate required fields
-    if (!postId || !message) {
+    if (!message || !message.trim()) {
       return res.status(400).json({
         success: false,
-        message: 'Post ID and message are required'
+        message: 'Message is required'
       });
     }
 
-    // Check if post exists
+    // Check if post exists and is active
     const post = await Post.findOne({ _id: postId, isActive: true });
     
     if (!post) {
@@ -43,6 +45,17 @@ export const createQuotation = asyncHandler(async (req, res) => {
       });
     }
 
+    // ✅ Prevent manufacturer from quoting their own post
+    const postOwnerId = post.userId.toString();
+    const currentUserId = manufacturerId.toString();
+    
+    if (postOwnerId === currentUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot send quotation to your own post'
+      });
+    }
+
     // Check if manufacturer already submitted quotation
     const existingQuotation = await Quotation.findOne({
       postId,
@@ -57,13 +70,13 @@ export const createQuotation = asyncHandler(async (req, res) => {
       });
     }
 
-    // Create quotation
+    // ✅ Create quotation with proper field names
     const quotation = new Quotation({
       postId,
       manufacturerId,
       message: message.trim(),
-      price: price || undefined,
-      deliveryTime: deliveryTime || undefined,
+      price: price && !isNaN(price) ? parseFloat(price) : undefined,
+      deliveryTime: deliveryTime?.trim() || undefined,
       attachments: attachments || []
     });
 
@@ -71,11 +84,14 @@ export const createQuotation = asyncHandler(async (req, res) => {
 
     // Update post quotations count
     post.quotationsCount = (post.quotationsCount || 0) + 1;
+    if (!post.quotations) {
+      post.quotations = [];
+    }
     post.quotations.push(quotation._id);
     await post.save();
 
-    // Populate manufacturer details
-    await quotation.populate('manufacturer', 'name email phone address');
+    // Populate manufacturer details before sending response
+    await quotation.populate('manufacturerId', 'name email phone address');
 
     console.log(`✅ Quotation created by manufacturer: ${manufacturerId} for post: ${postId}`);
 
@@ -94,7 +110,7 @@ export const createQuotation = asyncHandler(async (req, res) => {
   }
 });
 
-// Get manufacturer's own quotations
+// ✅ Get manufacturer's own quotations
 export const getMyQuotations = asyncHandler(async (req, res) => {
   try {
     const manufacturerId = req.user.id || req.userId;
@@ -109,7 +125,8 @@ export const getMyQuotations = asyncHandler(async (req, res) => {
       .populate('postId', 'title type description status')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
     const total = await Quotation.countDocuments({ 
       manufacturerId, 
@@ -136,7 +153,7 @@ export const getMyQuotations = asyncHandler(async (req, res) => {
   }
 });
 
-// Update quotation status (post owner only)
+// ✅ Update quotation status (post owner only)
 export const updateQuotationStatus = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
@@ -146,7 +163,7 @@ export const updateQuotationStatus = asyncHandler(async (req, res) => {
     if (!['pending', 'accepted', 'rejected'].includes(status)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid status'
+        message: 'Invalid status. Must be: pending, accepted, or rejected'
       });
     }
 
@@ -188,7 +205,7 @@ export const updateQuotationStatus = asyncHandler(async (req, res) => {
   }
 });
 
-// Delete quotation
+// ✅ Delete quotation
 export const deleteQuotation = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
@@ -236,4 +253,3 @@ export const deleteQuotation = asyncHandler(async (req, res) => {
     });
   }
 });
-

@@ -326,7 +326,6 @@ export const deletePost = asyncHandler(async (req, res) => {
   });
 });
 
-// ⚡ OPTIMIZED: Get Post Quotations
 export const getPostQuotations = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id || req.userId;
@@ -350,10 +349,10 @@ export const getPostQuotations = asyncHandler(async (req, res) => {
     });
   }
 
-  // ⚡ Optimized query with lean
+  // ⚡ Optimized query with lean - FIXED: Changed 'manufacturer' to 'manufacturerId'
   const quotations = await Quotation.find({ postId: id, isActive: true })
-    .select('price description files manufacturer createdAt updatedAt')
-    .populate('manufacturer', 'name email phone address')
+    .select('message price deliveryTime attachments status manufacturerId createdAt updatedAt')
+    .populate('manufacturerId', 'name email phone address')
     .sort({ createdAt: -1 })
     .lean()
     .exec();
