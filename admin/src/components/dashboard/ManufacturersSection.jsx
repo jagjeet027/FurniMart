@@ -627,11 +627,10 @@ const NotificationItem = ({ notification, onRead }) => (
 );
 
 const ManufacturerListItem = ({ manufacturer, onViewDetails }) => (
-  <div className="p-6 hover:bg-white/5 transition-colors">
+  <div className="p-4 hover:bg-white/5 transition-colors">
     <div className="flex items-center justify-between">
       <div>
-        <h3 className="text-lg font-medium text-white">{manufacturer.businessName}</h3>
-        <p className="text-white/60 mt-1">Reg: {manufacturer.registrationNumber}</p>
+        <h3 className="text-lg font-medium text-white">Company Name : {manufacturer.businessName}</h3>
         <div className="flex gap-3 mt-2">
           <span className={`px-3 py-1 rounded-full text-sm
             ${manufacturer.status === 'approved' 
