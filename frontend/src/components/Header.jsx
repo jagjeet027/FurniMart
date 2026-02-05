@@ -42,7 +42,7 @@ const menuSections = [
   {
     icon: <ShoppingCart className="h-5 w-5 text-orange-600" />,
     text: 'Orders',
-    link: '/orders'
+    link: '/order-tracking/:orderId'
   },
   {
     icon: <Clipboard className="h-5 w-5 text-orange-600" />,

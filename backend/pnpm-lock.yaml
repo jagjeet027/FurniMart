@@ -89,6 +89,9 @@ importers:
       socket.io:
         specifier: ^4.8.1
         version: 4.8.1
+      stripe:
+        specifier: ^20.3.0
+        version: 20.3.0(@types/node@24.3.0)
       twilio:
         specifier: ^5.4.0
         version: 5.8.2
@@ -1011,6 +1014,15 @@ packages:
   strip-ansi@6.0.1:
     resolution: {integrity: sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==}
     engines: {node: '>=8'}
+
+  stripe@20.3.0:
+    resolution: {integrity: sha512-DYzcmV1MfYhycr1GwjCjeQVYk9Gu8dpxyTlu7qeDCsuguug7oUTxPsUQuZeSf/OPzK7pofqobvOKVqAwlpgf/Q==}
+    engines: {node: '>=16'}
+    peerDependencies:
+      '@types/node': '>=16'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
 
   supports-color@5.5.0:
     resolution: {integrity: sha512-QjVjwdXIt408MIiAqCX4oUKsgU2EqAGzs2Ppkm4aQYbjm+ZEWEcW4SfFNTr4uMNZma0ey4f5lgLrkB0aX0QMow==}
@@ -2096,6 +2108,10 @@ snapshots:
   strip-ansi@6.0.1:
     dependencies:
       ansi-regex: 5.0.1
+
+  stripe@20.3.0(@types/node@24.3.0):
+    optionalDependencies:
+      '@types/node': 24.3.0
 
   supports-color@5.5.0:
     dependencies:

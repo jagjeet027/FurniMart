@@ -125,7 +125,7 @@ const App = () => {
           <Route path="/search-results" element={<SearchResultsPage />} />
           <Route path="/checkout" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
           <Route path="/wishlist" element={<PrivateRoute><WishlistPage /></PrivateRoute>} />
-          <Route path="/order-tracking" element={<PrivateRoute><OrderTrackingPage /></PrivateRoute>} />
+          <Route path="/order-tracking/:orderId" element={<PrivateRoute><OrderTrackingPage /></PrivateRoute>} />
           <Route path="/chat-history" element={<ChatHistory />} />
           
           {/* HOME PAGE ROUTE */}
