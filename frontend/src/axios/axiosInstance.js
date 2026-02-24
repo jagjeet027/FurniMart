@@ -2,7 +2,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: `${import.meta.env.VITE_BACKEND_URL || "http://localhost:5000"}/api`,
+baseURL: `${import.meta.env.VITE_BACKEND_URL}/api`,
   headers: {
     "Content-Type": "application/json",
     "Accept": "application/json",
@@ -49,7 +49,7 @@ const refreshAccessToken = async () => {
     console.log('🔄 Refreshing access token...');
     
     const response = await axios.post(
-      `${import.meta.env.VITE_BACKEND_URL || "http://localhost:5000"}/api/users/refresh-token`,
+      `${import.meta.env.VITE_BACKEND_URL}/api/users/refresh-token`,
       {},
       {
         withCredentials: true,

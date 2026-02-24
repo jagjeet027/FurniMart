@@ -1,6 +1,5 @@
-
 class OrganizationService {
-  static baseURL = 'http://localhost:5000/api/organizations';
+  static baseURL = `${import.meta.env.VITE_BACKEND_URL}/api/organizations`;
 
   // Test server connection
   static async testConnection() {

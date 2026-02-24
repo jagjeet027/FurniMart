@@ -28,7 +28,7 @@ const OrderTrackingPage = () => {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('details');
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+ const API_BASE_URL = import.meta.env.VITE_BACKEND_URL + '/api';
 
   const getAuthToken = () => localStorage.getItem('token');
 

@@ -31,7 +31,7 @@ const MobileChatModal = ({ isOpen, onClose, product, userInfo }) => {
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = import.meta.env.VITE_BACKEND_URL + '/api';
 
   // Initialize socket connection
   useEffect(() => {
