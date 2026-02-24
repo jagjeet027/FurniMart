@@ -9,7 +9,7 @@ import {
   forgotPassword,
   resetPassword
 } from '../controllers/userController.js';
-import { updateUserProfile } from '../Controllers/profileController.js';
+import { updateUserProfile } from '../controllers/profileController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 import adminAuth from '../middleware/adminAuth.js';
 import loginAuth from '../middleware/loginAuth.js';

@@ -7,7 +7,7 @@ import {
   getProductById,
   updateProduct,
   deleteProduct
-} from "../Controllers/productController.js";
+} from "../controllers/productController.js";
 import { authenticateToken } from '../middleware/authMiddleware.js';
 import { verifyManufacturer, verifyProductOwnership } from '../middleware/manufacturerProductAuth.js';
 

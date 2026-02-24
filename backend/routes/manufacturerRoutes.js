@@ -14,7 +14,7 @@ import {
   updateManufacturerStatus,
   deleteManufacturer,
   downloadDocument
-} from '../Controllers/manufacturerController.js';
+} from '../controllers/manufacturerController.js';
 
 const router = express.Router();
 
