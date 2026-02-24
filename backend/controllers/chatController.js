@@ -1,5 +1,5 @@
 import asyncHandler from 'express-async-handler';
-import Chat from '../models/Chat.js';
+import Chat from '../models/chat.js';
 import Product from '../models/product.js';
 import { Manufacturer } from '../models/manufacturer.js';
 import { User } from '../models/Users.js';
