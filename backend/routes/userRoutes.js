@@ -8,7 +8,7 @@ import {
   logoutUser,
   forgotPassword,
   resetPassword
-} from '../Controllers/userController.js';
+} from '../controllers/userController.js';
 import { updateUserProfile } from '../Controllers/profileController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 import adminAuth from '../middleware/adminAuth.js';
