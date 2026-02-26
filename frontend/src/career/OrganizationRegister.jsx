@@ -36,11 +36,13 @@ import {
   Loader
 } from 'lucide-react';
 
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
+
 // OrganizationService
 const OrganizationService = {
   async testConnection() {
     try {
-      const response = await fetch('http://localhost:5000/api/organizations/test');
+      const response = await fetch(`${API_BASE_URL}/api/organizations/test`);
       return response.ok;
     } catch (error) {
       return false;
@@ -56,7 +58,7 @@ const OrganizationService = {
       formData.append('logo', organizationData.logo);
     }
     
-    const response = await fetch('http://localhost:5000/api/organizations', {
+    const response = await fetch(`${API_BASE_URL}/api/organizations`, {
       method: 'POST',
       body: formData
     });
@@ -70,7 +72,7 @@ const OrganizationService = {
   },
   
   async parseStudentFile(formData) {
-    const response = await fetch('http://localhost:5000/api/organizations/parse-student-file', {
+    const response = await fetch(`${API_BASE_URL}/api/organizations/parse-student-file`, {
       method: 'POST',
       body: formData
     });
@@ -84,7 +86,7 @@ const OrganizationService = {
   },
   
   async downloadStudentTemplate() {
-    const response = await fetch('http://localhost:5000/api/organizations/student-template');
+    const response = await fetch(`${API_BASE_URL}/api/organizations/student-template`);
     if (!response.ok) {
       throw new Error('Failed to download template');
     }

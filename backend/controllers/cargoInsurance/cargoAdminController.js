@@ -1,6 +1,6 @@
 // controllers/cargo/cargoAdminController.js
 import { Company } from '../../models/cargo/Company.js';
-import { Shipment } from '../../models/cargo/shipment.js';
+import { Shipment } from '../../models/cargo/Shipment.js';
 import { Quote } from '../../models/cargo/quote.js';
 import { Payment } from '../../models/cargo/Payment.js';
 import Admin from '../../models/admin.js';

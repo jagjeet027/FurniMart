@@ -22,8 +22,7 @@ const RegisterIndividuals = () => {
   const [errors, setErrors] = useState({});
   const [apiResponse, setApiResponse] = useState(null);
 
-  const API_BASE_URL = 'http://localhost:5000/api/registration';
-
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL + '/api/registration';
   const experienceLevels = [
     'Entry Level (0-1 years)',
     'Junior (1-3 years)',

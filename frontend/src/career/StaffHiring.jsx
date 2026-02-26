@@ -48,7 +48,7 @@ const ModernStaffHiring = () => {
   const [totalJobs, setTotalJobs] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
-  const API_BASE_URL = 'http://localhost:5000/api/careers' || import.meta.env.VITE_API_URL || 'https://furnimart-careerspage-com.onrender.com/api/careers';
+  const API_BASE_URL = import.meta.env.VITE_BACKEND_URL + '/api/careers';
 
   // Add CSS styles programmatically
   useEffect(() => {
