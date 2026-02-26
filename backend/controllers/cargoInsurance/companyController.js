@@ -1,5 +1,5 @@
 // controllers/cargo/companyController.js
-import { Company } from '../../models/cargo/company.js';
+import { Company } from '../../models/cargo/Company.js';
 import { Payment } from '../../models/cargo/Payment.js';
 import { User } from '../../models/Users.js';
 

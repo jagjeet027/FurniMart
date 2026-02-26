@@ -24,8 +24,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const [ideaDescription, setIdeaDescription] = useState('');
   const [ideaCategory, setIdeaCategory] = useState('general');
   const [isSubmittingIdea, setIsSubmittingIdea] = useState(false);
-
-  const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+  
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
   useEffect(() => {
     const handleResize = () => {

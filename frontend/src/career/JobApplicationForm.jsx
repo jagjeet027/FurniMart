@@ -24,8 +24,7 @@ const JobApplicationForm = () => {
   const [errors, setErrors] = useState({});
   const [submitStatus, setSubmitStatus] = useState(null);
 
-  const API_BASE_URL = 'http://localhost:5000/api/careers';
-
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL + '/api/careers';
   const formatSalary = (salary) => {
     if (!salary) return 'Competitive';
     if (typeof salary === 'object') {

@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
-import { Company } from '../../models/cargo/company.js';
+import { Company } from '../../models/cargo/Company.js';
 import { LoanProvider } from '../../models/cargo/loanProvider.js';
 import { Payment } from '../../models/cargo/Payment.js';
 
