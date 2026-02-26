@@ -1,5 +1,5 @@
 
-import Loan from '../models/finance/loan.js';
+import Loan from '../models/finance/Loan.js';
 import LoanApplication from '../models/finance/LoanApplication.js';
 import Organization from '../models/finance/financeOrganization.js';
 
