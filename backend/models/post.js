@@ -86,4 +86,4 @@ postSchema.statics.findActiveWithAuthor = function(filter = {}) {
     .lean();
 };
 
-export const post = mongoose.model('post', postSchema);
+export const Post = mongoose.model('Post', postSchema);

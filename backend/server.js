@@ -142,21 +142,23 @@ app.use(helmet({
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
+  : [];
 
 app.use(
   cors({
     origin: function(origin, callback) {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) {
+      // Development mein sab allow
+      if (process.env.NODE_ENV === 'development') {
         return callback(null, true);
       }
-      return callback(new Error('CORS policy blocked this origin'), false);
+      // Production mein sirf allowed origins
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error('CORS blocked'), false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-    exposedHeaders: ['Content-Range', 'X-Content-Range']
   })
 );
 
