@@ -1,5 +1,5 @@
 class OrganizationService {
-  static baseURL = `${import.meta.env.VITE_BACKEND_URL}/api/organizations`;
+  static baseURL = import.meta.env.VITE_API_URL ?? 'https://backendbizness.onrender.com/api';
 
   // Test server connection
   static async testConnection() {
