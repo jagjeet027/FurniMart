@@ -4,7 +4,7 @@ import { Shipment } from '../../models/cargo/Shipment.js';
 import { Quote } from '../../models/cargo/Quote.js';
 import { Payment } from '../../models/cargo/Payment.js';
 import Admin from '../../models/admin.js';
-import { LoanProvider } from '../../models/cargo/loanProvider.js';
+import { LoanProvider } from '../../models/cargo/LoanProvider.js';
 // ========== DASHBOARD STATISTICS ==========
 export const getDashboardStats = async (req, res) => {
   try {

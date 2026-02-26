@@ -1,4 +1,4 @@
-import { LoanProvider } from '../../models/cargo/loanProvider.js';
+import { LoanProvider } from '../../models/cargo/LoanProvider.js';
 
 export const getAllLoanProviders = async (req, res) => {
   try {
