@@ -419,7 +419,7 @@ const OrganizationRegister = () => {
       console.log('Testing server connection...');
       const isConnected = await OrganizationService.testConnection();
       if (!isConnected) {
-        throw new Error('Cannot connect to server. Please ensure the backend server is running on http://localhost:5000');
+        throw new Error('Cannot connect to server. Please ensure the backend server is running on https://backendbizness.onrender.com');
       }
       
       const result = await OrganizationService.register(organizationData, candidates);
