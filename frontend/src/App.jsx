@@ -50,6 +50,7 @@ import AddOrganizationPage from '.././src/finance/pages/AddOrganizationPage';
 import OrganizationManagementPage from '.././src/finance/pages/OrganizationManagementPage';
 import AdminPanel from '../src/finance/components/AdminPanel';
 
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || http//localhost:5000; 
 
 const App = () => {
   const location = useLocation();

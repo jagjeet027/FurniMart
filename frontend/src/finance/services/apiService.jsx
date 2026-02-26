@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 // ❌ WRONG
-const API_BASE_URL = i`${import.meta.env.VITE_BACKEND_URL}/api` || 'https://backendbizness.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://backendbizness.onrender.com/api';
 
 console.log('🔌 API Base URL:', API_BASE_URL);
 
