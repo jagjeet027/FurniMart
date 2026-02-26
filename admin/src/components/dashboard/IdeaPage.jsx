@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
+
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://backendbizness.onrender.com/api';
 const IssuesPage = () => {
   const navigate = useNavigate();
   const { user, logout, token } = useAuth();
@@ -126,7 +128,7 @@ const IssuesPage = () => {
 
       const response = await makeAuthenticatedRequest({
         method: 'GET',
-        url: `http://localhost:5000/api/issues?${params}`
+        url: `${BASE_URL}/issues?${params}`
       });
 
       if (response) {
@@ -147,7 +149,7 @@ const IssuesPage = () => {
     try {
       const response = await makeAuthenticatedRequest({
         method: 'GET',
-        url: 'http://localhost:5000/api/issues/stats'
+        url: `${BASE_URL}/issues/stats`
       });
 
       if (response) {
@@ -181,7 +183,7 @@ const IssuesPage = () => {
     try {
       const response = await makeAuthenticatedRequest({
         method: 'POST',
-        url: 'http://localhost:5000/api/issues',
+        url: `${BASE_URL}/issues`,
         data: formData
       });
 
@@ -206,7 +208,7 @@ const IssuesPage = () => {
     try {
       const response = await makeAuthenticatedRequest({
         method: 'PUT',
-        url: `http://localhost:5000/api/issues/${selectedIssue._id}`,
+        url: `${BASE_URL}/issues/${selectedIssue._id}`,
         data: formData
       });
 
@@ -231,7 +233,7 @@ const IssuesPage = () => {
     try {
       const response = await makeAuthenticatedRequest({
         method: 'DELETE',
-        url: `http://localhost:5000/api/issues/${issueId}`
+        url: `${BASE_URL}/issues/${issueId}`
       });
 
       if (response) {
@@ -248,7 +250,7 @@ const IssuesPage = () => {
     try {
       const response = await makeAuthenticatedRequest({
         method: 'GET',
-        url: `http://localhost:5000/api/issues/${issueId}`
+        url: `${BASE_URL}/issues/${issueId}`
       });
 
       if (response) {

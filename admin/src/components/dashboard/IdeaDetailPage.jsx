@@ -6,6 +6,9 @@ import {
   MessageSquare, Send, Edit3, Trash2
 } from 'lucide-react';
 
+
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://backendbizness.onrender.com/api';
+
 const IssueDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -40,9 +43,9 @@ const IssueDetailPage = () => {
 
     try {
       const token = localStorage.getItem('accessToken');
-      const response = await axios.get(`http://localhost:5000/api/issues/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`${BASE_URL}/issues/${id}`, {
+  headers: { Authorization: `Bearer ${token}` }
+});
       
       const issueData = response.data.data.issue;
       setIssue(issueData);
@@ -76,11 +79,11 @@ const IssueDetailPage = () => {
     setIsSubmittingComment(true);
     try {
       const token = localStorage.getItem('accessToken');
-      await axios.post(`http://localhost:5000/api/issues/${id}/comments`, {
-        message: newComment
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.post(`${BASE_URL}/issues/${id}/comments`, {
+  message: newComment
+}, {
+  headers: { Authorization: `Bearer ${token}` }
+});
 
       setNewComment('');
       fetchIssue(); // Refresh issue data to get new comment
@@ -98,9 +101,9 @@ const IssueDetailPage = () => {
 
     try {
       const token = localStorage.getItem('accessToken');
-      await axios.put(`http://localhost:5000/api/issues/${id}`, formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.put(`${BASE_URL}/issues/${id}`, formData, {
+  headers: { Authorization: `Bearer ${token}` }
+});
 
       setShowEditModal(false);
       fetchIssue(); // Refresh issue data
@@ -117,9 +120,11 @@ const IssueDetailPage = () => {
 
     try {
       const token = localStorage.getItem('accessToken');
-      await axios.delete(`http://localhost:5000/api/issues/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.delete(`${BASE_URL}/issues/${id}`, {
+  headers: { Authorization: `Bearer ${token}` }
+});
+
+
 
       navigate('/issues');
     } catch (err) {

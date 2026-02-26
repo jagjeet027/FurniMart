@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import Header from './components/Header';
 import SurakshitSafar from './cargo/Surakshitsafar.jsx'
-import FurniturePlatform from './furniGlobalHub.jsx'
-import ProfilePage from '../src/post/Profilepage.jsx';
+import FurniturePlatform from './FurniGlobalHub.jsx'
+import ProfilePage from '../src/post/Profilepage.jsx'
 import LoginPage from './components/LoginPage';
 import './index.css';
 import Footer from './components/Footer';

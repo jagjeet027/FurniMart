@@ -9,6 +9,8 @@ import Sidebar from './Sidebar';
 import ProductUploadForm from './ProductUploadForm';
 import api from '../../axios/axiosInstance' ; // Make sure this path is correct for your project structure
 
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://backendbizness.onrender.com/api';
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -67,11 +69,7 @@ const Dashboard = () => {
       }
   
       try {
-        const token = localStorage.getItem('accessToken');
-        const response = await api.get(`http://localhost:5000/api/manufacturers/${user._id}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          }
+        const response = await api.get(`${BASE_URL}/manufacturers/${user._id}`, {
         });
         
         setManufacturerData(response.data.data.manufacturer);
@@ -121,9 +119,8 @@ const Dashboard = () => {
       });
       
       // Post the data to your API
-      const response = await api.post('http://localhost:5000/api/products', productData, {
+        const response = await api.post(`${BASE_URL}/products`, productData, {
         headers: {
-          Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
         },
       });

@@ -1,7 +1,8 @@
 // frontend/src/finance/services/apiService.jsx - UPDATED VERSION
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api';
+// ❌ WRONG
+const API_BASE_URL = i`${import.meta.env.VITE_BACKEND_URL}/api` || 'https://backendbizness.onrender.com/api';
 
 console.log('🔌 API Base URL:', API_BASE_URL);
 
