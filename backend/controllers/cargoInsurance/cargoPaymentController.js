@@ -1,8 +1,8 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
-import { Company } from '../../models/cargo/Company.js';
+import { Company } from '../../models/cargo/company.js';
 import { LoanProvider } from '../../models/cargo/loanProvider.js';
-import { Payment } from '../../models/cargo/Payment.js';
+import { Payment } from '../../models/cargo/payment.js';
 
 export const verifyCargoPayment = async (req, res) => {
   try {

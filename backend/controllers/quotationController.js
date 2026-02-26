@@ -1,7 +1,7 @@
 // controllers/quotationController.js
 import asyncHandler from 'express-async-handler';
 import { Quotation } from '../models/quotation.js';
-import { Post } from '../models/post.js';
+import { post } from '../models/post.js';
 
 // ✅ FIXED: Create quotation (manufacturers only)
 export const createQuotation = asyncHandler(async (req, res) => {

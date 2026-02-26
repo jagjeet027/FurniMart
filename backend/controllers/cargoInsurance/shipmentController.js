@@ -1,4 +1,4 @@
-import { Shipment } from '../../models/cargo/Shipment.js';
+import { Shipment } from '../../models/cargo/shipment.js';
 
 // Search shipments
 export const searchShipments = async (req, res) => {

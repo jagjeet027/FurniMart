@@ -1,6 +1,6 @@
 // controllers/cargo/companyController.js
-import { Company } from '../../models/cargo/Company.js';
-import { Payment } from '../../models/cargo/Payment.js';
+import { Company } from '../../models/cargo/company.js';
+import { Payment } from '../../models/cargo/payment.js';
 import { User } from '../../models/Users.js';
 
 // Get all companies with filters
