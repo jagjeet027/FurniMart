@@ -36,7 +36,7 @@ const MobileChatModal = ({ isOpen, onClose, product, userInfo }) => {
   // Initialize socket connection
   useEffect(() => {
     if (isOpen && !socket) {
-      const newSocket = io(process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000');
+      const newSocket = io(import.meta.env.VITE_BACKEND_URL);
       
       newSocket.on('connect', () => {
         console.log('Connected to socket server');

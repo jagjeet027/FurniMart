@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL + '/api';
+
 const IssueDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -39,7 +41,8 @@ const IssueDetailPage = () => {
     }
 
     try {
-      const response = await axios.get(`http://localhost:5000/api/issues/${id}`, {
+      const token = localStorage.getItem('accessToken');
+      const response = await axios.get(`${API_BASE_URL}/issues/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -73,14 +76,15 @@ const IssueDetailPage = () => {
 
     setIsSubmittingComment(true);
     try {
-      await axios.post(`http://localhost:5000/api/issues/${id}/comments`, {
+      const token = localStorage.getItem('accessToken');
+      await axios.post(`${API_BASE_URL}/issues/${id}/comments`, {
         message: newComment
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
       setNewComment('');
-      fetchIssue(); // Refresh issue data to get new comment
+      fetchIssue();
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to add comment');
     } finally {
@@ -95,12 +99,12 @@ const IssueDetailPage = () => {
 
     try {
       const token = localStorage.getItem('accessToken');
-      await axios.put(`http://localhost:5000/api/issues/${id}`, formData, {
+      await axios.put(`${API_BASE_URL}/issues/${id}`, formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
       setShowEditModal(false);
-      fetchIssue(); // Refresh issue data
+      fetchIssue();
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to update issue');
     } finally {
@@ -114,7 +118,7 @@ const IssueDetailPage = () => {
 
     try {
       const token = localStorage.getItem('accessToken');
-      await axios.delete(`http://localhost:5000/api/issues/${id}`, {
+      await axios.delete(`${API_BASE_URL}/issues/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -231,7 +235,6 @@ const IssueDetailPage = () => {
                   <StatusIcon size={12} className="mr-1" />
                   {issue.status.charAt(0).toUpperCase() + issue.status.slice(1).replace('-', ' ')}
                 </span>
-                
               </div>
             </div>
             
@@ -357,7 +360,6 @@ const IssueDetailPage = () => {
                   {issue.status.charAt(0).toUpperCase() + issue.status.slice(1).replace('-', ' ')}
                 </span>
               </div>
-              
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Category:</span>
                 <span className="text-sm font-medium capitalize">{issue.category}</span>
