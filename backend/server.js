@@ -141,18 +141,20 @@ app.use(helmet({
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : [];
+  : ['https://furnimart-1.onrender.com']; // fallback hardcode karo
 
 app.use(
   cors({
     origin: function(origin, callback) {
-      // Development mein sab allow
-      if (process.env.NODE_ENV === 'development') {
+      // No origin = same origin or Postman = allow
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      // Production mein sirf allowed origins
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
+      
+      // Development check hatao ya alag karo
+      console.log('CORS blocked for origin:', origin);
       return callback(new Error('CORS blocked'), false);
     },
     credentials: true,
@@ -160,6 +162,7 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   })
 );
+
 
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
