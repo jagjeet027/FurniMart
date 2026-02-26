@@ -1,5 +1,5 @@
 import asyncHandler from 'express-async-handler';
-import { Post } from '../models/Post.js';
+import { Post } from '../models/post.js';
 import { Quotation } from '../models/quotation.js';
 import mongoose from 'mongoose';
 
