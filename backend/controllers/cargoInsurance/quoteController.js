@@ -1,4 +1,4 @@
-import { Quote } from '../../models/cargo/quote.js';
+import { Quote } from '../../models/cargo/Quote.js';
 
 // Get quotes for shipment
 export const getQuotesForShipment = async (req, res) => {
