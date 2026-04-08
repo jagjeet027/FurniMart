@@ -1,98 +1,96 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import Header from './components/Header';
-import FurnitureMarketplace from './FurnitureMarketplace';
-import ServiceSection from './components/ServiceSection';
-import Banner from './components/Banner';
-import CardSection from './components/CardSection';
+import SurakshitSafar from './cargo/Surakshitsafar.jsx'
+import FurniturePlatform from './FurniGlobalHub.jsx'
+import ProfilePage from '../src/post/Profilepage.jsx'
 import LoginPage from './components/LoginPage';
 import './index.css';
 import Footer from './components/Footer';
 import SignupPage from './components/SignUpPage';
-import FurnitureShowcase from './components/FurnitureShowcase';
-// import Map from './components/Map';
-import CategoryList from "./components/CategoryList";
-import CategoryDetail from "./components/CategoryDetails";
 import { AuthProvider } from './contexts/AuthContext';
-import Dashboard from './components/manufacturer/Dashboard';
+import { LoanProvider } from './contexts/LoanContext'; // Add this import
+import Dashboard from './components/manufacturer/Dashboard';    
 import PrivateRoute from './components/PrivateRoute';
+import ProductCard from './components/ProductCardDetails.jsx';
 import ProductDetailPage from './components/ProductDetailPage';
 import ManufacturerRegistration from './components/manufacturer/ManufacturerRegistration';
 import PremiumFeatures from './components/manufacturer/PremiumFeatures'
-import HomePage from './services/AuthService.jsx';
-import Profile from './components/manufacturer/Profile';
-import Recruitment from './components/Recruitment/pages/Recruitment';
-import StaffHiring from './components/Recruitment/pages/StaffHiring'
+import IssuesPage from './components/manufacturer/IdeaPage.jsx';
+import IssueDetailPage from './components/manufacturer/IdeaDetailPage.jsx';
 import Faq from './components/Faqsection/Faq.jsx'
-import Orders from './pages/CheckoutPage.jsx'
-import OrderTrackingPage from './pages/OrderTrackingPage.jsx';
-import ChatScreen from './components/userDashBoard/ChatScreen.jsx';
+import Orders from './orderpages/CheckoutPage.jsx'
+import OrderTrackingPage from './orderpages/OrderTrackingPage.jsx';
 import ProductManagement from './components/manufacturer/ProductManagement';
 import EditProduct from './components/manufacturer/EditProduct.jsx';
-import CheckoutPage from './pages/CheckoutPage';
-import Admin from './components/admin/Admin.jsx';
-import ManufactDetailsAdmin from './components/admin/ManufactDetailsAdmin.jsx';
-import Userdashboard from './components/admin/Userdashboard.jsx';
+import CheckoutPage from './orderpages/CheckoutPage.jsx';
+import WishlistPage from './orderpages/wishlistPage.jsx';
+import CategoryProductsPage from './components/userDashBoard/CategoryProductsPage.jsx';
+import CategoriesOverviewPage from './components/userDashBoard/CategoriesOverviewPage.jsx';
+import APIDebugComponent from './services/APIDebugComponent.jsx';
+import IdeaSharingPlatform from './components/userDashBoard/IdeaSharingPlatform.jsx';
+import ForgotPasswordPage from './components/userDashBoard/ForgotPasswordPage.jsx';
+import ResetPasswordPage from './components/userDashBoard/ResetPasswordPage.jsx';
+import SearchResultsPage from './components/userDashBoard/SearchResultsPage.jsx';
 
-// import ChatBot from './components/ChatBot.jsx';
+import StaffHiring from './career/StaffHiring.jsx';
+import JobApplicationForm from './career/JobApplicationForm.jsx';
+import RegisterIndividuals from './career/RegisterIndividuals.jsx';
+import OrganizationRegister from './career/OrganizationRegister.jsx';
+import NotFoundPage from './components/NotFound';
+import ChatHistory from './components/userDashBoard/ChatHistory.jsx';
 
-// import { CartProvider, Navbar,Home } from '../src/components/Ecomerse.jsx';
+// finance imports
+import HomePage from '.././src/finance/pages/HomePage';
+import SearchPage from '.././src/finance/pages/SearchPage';
+import ComparePage from '.././src/finance/pages/ComparePage';
+import LoanDetailsPage from '.././src/finance/pages/LoanDetailsPage';
+import EligibilityPage from '.././src/finance/pages/EligibilityPage';
+import AddOrganizationPage from '.././src/finance/pages/AddOrganizationPage';
+import OrganizationManagementPage from '.././src/finance/pages/OrganizationManagementPage';
+import AdminPanel from '../src/finance/components/AdminPanel';
 
-import { socket } from "./services/socketService";
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || http//localhost:5000; 
 
 const App = () => {
   const location = useLocation();
-  const [issues, setIssues] = useState({});
-  const [messages, setMessages] = useState([]);
-
-  useEffect(() => {
-    // Socket event handlers
-    const handleSupportIssues = (data) => setIssues(data);
-    const handleIssueResponse = (data) => {
-      setMessages((prev) => [ 
-        ...prev,
-        {
-          type: "response",
-          title: data.issue,
-          content: data.response,
-        },
-      ]);
-    };
-    socket.on("supportIssues", handleSupportIssues);
-    socket.on("issueResponse", handleIssueResponse);
-    return () => {
-      socket.off("supportIssues", handleSupportIssues);
-      socket.off("issueResponse", handleIssueResponse);
-    };
-  }, []);
-
-  const handleIssueClick = (key) => {
-    setMessages((prev) => [
-      ...prev,
-      {
-        type: "issue",
-        title: issues[key].title,
-        content: issues[key].title,
-      },
-    ]);
-    socket.emit("selectIssue", key);
-  };
 
   // Paths that should not show header/footer
   const noHeaderFooterPaths = [
-    '/admin',
-    '/admin/manufacturer/dashboard',
-    '/userdashboard',
-
-    
+    '/login',
+    '/signup',
+    '/forgot-password',
+    '/reset-password',
+    '/checkout',
+    '/ideas',
+    '/idea/:id',
     '/manufacturer/register',
     '/manufacturer/dashboard',
     '/manufactdetails',
+    '/cargo-insurance',
     '/inventory',
     '/order',
     '/premium',
     '/manufacturer/faqsection',
     '/products/management',
+    '/categories/management',
+    '/new-idea',
+    '/user-profile',
+    '/staff-hiring',
+    '/careers',
+    '/jobs/:jobId/apply',
+    '/register/individual-applicant',
+    '/register/organization-applicant',
+
+    '/finance',
+    '/search',
+    '/compare',
+    '/loan/:id',
+    '/eligibility',
+    '/add-organization',
+    '/admin/organizations',
+    '/admin',
+    
   ];
 
   // Improved check for paths that should hide header/footer
@@ -107,76 +105,104 @@ const App = () => {
     }
   );
 
-  // Special check for product management vs product details
   const isProductManagementPath = location.pathname === '/products' || location.pathname.startsWith('/products/management');
   const isProductDetailsPath = location.pathname.match(/^\/products\/[^/]+$/) && !isProductManagementPath;
 
-  // Final decision on header/footer visibility
   const hideHeaderFooter = shouldHideHeaderFooter && !isProductDetailsPath;
-
-  // Check if current path should have mobile footer
   const shouldShowMobileFooter = !hideHeaderFooter && !location.pathname.startsWith('/manufacturer/dashboard');
 
   return (
-    <AuthProvider>
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        {/* Header */}
-        {!hideHeaderFooter && <Header />}
-        
-        {/* Main Content */}
-        <main className={`flex-1 ${shouldShowMobileFooter ? 'pb-16 md:pb-0' : ''}`}>
-          <Routes>
-            <Route path="/chatsupport" element={<Navigate to="/chat" />} />
-            <Route path="/chat" element={<ChatScreen issues={issues} messages={messages} onIssueSelect={handleIssueClick} />} />
-            <Route path="/" element={
-              <div className="space-y-0">
-                <FurnitureMarketplace />
-                <Recruitment/>
-                <FurnitureShowcase />
-                <ServiceSection />
-                <Banner />
-                <CardSection />
-                <Faq/>
-              </div>
-            } />
-        <Route path="/admin/*" element={<Admin />} />
-        <Route path="/manufactdetails" element ={<ManufactDetailsAdmin/>}/>
-        <Route path="/userdashboard/*" element={<Userdashboard />} />
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {!hideHeaderFooter && <Header />}
+      <main className={`flex-1 ${shouldShowMobileFooter ? 'pb-16 md:pb-0' : ''}`}>
+        <Routes>
+          {/* AUTHENTICATION ROUTES - First Priority */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage/>} />
+          <Route path="/reset-password/:token" element={<ResetPasswordPage/>} />
+
+          <Route path="/user-profile" element={<ProfilePage/>}/>
+          <Route path="/search-results" element={<SearchResultsPage />} />
+          <Route path="/checkout" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
+          <Route path="/wishlist" element={<PrivateRoute><WishlistPage /></PrivateRoute>} />
+          <Route path="/order-tracking/:orderId" element={<PrivateRoute><OrderTrackingPage /></PrivateRoute>} />
+          <Route path="/chat-history" element={<ChatHistory />} />
+          
+          {/* HOME PAGE ROUTE */}
+          <Route path="/" element={
+            <div className="space-y-0">
+              <FurniturePlatform />              
+            </div>
+          } />
+          <Route path="/cargo-insurance" element={<SurakshitSafar />} />
+          {/* finance route */}
+
+          <Route path="/finance" element={<HomePage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/compare" element={<ComparePage />} />
+          <Route path="/loan/:id" element={<LoanDetailsPage />} />
+          <Route path="/eligibility" element={<EligibilityPage />} />
+          <Route path="/add-organization" element={<AddOrganizationPage />} />
+          <Route path="/admin/organizations" element={<OrganizationManagementPage />} />
+          <Route path="/admin" element={<AdminPanel />} />
 
 
+          <Route path='/products' element={<ProductCard />}  />
+          <Route path ="/new-idea" element={<PrivateRoute><IdeaSharingPlatform/></PrivateRoute>} />
+          <Route path="/products/management" element={<PrivateRoute><ProductManagement /></PrivateRoute>} />
+          
+          {/* CATEGORIES ROUTES */}
+          <Route path="/categories" element={<Navigate to="/categories/overview" replace />} />
+          <Route path="/categories/overview" element={<CategoriesOverviewPage />} />
+          <Route path="/categories/:categoryId/products" element={<CategoryProductsPage />} />
+          <Route path="/category/:id" element={<Navigate to="/categories/:id/products" replace />} />
+          
+          {/* FAQ AND ORDER ROUTES */}
+          <Route path="/order" element={<Orders />} />
+          <Route path="/faqsection" element={<Faq />} />
+          
+          {/* MANUFACTURER ROUTES */}
+          <Route path="/manufacturer/register" element={<ManufacturerRegistration />} />
+          <Route path="/manufacturer/dashboard" element={<PrivateRoute><Dashboard /> </PrivateRoute>}/>
+          <Route path="/premium" element={<PrivateRoute><PremiumFeatures /></PrivateRoute>}/>
+          
+          {/* IDEAS ROUTES */}
+          <Route path="/ideas" element={<PrivateRoute><IssuesPage /></PrivateRoute>} />
+          <Route path="/idea/:id" element={<PrivateRoute><IssueDetailPage /></PrivateRoute>} />
 
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/profile" element={<Profile/>} />
-            <Route path="/order" element={<Orders />} />
-            <Route path="/products" element={<ProductManagement />} />
-            <Route path="/categories" element={<CategoryList />} />
-            <Route path="/category/:id" element={<CategoryDetail />} />
-            <Route path="/products/:id/edit" element={<EditProduct />} />
-            <Route path="/faqsection" element={<Faq />} />
-            <Route path="/products/:id" element={<ProductDetailPage />} />
-            <Route path="/manufacturer/register" element={<ManufacturerRegistration />} />
-            <Route path="/furniture" element={<FurnitureMarketplace />} />
-            <Route path="/manufacturer/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>}/>
-            <Route path="/hompageStaff" element={<HomePage />} />
-            <Route path="/premium" element={<PremiumFeatures />}/>
-            <Route path="/staff/dashboard"  element={<StaffHiring/>}/>
-            <Route path="/checkout" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
-            <Route path="/order-tracking" element={<OrderTrackingPage />} />
-          </Routes>
-        </main>
+          {/* DEBUG ROUTE */}
+          <Route path="/debug-api" element={<APIDebugComponent />} />
+          
+          {/* DYNAMIC PRODUCT ROUTES - Must come LAST */}
+          <Route path="/products" element={<ProductManagement />} />
+          <Route path="/products/:id/edit" element={<PrivateRoute><EditProduct /></PrivateRoute>} />
+          <Route path="/products/:id" element={<ProductDetailPage />} />
 
-        {/* Footer */}
-        {!hideHeaderFooter && <Footer />}
-      </div>
-    </AuthProvider>
+          {/* CAREER ROUTES */}
+          <Route path="/staff-hiring" element={<StaffHiring />} /> 
+          <Route path="/careers" element={<StaffHiring />} />
+          <Route path="/jobs/:jobId/apply" element={<JobApplicationForm />} />
+          <Route path="/register/individual-applicant" element={<RegisterIndividuals/>}/>
+          <Route path="register/organization-applicant" element={<OrganizationRegister/>} />
+
+          {/* 404 NOT FOUND ROUTE - Must be LAST */}
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </main>
+
+      {/* Footer */}
+      {!hideHeaderFooter && <Footer />}
+    </div>
   );
 };
 
 const AppWrapper = () => (
   <Router>
     <AuthProvider>
-      <App />
+      <LoanProvider>
+        <App />
+      </LoanProvider>
     </AuthProvider>
   </Router>
 );

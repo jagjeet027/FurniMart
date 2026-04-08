@@ -3,6 +3,8 @@ import {
   getAllCategories, 
   getCategoryById, 
   createCategory,
+  updateCategory,      // ADD THIS
+  deleteCategory,      // ADD THIS
   initializeDefaultCategories
 } from "../controllers/categoryController.js";
 
@@ -14,6 +16,8 @@ router.get("/initialize", initializeDefaultCategories);
 router.get("/:id", getCategoryById);
 
 // Protected routes (admin only)
-router.post("/",  createCategory);
+router.post("/", createCategory);
+router.put("/:id", updateCategory);     // ADD THIS
+router.delete("/:id", deleteCategory);  // ADD THIS
 
 export default router;

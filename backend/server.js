@@ -1,125 +1,229 @@
+
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
 import mongoSanitize from 'express-mongo-sanitize';
 import xss from 'xss-clean';
 import compression from 'compression';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
-import { createServer } from 'http';
+import http from 'http';
+import { Server } from 'socket.io';
+import fs from 'fs';
+import path from 'path';
+import cookieParser from 'cookie-parser';
+import { fileURLToPath } from 'url';
 import connectDB from './db/db.js';
-import { setupSocket } from './config/socketConfig.js';
-import { predefinedIssues } from './data/issues.js';
+import Razorpay from 'razorpay';
 
 import userRoutes from './routes/userRoutes.js';
 import manufacturerRoutes from './routes/manufacturerRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
+import issueRoutes from './routes/issueRoute.js';
+import chatRoutes from './routes/chatRoutes.js';
+import careerRoutes from './routes/careerRoutes/careerRoutes.js';
+import registrationRoutes from './routes/careerRoutes/registration.js';
+import organizationRoutes from './routes/careerRoutes/organizationRoutes.js';
+import postRoutes from './routes/postRoutes.js';
+// Import cargo routes
+import companyRoutes from './routes/cargo/companyRoutes.js';
+import shipmentRoutes from './routes/cargo/shipmentRoutes.js';
+import quoteRoutes from './routes/cargo/quoteRoutes.js';
+import cargoAdminRoutes from './routes/cargo/cargoAdminRoutes.js';
+import cargoPaymentRoutes from './routes/cargo/cargoPaymentRoutes.js';
+import loanProviderRoutes from './routes/cargo/loanProviderRoutes.js';
 
-// Load env vars
+// import finance routes
+import financeRoutes from './routes/finance/financeRoutes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 dotenv.config();
 
+global.razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET
+});
+
 const app = express();
-// After creating the server
-const server = createServer(app);
-const io = setupSocket(server);
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: process.env.ALLOWED_ORIGINS?.split(',').map(origin => origin.trim()) || [],
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
+
+const onlineUsers = new Map();
+
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+  
+  socket.on('user-join', (userData) => {
+    const { userId, userType, userName } = userData;
+    onlineUsers.set(socket.id, { userId, userType, userName, socketId: socket.id });
+    console.log(`${userName} (${userType}) joined`);
+    io.emit('online-users-count', onlineUsers.size);
+  });
+  
+  socket.on('join-chat', (chatRoomId) => {
+    socket.join(chatRoomId);
+    console.log(`Socket ${socket.id} joined chat room: ${chatRoomId}`);
+  });
+  
+  socket.on('leave-chat', (chatRoomId) => {
+    socket.leave(chatRoomId);
+    console.log(`Socket ${socket.id} left chat room: ${chatRoomId}`);
+  });
+  
+  socket.on('typing-start', (data) => {
+    socket.to(data.chatRoomId).emit('user-typing', {
+      userId: data.userId,
+      userName: data.userName,
+      isTyping: true
+    });
+  });
+  
+  socket.on('typing-stop', (data) => {
+    socket.to(data.chatRoomId).emit('user-typing', {
+      userId: data.userId,
+      userName: data.userName,
+      isTyping: false
+    });
+  });
+  
+  socket.on('message-read', (data) => {
+    socket.to(data.chatRoomId).emit('message-read-receipt', {
+      messageId: data.messageId,
+      readBy: data.userId
+    });
+  });
+  
+  socket.on('new-message', (data) => {
+    socket.to(data.chatRoomId).emit('message-received', data);
+  });
+  
+  socket.on('disconnect', () => {
+    const user = onlineUsers.get(socket.id);
+    if (user) {
+      console.log(`${user.userName} (${user.userType}) disconnected`);
+      onlineUsers.delete(socket.id);
+      io.emit('online-users-count', onlineUsers.size);
+    }
+  });
+});
+
 app.set('io', io);
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
 
-// Setup Socket.io
-// const io = setupSocket(server);
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
 
-// Security Middleware
-app.use(helmet());
-
-// CORS Configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : ['https://furnimart-1.onrender.com']; // fallback hardcode karo
 
 app.use(
   cors({
     origin: function(origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
+      // No origin = same origin or Postman = allow
       if (!origin) return callback(null, true);
       
-      if (allowedOrigins.indexOf(origin) === -1) {
-        const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-        return callback(new Error(msg), false);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
       }
-      return callback(null, true);
+      
+      // Development check hatao ya alag karo
+      console.log('CORS blocked for origin:', origin);
+      return callback(new Error('CORS blocked'), false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-    exposedHeaders: ['Content-Range', 'X-Content-Range']
   })
 );
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, 
-  max: 100, 
-  message: 'Too many requests from this IP, please try again later.'
-});
 
-// Apply rate limiter to API routes
-app.use('/api/', limiter);
-
-// Body parser
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// Request timeout
-app.use((req, res, next) => {
-  res.setTimeout(30000, () => {
-    res.status(408).send('Request Timeout');
-  });
-  next();
-});
-
-// Security middleware
+app.use(cookieParser());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(mongoSanitize());
 app.use(xss());
 app.use(compression());
 
-// Logging
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
 }
 
-// API Routes
+const uploadDir = './uploads/chat-images';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+app.use('/uploads', express.static('uploads'));
+
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'Server is running',
+    timestamp: new Date().toISOString(),
+    onlineUsers: onlineUsers.size,
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 app.use('/api/users', userRoutes);
 app.use('/api/manufacturers', manufacturerRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/issues', issueRoutes);
+app.use('/api/chats', chatRoutes);
+app.use('/api/careers', careerRoutes);
+app.use('/api/registration', registrationRoutes);
+app.use('/api/organizations', organizationRoutes);
+app.use('/api/posts', postRoutes);
+app.use('/api/cargo/companies', companyRoutes);
+app.use('/api/cargo/shipments', shipmentRoutes);
+app.use('/api/cargo/quotes', quoteRoutes);
+app.use('/api/cargo/payments', cargoPaymentRoutes);
+app.use('/api/cargo/admin', cargoAdminRoutes);
+app.use('/api/cargo/loan-providers', loanProviderRoutes);
+app.use('/api/finance', financeRoutes);
 
-app.post('/api/chat', (req, res) => {
-  const { userInput } = req.body;
-  
-  // Simple matching algorithm - can be enhanced with fuzzy search
-  const matchedIssue = predefinedIssues.find(item => 
-    item.issue.toLowerCase().includes(userInput.toLowerCase())
-  );
-  
-  if (matchedIssue) {
-    res.json({ response: matchedIssue.response });
-  } else {
-    res.json({ 
-      response: "I'm sorry, I couldn't find a matching solution. Please try rephrasing or contact support."
-    });
-  }
-});
 
-// Global Error Handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Error:', err.message);
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.error('Stack:', err.stack);
+  }
+  
   res.status(err.status || 500).json({
     status: 'error',
     message: err.message || 'Internal server error',
@@ -127,37 +231,52 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Handle 404
-app.use((req, res) => {
+app.use('*', (req, res) => {
   res.status(404).json({
     status: 'error',
-    message: 'Route not found'
+    message: `Route ${req.originalUrl} not found`
   });
 });
 
-// Connect to Database
 connectDB();
 
-// Start Server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
 });
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-  console.log('UNHANDLED REJECTION! 💥 Shutting down...');
-  console.log(err.name, err.message);
+const gracefulShutdown = (signal) => {
+  console.log(`\n${signal} received. Shutting down gracefully...`);
   server.close(() => {
-    process.exit(1);
+    console.log('HTTP server closed.');
+    process.exit(0);
   });
+  setTimeout(() => {
+    console.error('Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('unhandledRejection', (err) => {
+  console.error('UNHANDLED REJECTION!');
+  console.error('Error:', err.name, err.message);
+  if (process.env.NODE_ENV === 'development') {
+    console.error('Stack:', err.stack);
+  }
+  gracefulShutdown('UNHANDLED REJECTION');
 });
 
-// Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
-  console.log('UNCAUGHT EXCEPTION! 💥 Shutting down...');
-  console.log(err.name, err.message);
+  console.error('UNCAUGHT EXCEPTION! Shutting down...');
+  console.error('Error:', err.name, err.message);
+  if (process.env.NODE_ENV === 'development') {
+    console.error('Stack:', err.stack);
+  }
   process.exit(1);
 });
 
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+export { app, io, server };
 export default app;

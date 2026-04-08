@@ -5,7 +5,7 @@ const manufacturerSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: false  // Making it optional since it's not being set in your current flow
+    required: [true, 'User ID is required']
   },
   businessName: {
     type: String,
@@ -14,7 +14,6 @@ const manufacturerSchema = new mongoose.Schema({
     minlength: [2, 'Business name must be at least 2 characters'],
     maxlength: [100, 'Business name cannot exceed 100 characters']
   },
-
   businessType: {
     type: String,
     required: [true, 'Business type is required'],
@@ -154,13 +153,15 @@ const manufacturerSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-manufacturerSchema.index({ userId: 1 }, { unique: false });
+// Index for faster queries - userId should be unique per user
+manufacturerSchema.index({ userId: 1 }, { unique: true });
 
-// Your existing virtuals and middleware
+// Virtual for full address
 manufacturerSchema.virtual('fullAddress').get(function() {
   return `${this.address.streetAddress}, ${this.address.city}, ${this.address.state} ${this.address.postalCode}, ${this.address.country}`;
 });
 
+// Pre-save middleware for validation
 manufacturerSchema.pre('save', async function(next) {
   if (!this.isModified()) return next();
 
@@ -173,5 +174,4 @@ manufacturerSchema.pre('save', async function(next) {
 
 const Manufacturer = mongoose.models.Manufacturer || mongoose.model('Manufacturer', manufacturerSchema);
 
-
-export  {Manufacturer};
+export { Manufacturer };

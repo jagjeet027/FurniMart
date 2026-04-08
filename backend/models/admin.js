@@ -1,36 +1,72 @@
-const mongoose = require("mongoose");
+import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
-const AdminSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: [true, "Name is required"],
-      trim: true, // Removes extra spaces
-    },
-    mobile: {
-      type: String, 
-      match: [/^\d{10}$/, "Please provide a valid 10-digit mobile number"],
-    },
-    email: {
-      type: String,
-      required: [true, "Email is required"],
-      unique: true,
-      match: [/^\S+@\S+\.\S+$/, "Please provide a valid email address"],
-    },
-    password: {
-      type: String,
-      required: [true, "Password is required"],
-      minlength: [6, "Password must be at least 6 characters long"],
-    },
-    phone: {
-      type:Number,
-      required:true
-
-    }
+const adminSchema = new mongoose.Schema({
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true
   },
-  { timestamps: true });
+  adminId: {
+    type: String,
+    required: true,
+    unique: true,
+    default: "ADmin820"
+  },
+  password: {
+    type: String,
+    required: true,
+    minlength: 6
+  },
+  secretCode: {
+    type: String,
+    required: true
+  },
+  isRegistered: {
+    type: Boolean,
+    default: false
+  }
+}, {
+  timestamps: true
+});
 
+// Pre-save middleware to hash password
+adminSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
-const Admin = mongoose.model("Admin", AdminSchema);
+// Pre-save middleware to hash secret code
+adminSchema.pre('save', async function(next) {
+  if (!this.isModified('secretCode')) return next();
+  
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.secretCode = await bcrypt.hash(this.secretCode, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
-module.exports = Admin;
+// Method to compare password
+adminSchema.methods.comparePassword = async function(candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
+};
+
+// Method to compare secret code
+adminSchema.methods.compareSecretCode = async function(candidateSecretCode) {
+  return await bcrypt.compare(candidateSecretCode, this.secretCode);
+};
+
+const Admin = mongoose.model('Admin', adminSchema);
+export default Admin;

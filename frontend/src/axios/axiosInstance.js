@@ -1,28 +1,108 @@
+
 import axios from "axios";
 
-// Create axios instance
 const api = axios.create({
-  baseURL: `${import.meta.env.VITE_BACKEND_URL || "http://localhost:5000"}/api`,
+baseURL:import.meta.env.VITE_API_URL ?? 'https://backendbizness.onrender.com/api',
   headers: {
     "Content-Type": "application/json",
     "Accept": "application/json",
   },
   withCredentials: true,
-  timeout: 10000, // 10 second timeout
+  timeout: 10000,
 });
 
-// Add a request interceptor to handle token injection
-api.interceptors.request.use(
-  (config) => {
-    // Always get the latest token from localStorage
-    const currentToken = localStorage.getItem("accessToken"); // Changed from "token" to "accessToken"
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
+// ⚡ FIXED: Token expiry check - only check if truly expired
+const isTokenExpired = (token) => {
+  if (!token) return true;
+  
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const exp = payload.exp * 1000;
+    const now = Date.now();
     
+    // ✅ FIXED: Only consider expired if ACTUALLY expired (no buffer)
+    // This prevents unnecessary refresh calls
+    return exp < now;
+  } catch (error) {
+    console.error('Error parsing token:', error);
+    return true;
+  }
+};
+
+// Helper to refresh token
+const refreshAccessToken = async () => {
+  try {
+    console.log('🔄 Refreshing access token...');
+    
+    const response = await axios.post(
+      `${import.meta.env.VITE_API_URL ?? 'https://backendbizness.onrender.com/api'}/users/refresh-token`,
+      {},
+      {
+        withCredentials: true,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+    
+    if (response.data.success && response.data.accessToken) {
+      const newToken = response.data.accessToken;
+      localStorage.setItem('accessToken', newToken);
+      console.log('✅ Token refreshed successfully');
+      return newToken;
+    }
+    
+    throw new Error('Invalid refresh response');
+  } catch (error) {
+    console.error('❌ Token refresh failed:', error);
+    throw error;
+  }
+};
+
+// Handle auth failure
+const handleAuthFailure = () => {
+  console.log('🚪 Logging out user due to auth failure...');
+  
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("userData");
+  localStorage.removeItem("refreshToken");
+  
+  delete api.defaults.headers.common['Authorization'];
+  
+  if (typeof window !== 'undefined') {
+    setTimeout(() => {
+      window.location.href = '/login';
+    }, 100);
+  }
+};
+
+// ⚡ FIXED: Request interceptor - NO preemptive refresh
+api.interceptors.request.use(
+  async (config) => {
+    // Skip token check for refresh-token endpoint
+    if (config.url.includes('/refresh-token')) {
+      return config;
+    }
+
+    const currentToken = localStorage.getItem("accessToken");
+    
+    // ✅ FIXED: Only add token, don't check expiry here
+    // Let the server handle token validation
     if (currentToken) {
       config.headers.Authorization = `Bearer ${currentToken}`;
     }
-    
-    // Ensure CORS headers are properly set
-    config.headers["X-Requested-With"] = "XMLHttpRequest";
     
     return config;
   },
@@ -31,7 +111,7 @@ api.interceptors.request.use(
   }
 );
 
-// Add a response interceptor to handle common errors and token refresh
+// ⚡ FIXED: Response interceptor - Only refresh on 401
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -46,72 +126,54 @@ api.interceptors.response.use(
       });
     }
 
-    // Handle 401 errors (Unauthorized)
+    // ✅ FIXED: Only handle 401 errors from server
     if (error.response.status === 401 && !originalRequest._retry) {
+      
+      // If refresh token endpoint failed, logout
+      if (originalRequest.url.includes('/refresh-token')) {
+        console.error('Refresh token invalid or expired - logging out');
+        handleAuthFailure();
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
 
-      try {
-        // Try to refresh the token
-        const refreshResponse = await api.post('/auth/refresh-token');
-        
-        if (refreshResponse.data.accessToken) {
-          // Update the token in localStorage
-          localStorage.setItem('accessToken', refreshResponse.data.accessToken);
-          
-          // Update the Authorization header for this request
-          originalRequest.headers.Authorization = `Bearer ${refreshResponse.data.accessToken}`;
-          
-          // Retry the original request
-          return api(originalRequest);
-        } else {
-          // Refresh failed, redirect to login
-          handleAuthFailure();
-        }
-      } catch (refreshError) {
-        // Refresh failed, redirect to login
-        console.error('Token refresh failed:', refreshError);
-        handleAuthFailure();
+      // Queue requests while refreshing
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then(token => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch(err => {
+            return Promise.reject(err);
+          });
       }
-    }
 
-    // Handle other specific error cases
-    switch (error.response.status) {
-      case 401:
-        console.error("Unauthorized access");
+      isRefreshing = true;
+
+      try {
+        const newAccessToken = await refreshAccessToken();
+        
+        api.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        
+        processQueue(null, newAccessToken);
+        isRefreshing = false;
+        
+        return api(originalRequest);
+      } catch (refreshError) {
+        processQueue(refreshError, null);
+        isRefreshing = false;
         handleAuthFailure();
-        break;
-      case 403:
-        console.error("Access forbidden");
-        break;
-      case 429:
-        console.error("Too many requests");
-        break;
-      case 500:
-        console.error("Server error");
-        break;
-      default:
-        console.error("Request failed:", error.response.data);
+        return Promise.reject(refreshError);
+      }
     }
 
     return Promise.reject(error);
   }
 );
-
-// Helper function to handle authentication failure
-const handleAuthFailure = () => {
-  // Clear tokens
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("userData");
-  
-  // Remove cookies if using js-cookie
-  if (typeof window !== 'undefined' && window.Cookies) {
-    window.Cookies.remove('refreshToken');
-  }
-  
-  // Redirect to login page (you might want to use your router here)
-  if (typeof window !== 'undefined') {
-    window.location.href = '/login';
-  }
-};
 
 export default api;

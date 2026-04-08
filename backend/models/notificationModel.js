@@ -1,3 +1,4 @@
+// models/notification.js (Mongoose model)
 import mongoose from 'mongoose';
 
 const notificationSchema = new mongoose.Schema({
@@ -6,27 +7,47 @@ const notificationSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-  isNew: {
-    type: Boolean,
-    default: true
-  },
   type: {
     type: String,
-    enum: ['info', 'warning', 'success', 'error'],
+    enum: ['info', 'success', 'warning', 'error', 'manufacturer_registration'],
     default: 'info'
   },
-  relatedTo: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Manufacturer',
-    required: false
+  isRead: {
+    type: Boolean,
+    default: false
   },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-    expires: 30 * 24 * 60 * 60 
+  readAt: {
+    type: Date
+  },
+  readBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin'
+  },
+  relatedId: {
+    type: mongoose.Schema.Types.ObjectId,
+    refPath: 'relatedModel'
+  },
+  relatedModel: {
+    type: String,
+    enum: ['Manufacturer', 'User', 'Order']
+  },
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high'],
+    default: 'medium'
+  },
+  metadata: {
+    type: mongoose.Schema.Types.Mixed
   }
+}, {
+  timestamps: true
 });
 
- const Notification = mongoose.model('Notification', notificationSchema);
+// Index for performance
+notificationSchema.index({ createdAt: -1 });
+notificationSchema.index({ isRead: 1 });
+notificationSchema.index({ type: 1 });
 
- export default Notification;
+const Notification = mongoose.model('Notification', notificationSchema);
+
+export default Notification;

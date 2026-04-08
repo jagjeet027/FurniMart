@@ -1,4 +1,3 @@
-// routes/payment.js
 import express from 'express';
 import { createOrder, verifyPayment, getPaymentDetails } from '../controllers/paymentController.js';
 

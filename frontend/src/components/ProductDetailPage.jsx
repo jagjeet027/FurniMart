@@ -11,13 +11,18 @@ import {
   Tag,
   Award,
   ArrowLeft,
-  Loader2
+  Loader2,
+  X,
+  MessageCircle
 } from 'lucide-react';
 import api from '../axios/axiosInstance';
+import { useAuth } from '../contexts/AuthContext';
+import ChatModal from '../components/userDashBoard/UserChatModal'; // Import your ChatModal component
 
 const ProductDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth(); // Get user info from auth context
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [activeTab, setActiveTab] = useState('details');
   const [quantity, setQuantity] = useState(20);
@@ -26,6 +31,33 @@ const ProductDetailPage = () => {
   const [similarProducts, setSimilarProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isInWishlist, setIsInWishlist] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  
+  // Chat Modal State
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  // Listen for wishlist updates from other components
+  useEffect(() => {
+    const handleWishlistUpdate = (event) => {
+      if (selectedProduct && event.detail) {
+        // Direct update if this is the product being modified
+        if (event.detail.productId === selectedProduct._id) {
+          setIsInWishlist(event.detail.inWishlist);
+        } else {
+          // Otherwise check status
+          checkWishlistStatus(selectedProduct._id);
+        }
+      }
+    };
+
+    window.addEventListener('wishlistUpdated', handleWishlistUpdate);
+    
+    return () => {
+      window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
+    };
+  }, [selectedProduct]);
 
   useEffect(() => {
     const fetchProductData = async () => {
@@ -36,6 +68,11 @@ const ProductDetailPage = () => {
         
         setSelectedProduct(productData);
         setSelectedSize(productData.sizes ? productData.sizes[0] : null);
+        
+        // Check if product is in wishlist
+        setTimeout(() => {
+          checkWishlistStatus(productData._id);
+        }, 100);
         
         // Fetch similar products
         if (productData.category) {
@@ -64,12 +101,84 @@ const ProductDetailPage = () => {
     }
   }, [id]);
 
+  // Check if product is in wishlist
+  const checkWishlistStatus = (productId) => {
+    try {
+      const storedWishlist = localStorage.getItem('wishlist');
+      if (storedWishlist) {
+        const wishlistItems = JSON.parse(storedWishlist);
+        const exists = wishlistItems.some(item => item._id === productId);
+        setIsInWishlist(exists);
+        return exists;
+      } else {
+        setIsInWishlist(false);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error checking wishlist status:', error);
+      setIsInWishlist(false);
+      return false;
+    }
+  };
+
+  const toggleWishlist = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      let wishlistItems = [];
+      const storedWishlist = localStorage.getItem('wishlist');
+      
+      if (storedWishlist) {
+        wishlistItems = JSON.parse(storedWishlist);
+      }
+
+      const currentlyInWishlist = wishlistItems.some(item => item._id === selectedProduct._id);
+
+      if (currentlyInWishlist) {
+        wishlistItems = wishlistItems.filter(item => item._id !== selectedProduct._id);
+        setToastMessage(`${selectedProduct.name} removed from your wishlist`);
+        setIsInWishlist(false);
+      } else {
+        wishlistItems.push({
+          _id: selectedProduct._id,
+          name: selectedProduct.name,
+          price: selectedProduct.price,
+          rating: selectedProduct.rating,
+          reviews: selectedProduct.reviews,
+          image: selectedProduct.image,
+          images: selectedProduct.images
+        });
+        setToastMessage(`${selectedProduct.name} added to your wishlist`);
+        setIsInWishlist(true);
+      }
+
+      localStorage.setItem('wishlist', JSON.stringify(wishlistItems));
+      setShowToast(true);
+      
+      window.dispatchEvent(new CustomEvent('wishlistUpdated', { 
+        detail: { 
+          productId: selectedProduct._id,
+          inWishlist: !currentlyInWishlist 
+        } 
+      }));
+      
+      setTimeout(() => {
+        setShowToast(false);
+      }, 3000);
+    } catch (error) {
+      console.error('Error updating wishlist:', error);
+    }
+  };
+
   const handleSimilarProductClick = (productId) => {
     navigate(`/products/${productId}`);
+    window.location.reload();
   };
 
   const handleBuyNow = () => {
-    // Navigate to checkout page with the selected product details
     navigate('/checkout', {
       state: {
         product: selectedProduct,
@@ -79,17 +188,36 @@ const ProductDetailPage = () => {
     });
   };
 
-
-  const handleQuantity = (type) => {
-    if (type === 'increase') {
-      setQuantity(prev => prev + 1);
-    } else if (type === 'decrease' && quantity > 20) {
-      setQuantity(prev => prev - 1);
-    } else {
-      alert('Order minimum is 20 products');
-      setQuantity(20);
+  const handleChatWithManufacturer = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
     }
+    
+    console.log('Opening chat for product:', selectedProduct);
+    setIsChatOpen(true);
   };
+
+  // Get user info for chat
+  const getUserInfo = () => {
+    if (user) {
+      return {
+        id: user._id || user.id,
+        name: user.name || user.username || 'User',
+        email: user.email || 'user@example.com',
+        type: user.type || user.role || 'wholeseller'
+      };
+    }
+    
+    // Fallback for demo/testing
+    return {
+      id: '64a7b8c9d1e2f3a4b5c6d7e8', // Valid ObjectId format
+      name: 'Demo User',
+      email: 'demo@example.com',
+      type: 'wholeseller'
+    };
+  };
+
   const renderRatingStars = (rating) => {
     return [...Array(5)].map((_, index) => (
       <Star 
@@ -133,6 +261,19 @@ const ProductDetailPage = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen py-8 px-4">
+      {/* Toast Notification */}
+      {showToast && (
+        <div className="fixed top-20 right-4 z-50 bg-white shadow-lg rounded-lg px-4 py-3 flex items-center">
+          <span className="text-gray-800">{toastMessage}</span>
+          <button 
+            onClick={() => setShowToast(false)}
+            className="ml-3 text-gray-500 hover:text-gray-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div className="container mx-auto grid lg:grid-cols-2 gap-6">
         {/* Left Side: Image Gallery */}
         <div className="space-y-4">
@@ -144,8 +285,13 @@ const ProductDetailPage = () => {
             />
             
             <div className="absolute top-4 right-4 flex space-x-2">
-              <button className="bg-white/80 p-2 rounded-full shadow-md hover:bg-white">
-                <Heart className="h-4 w-4 text-red-500" />
+              <button 
+                onClick={toggleWishlist}
+                className="bg-white/80 p-2 rounded-full shadow-md hover:bg-white"
+              >
+                <Heart 
+                  className={`h-4 w-4 ${isInWishlist ? 'text-red-500 fill-current' : 'text-red-500'}`} 
+                />
               </button>
               <button className="bg-white/80 p-2 rounded-full shadow-md hover:bg-white">
                 <Repeat className="h-4 w-4 text-blue-500" />
@@ -183,11 +329,15 @@ const ProductDetailPage = () => {
                 <Check className="mr-1 h-4 w-4" /> In Stock
               </span>
             </div>
+            {/* Manufacturer Info */}
+            <div className="mt-2 text-sm text-gray-600">
+              <span className="font-medium">Manufacturer:</span> {selectedProduct.manufacturer}
+            </div>
           </div>
 
           <div>
             <div className="flex items-center flex-wrap">
-              <span className="text-3xl font-bold text-blue-600 mr-2">${selectedProduct.price}</span>
+              <span className="text-3xl font-bold text-blue-600 mr-2">{selectedProduct.price}</span>
               {selectedProduct.discount && (
                 <>
                   <span className="line-through text-gray-500 mr-2">
@@ -234,7 +384,7 @@ const ProductDetailPage = () => {
             <span className="mr-4 text-sm">Quantity:</span>
             <div className="flex items-center border rounded-lg text-sm">
               <button 
-                onClick={handleQuantity}
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
                 className="px-2 py-1 border-r"
               >
                 -
@@ -250,15 +400,18 @@ const ProductDetailPage = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-4">
-            <button className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center text-sm">
-              <ShoppingCart className="mr-2 h-4 w-4" /> Chat with Manufacturer
-            </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <button 
               className="bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 flex items-center justify-center text-sm"
               onClick={handleBuyNow}
             >
               Buy Now
+            </button>
+            <button 
+              className="bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center text-sm"
+              onClick={handleChatWithManufacturer}
+            >
+              <MessageCircle className="mr-2 h-4 w-4" /> Chat
             </button>
           </div>
 
@@ -314,6 +467,14 @@ const ProductDetailPage = () => {
           </div>
         </div>
       )}
+
+      {/* Chat Modal */}
+      <ChatModal
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        product={selectedProduct} // Pass the actual product data
+        userInfo={getUserInfo()} // Pass real user info
+      />
     </div>
   );
 };
